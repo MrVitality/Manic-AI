@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(xcopy:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx next build)",
+      "Bash(node_modules.binnext:*)",
+      "Bash(ls:*)",
+      "Bash(cmd /c \"cd C:\\\\Users\\\\mark_\\\\Desktop\\\\Manic-AI\\\\frontend && dir node_modules\\\\.bin\\\\next*\")",
+      "Bash(cmd /c \"cd C:\\\\Users\\\\mark_\\\\Desktop\\\\Manic-AI\\\\frontend && npm run build\")",
+      "Bash(powershell -Command \"Set-Location 'C:\\\\Users\\\\mark_\\\\Desktop\\\\Manic-AI\\\\frontend'; npm run build 2>&1\":*)",
+      "Bash(powershell -Command:*)"
+    ]
+  }
+}

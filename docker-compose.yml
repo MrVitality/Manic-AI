@@ -1,0 +1,405 @@
+name: manic-ai
+
+services:
+  # ===========================================================================
+  # Core AI Services
+  # ===========================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+    networks:
+      - ai-network
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:6333:6333"
+      - "${BIND_IP}:6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    networks:
+      - ai-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-redis
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:6380:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - ai-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================================================
+  # Supabase Stack
+  # ===========================================================================
+  supabase-db:
+    image: supabase/postgres:15.1.1.78
+    container_name: ai-supabase-db
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:5433:5432"
+    volumes:
+      - supabase-db-data:/var/lib/postgresql/data
+      - ./supabase/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    env_file:
+      - .env
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - listen_addresses=*
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    networks:
+      - ai-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  supabase-auth:
+    image: supabase/gotrue:v2.143.0
+    container_name: ai-supabase-auth
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - ai-network
+
+  supabase-rest:
+    image: postgrest/postgrest:v12.0.1
+    container_name: ai-supabase-rest
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - ai-network
+
+  supabase-meta:
+    image: supabase/postgres-meta:v0.80.0
+    container_name: ai-supabase-meta
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      PG_META_PORT: "8080"
+      PG_META_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/postgres
+    networks:
+      - ai-network
+
+  supabase-storage:
+    image: supabase/storage-api:v0.46.4
+    container_name: ai-supabase-storage
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - supabase-storage-data:/var/lib/storage
+    networks:
+      - ai-network
+
+  supabase-kong:
+    image: kong:2.8.1
+    container_name: ai-supabase-kong
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:8001:8000"
+      - "${BIND_IP}:8444:8443"
+    env_file:
+      - .env
+    volumes:
+      - ./supabase/kong.yml:/var/lib/kong/kong.yml:ro
+    networks:
+      - ai-network
+
+  supabase-studio:
+    image: supabase/studio:20240101-8e4a094
+    container_name: ai-supabase-studio
+    restart: unless-stopped
+    depends_on:
+      - supabase-meta
+    env_file:
+      - .env
+    networks:
+      - ai-network
+
+  studio-auth:
+    image: nginx:alpine
+    container_name: ai-studio-auth
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:3005:80"
+    volumes:
+      - ./supabase/studio-nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./supabase/.htpasswd:/etc/nginx/.htpasswd:ro
+    depends_on:
+      - supabase-studio
+    networks:
+      - ai-network
+
+  # ===========================================================================
+  # Workflow & Automation
+  # ===========================================================================
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: ai-n8n
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:5679:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    environment:
+      - N8N_PORT=5678
+      - N8N_RUNNERS_DISABLED=true
+      - N8N_SECURE_COOKIE=false
+      - GENERIC_TIMEZONE=UTC
+      - N8N_HOST=${BIND_IP}
+      - WEBHOOK_URL=http://${BIND_IP}:5679/
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - N8N_TEMPLATES_ENABLED=false
+      # Authentication
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-ManicAI2024!}
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - ai-network
+
+  # ===========================================================================
+  # Chat & Search UIs
+  # ===========================================================================
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.8.3
+    container_name: ai-open-webui
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:3006:8080"
+    volumes:
+      - open-webui-data:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_AUTH=true
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    networks:
+      - ai-network
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: ai-searxng
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:8889:8080"
+    volumes:
+      - ./searxng:/etc/searxng
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - ai-network
+
+  # ===========================================================================
+  # Observability & LLM Tools
+  # ===========================================================================
+  langfuse-db:
+    image: postgres:15-alpine
+    container_name: ai-langfuse-db
+    restart: unless-stopped
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=langfuse
+      - POSTGRES_PASSWORD=${LANGFUSE_DB_PASSWORD}
+      - POSTGRES_DB=langfuse
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - ai-network
+
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: ai-langfuse
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:3007:3000"
+    depends_on:
+      - langfuse-db
+    environment:
+      - DATABASE_URL=postgresql://langfuse:${LANGFUSE_DB_PASSWORD}@langfuse-db:5432/langfuse
+      - NEXTAUTH_SECRET=${LANGFUSE_SECRET}
+      - NEXTAUTH_URL=http://${BIND_IP}:3007
+      - SALT=${LANGFUSE_SALT}
+      - TELEMETRY_ENABLED=false
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - ai-network
+
+  flowise:
+    image: flowiseai/flowise:latest
+    container_name: ai-flowise
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:3008:3000"
+    volumes:
+      - flowise-data:/root/.flowise
+    environment:
+      - FLOWISE_USERNAME=admin
+      - FLOWISE_PASSWORD=${FLOWISE_PASSWORD}
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - ai-network
+
+  # ===========================================================================
+  # Manic AI - Unified API
+  # ===========================================================================
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: manic-ai-api
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:8081:8081"
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      CHAT_MODEL: ${CHAT_MODEL:-llama3.2:3b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      VECTOR_DIMENSION: ${VECTOR_DIMENSION:-768}
+      SUPABASE_DB_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://ai-redis:6379
+      QDRANT_URL: http://qdrant:6333
+      SEARXNG_URL: http://ai-searxng:8080
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      RAG_THRESHOLD: ${RAG_THRESHOLD:-0.7}
+      RAG_KEYWORD_WEIGHT: ${RAG_KEYWORD_WEIGHT:-0.3}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: http://langfuse:3000
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - ai-network
+
+  # ===========================================================================
+  # Manic AI - Frontend
+  # ===========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: manic-ai-frontend
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://${BIND_IP}:8081
+      - NEXT_PUBLIC_OLLAMA_URL=http://${BIND_IP}:11434
+      - NEXT_PUBLIC_SUPABASE_URL=http://${BIND_IP}:8001
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY}
+    depends_on:
+      - api
+      - ollama
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - ai-network
+
+networks:
+  ai-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
+  qdrant-data:
+  redis-data:
+  supabase-db-data:
+  supabase-storage-data:
+  n8n-data:
+  open-webui-data:
+  langfuse-db-data:
+  flowise-data:

@@ -1,0 +1,64 @@
+# =============================================================================
+# AI Agent Frontend - Docker Compose Service
+# =============================================================================
+# Add this service to your main docker-compose.yaml
+# 
+# This integrates with the existing AI stack:
+# - Ollama for LLM inference
+# - Supabase for optional auth/storage
+# - Caddy for reverse proxy
+# =============================================================================
+
+services:
+  # =========================================================================
+  # AI Chat Frontend
+  # =========================================================================
+  ai-frontend:
+    build:
+      context: ./ai-frontend
+      dockerfile: Dockerfile
+    container_name: ai-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=https://ollama.${DOMAIN}
+      - NEXT_PUBLIC_SUPABASE_URL=https://supabase.${DOMAIN}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    networks:
+      - frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ai-frontend.rule=Host(`chat.${DOMAIN}`)"
+      - "traefik.http.routers.ai-frontend.entrypoints=websecure"
+      - "traefik.http.routers.ai-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.ai-frontend.loadbalancer.server.port=3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+# =============================================================================
+# Alternative: Using Caddy instead of Traefik
+# =============================================================================
+# Add to your Caddyfile:
+#
+# chat.{$DOMAIN} {
+#     reverse_proxy ai-frontend:3000
+# }
+#
+# =============================================================================
+
+# =============================================================================
+# Network Configuration (if not already defined)
+# =============================================================================
+networks:
+  frontend:
+    external: true
