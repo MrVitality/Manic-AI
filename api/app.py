@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +8,7 @@ from api.database import init_pool, close_pool
 from api.http_client import init_client, close_client
 from api.services.embedding import init_redis
 from api.services.langfuse import init_langfuse
+from api.services.health_logger import health_log_loop
 
 # Import all routers
 from api.routers import health, chat, ingest, documents, collections, qdrant, search, analytics, system, models
@@ -20,10 +22,16 @@ async def lifespan(app: FastAPI):
     await init_redis()
     init_langfuse()
     await _run_ddl()
+    health_task = asyncio.create_task(health_log_loop())
 
     yield  # app runs
 
     # Shutdown
+    health_task.cancel()
+    try:
+        await health_task
+    except asyncio.CancelledError:
+        pass
     await close_pool()
     await close_client()
 
