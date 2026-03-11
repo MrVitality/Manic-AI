@@ -4,8 +4,9 @@
     {
       "name": "Frontend (Next.js)",
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
-      "runtimeArgs": ["C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js", "--prefix", "C:\\Users\\mark_\\Desktop\\Manic-AI\\.claude\\worktrees\\sleepy-benz\\frontend", "run", "dev"],
-      "port": 3000
+      "runtimeArgs": ["C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js", "--prefix", "C:\\Users\\mark_\\Desktop\\Manic-AI\\.claude\\worktrees\\tender-saha\\frontend", "run", "dev"],
+      "port": 3000,
+      "autoPort": true
     },
     {
       "name": "Backend API (FastAPI)",
