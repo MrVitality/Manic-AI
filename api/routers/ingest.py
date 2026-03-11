@@ -1,12 +1,12 @@
 import asyncio
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.config import EMBEDDING_MODEL, VECTOR_DIMENSION
 from api.database import get_db_optional
@@ -40,9 +40,9 @@ class IngestRequest(BaseModel):
     user_id: Optional[str] = None
     collection_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = {}
-    chunk_size: Optional[int] = 500
-    chunk_overlap: Optional[int] = 50
-    backend: Optional[str] = "both"  # "supabase", "qdrant", or "both"
+    chunk_size: int = Field(default=500, ge=1, le=10000)
+    chunk_overlap: int = Field(default=50, ge=0)
+    backend: Literal["supabase", "qdrant", "both"] = "both"
 
 
 class IngestResponse(BaseModel):
@@ -85,52 +85,57 @@ async def ingest_document(
 
         # Generate embeddings for all chunks in parallel (key performance improvement)
         chunk_embeddings = await asyncio.gather(
-            *[generate_embedding(chunk["content"], client=client) for chunk in chunks]
+            *[generate_embedding(chunk["content"], client=client) for chunk in chunks],
+            return_exceptions=True,
         )
+        failed = [e for e in chunk_embeddings if isinstance(e, BaseException)]
+        if failed:
+            raise RuntimeError(f"Embedding generation failed for {len(failed)} chunk(s): {failed[0]}")
 
         # Ingest to Supabase
         if backend in ["supabase", "both"] and db:
             async with db.acquire() as conn:
-                await conn.execute(
-                    """
-                    INSERT INTO rag.documents (id, user_id, filename, content_type, file_size, status, chunk_count, metadata)
-                    VALUES ($1, $2, $3, $4, $5, 'processing', $6, $7)
-                    """,
-                    document_id,
-                    request.user_id,
-                    request.filename,
-                    request.content_type,
-                    len(request.content),
-                    len(chunks),
-                    json.dumps(request.metadata),
-                )
-                if request.collection_id:
+                async with conn.transaction():
                     await conn.execute(
                         """
-                        INSERT INTO rag.document_collections (document_id, collection_id)
-                        VALUES ($1, $2) ON CONFLICT DO NOTHING
+                        INSERT INTO rag.documents (id, user_id, filename, content_type, file_size, status, chunk_count, metadata)
+                        VALUES ($1, $2, $3, $4, $5, 'processing', $6, $7)
                         """,
                         document_id,
-                        request.collection_id,
+                        request.user_id,
+                        request.filename,
+                        request.content_type,
+                        len(request.content),
+                        len(chunks),
+                        json.dumps(request.metadata),
                     )
-                for i, chunk in enumerate(chunks):
-                    embedding_str = "[" + ",".join(str(x) for x in chunk_embeddings[i]) + "]"
+                    if request.collection_id:
+                        await conn.execute(
+                            """
+                            INSERT INTO rag.document_collections (document_id, collection_id)
+                            VALUES ($1, $2) ON CONFLICT DO NOTHING
+                            """,
+                            document_id,
+                            request.collection_id,
+                        )
+                    for i, chunk in enumerate(chunks):
+                        embedding_str = "[" + ",".join(str(x) for x in chunk_embeddings[i]) + "]"
+                        await conn.execute(
+                            """
+                            INSERT INTO rag.chunks (document_id, chunk_index, content, content_tokens, embedding, metadata)
+                            VALUES ($1, $2, $3, $4, $5::vector, $6)
+                            """,
+                            document_id,
+                            chunk["index"],
+                            chunk["content"],
+                            len(chunk["content"]) // 4,
+                            embedding_str,
+                            json.dumps({"start": chunk["start"], "end": chunk["end"]}),
+                        )
                     await conn.execute(
-                        """
-                        INSERT INTO rag.chunks (document_id, chunk_index, content, content_tokens, embedding, metadata)
-                        VALUES ($1, $2, $3, $4, $5::vector, $6)
-                        """,
+                        "UPDATE rag.documents SET status = 'completed' WHERE id = $1",
                         document_id,
-                        chunk["index"],
-                        chunk["content"],
-                        len(chunk["content"]) // 4,
-                        embedding_str,
-                        json.dumps({"start": chunk["start"], "end": chunk["end"]}),
                     )
-                await conn.execute(
-                    "UPDATE rag.documents SET status = 'completed' WHERE id = $1",
-                    document_id,
-                )
             supabase_success = True
 
         # Ingest to Qdrant
@@ -156,7 +161,6 @@ async def ingest_document(
             qdrant_success = await qdrant_upsert("documents", qdrant_points, client)
 
         # Determine final status
-        status = "completed"
         if backend == "both":
             if supabase_success and qdrant_success:
                 status = "completed"
@@ -164,6 +168,10 @@ async def ingest_document(
                 status = "partial"
             else:
                 status = "failed"
+        elif backend == "qdrant":
+            status = "completed" if qdrant_success else "failed"
+        elif backend == "supabase":
+            status = "completed" if supabase_success else "failed"
 
         return IngestResponse(
             document_id=document_id,
