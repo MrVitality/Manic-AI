@@ -26,8 +26,8 @@ export default function InferenceSettings() {
               onClick={() => updateSettings({ temperature: preset.value })}
               className="p-3 rounded-lg text-center transition-all"
               style={{
-                background: Math.abs(settings.temperature - preset.value) < 0.05 ? 'rgba(59,130,246,0.1)' : 'var(--glass-bg)',
-                border: `1px solid ${Math.abs(settings.temperature - preset.value) < 0.05 ? 'rgba(59,130,246,0.3)' : 'var(--glass-border)'}`,
+                background: Math.abs(settings.temperature - preset.value) < 0.05 ? 'rgba(129,140,248,0.1)' : 'var(--glass-bg)',
+                border: `1px solid ${Math.abs(settings.temperature - preset.value) < 0.05 ? 'rgba(129,140,248,0.3)' : 'var(--glass-border)'}`,
               }}
             >
               <div className="text-sm font-semibold" style={{ color: Math.abs(settings.temperature - preset.value) < 0.05 ? 'var(--accent-blue)' : 'var(--text-primary)' }}>

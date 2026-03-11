@@ -5,11 +5,11 @@ import { useTheme } from '@/hooks/useTheme'
 import GlassPanel from '@/components/ui/GlassPanel'
 
 const ACCENT_COLORS: Array<{ id: string; label: string; color: string }> = [
+  { id: 'indigo', label: 'Indigo', color: '#818cf8' },
+  { id: 'violet', label: 'Violet', color: '#a78bfa' },
   { id: 'blue', label: 'Blue', color: '#3b82f6' },
   { id: 'purple', label: 'Purple', color: '#8b5cf6' },
-  { id: 'cyan', label: 'Cyan', color: '#06b6d4' },
   { id: 'emerald', label: 'Emerald', color: '#10b981' },
-  { id: 'rose', label: 'Rose', color: '#f43f5e' },
 ]
 
 const FONT_SIZES: Array<{ id: string; label: string }> = [
@@ -33,8 +33,8 @@ export default function AppearanceSettings() {
               onClick={() => { if (theme !== 'dark') toggleTheme() }}
               className="flex-1 p-4 rounded-lg transition-all text-center"
               style={{
-                background: theme === 'dark' ? 'rgba(59,130,246,0.1)' : 'var(--glass-bg)',
-                border: `1px solid ${theme === 'dark' ? 'rgba(59,130,246,0.3)' : 'var(--glass-border)'}`,
+                background: theme === 'dark' ? 'rgba(129,140,248,0.1)' : 'var(--glass-bg)',
+                border: `1px solid ${theme === 'dark' ? 'rgba(129,140,248,0.3)' : 'var(--glass-border)'}`,
               }}
             >
               <div className="w-8 h-8 mx-auto mb-2 rounded-lg" style={{ background: '#0a0a0f', border: '1px solid #333' }} />
@@ -44,8 +44,8 @@ export default function AppearanceSettings() {
               onClick={() => { if (theme !== 'light') toggleTheme() }}
               className="flex-1 p-4 rounded-lg transition-all text-center"
               style={{
-                background: theme === 'light' ? 'rgba(59,130,246,0.1)' : 'var(--glass-bg)',
-                border: `1px solid ${theme === 'light' ? 'rgba(59,130,246,0.3)' : 'var(--glass-border)'}`,
+                background: theme === 'light' ? 'rgba(129,140,248,0.1)' : 'var(--glass-bg)',
+                border: `1px solid ${theme === 'light' ? 'rgba(129,140,248,0.3)' : 'var(--glass-border)'}`,
               }}
             >
               <div className="w-8 h-8 mx-auto mb-2 rounded-lg" style={{ background: '#f8f9fc', border: '1px solid #ddd' }} />
@@ -90,8 +90,8 @@ export default function AppearanceSettings() {
                 onClick={() => updateSettings({ fontSize: size.id as any })}
                 className="flex-1 py-2 rounded-lg text-center transition-all"
                 style={{
-                  background: settings.fontSize === size.id ? 'rgba(59,130,246,0.1)' : 'var(--glass-bg)',
-                  border: `1px solid ${settings.fontSize === size.id ? 'rgba(59,130,246,0.3)' : 'var(--glass-border)'}`,
+                  background: settings.fontSize === size.id ? 'rgba(129,140,248,0.1)' : 'var(--glass-bg)',
+                  border: `1px solid ${settings.fontSize === size.id ? 'rgba(129,140,248,0.3)' : 'var(--glass-border)'}`,
                   color: settings.fontSize === size.id ? 'var(--accent-blue)' : 'var(--text-secondary)',
                 }}
               >

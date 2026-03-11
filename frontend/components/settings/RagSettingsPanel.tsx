@@ -52,8 +52,8 @@ export default function RagSettingsPanel() {
                   onClick={() => updateSettings({ ragBackend: backend })}
                   className="py-2 rounded-lg text-xs font-medium transition-all text-center capitalize"
                   style={{
-                    background: settings.ragBackend === backend ? 'rgba(59,130,246,0.1)' : 'var(--glass-bg)',
-                    border: `1px solid ${settings.ragBackend === backend ? 'rgba(59,130,246,0.3)' : 'var(--glass-border)'}`,
+                    background: settings.ragBackend === backend ? 'rgba(129,140,248,0.1)' : 'var(--glass-bg)',
+                    border: `1px solid ${settings.ragBackend === backend ? 'rgba(129,140,248,0.3)' : 'var(--glass-border)'}`,
                     color: settings.ragBackend === backend ? 'var(--accent-blue)' : 'var(--text-secondary)',
                   }}
                 >
