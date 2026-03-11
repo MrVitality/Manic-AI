@@ -129,8 +129,8 @@ async def _unified_search(
 async def search_documents(
     request: SearchRequest,
     client: httpx.AsyncClient = Depends(get_client),
+    db=Depends(get_db_optional),
 ):
-    db = get_db_optional()
     try:
         query_embedding = await generate_embedding(request.query, client=client)
         results = await _unified_search(
@@ -154,9 +154,9 @@ async def search_documents(
 async def search_explain(
     request: SearchExplainRequest,
     client: httpx.AsyncClient = Depends(get_client),
+    db=Depends(get_db_optional),
 ):
     start = time.time()
-    db = get_db_optional()
     query_embedding = await generate_embedding(request.query, client=client)
     backend = request.backend or "supabase"
     top_k = request.top_k or 5
