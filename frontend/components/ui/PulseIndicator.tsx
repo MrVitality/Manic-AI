@@ -31,7 +31,7 @@ export default function PulseIndicator({ status, size = 'md' }: PulseIndicatorPr
         className="relative inline-flex rounded-full w-full h-full"
         style={{
           background: color,
-          boxShadow: `0 0 ${s}px ${color}80`,
+          boxShadow: `0 0 ${Math.floor(s * 0.5)}px ${color}40`,
         }}
       />
     </span>

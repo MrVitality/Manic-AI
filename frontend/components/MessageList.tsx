@@ -47,7 +47,7 @@ function MessageItem({ message, isLast, onRegenerate }: MessageItemProps) {
     <div
       className="px-4 py-6 animate-fade-in border-b border-[var(--border-color)]"
       style={{
-        background: isUser ? 'rgba(0, 240, 255, 0.02)' : 'transparent',
+        background: isUser ? 'rgba(129, 140, 248, 0.03)' : 'transparent',
       }}
     >
       <div className="max-w-3xl mx-auto flex gap-4">

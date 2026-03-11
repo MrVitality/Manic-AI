@@ -228,7 +228,7 @@ export default function CommandPalette() {
                       onMouseEnter={() => setSelectedIndex(idx)}
                       className="w-full flex items-center gap-3 px-4 py-2 text-left transition-colors"
                       style={{
-                        background: isSelected ? 'rgba(59,130,246,0.1)' : 'transparent',
+                        background: isSelected ? 'rgba(129,140,248,0.1)' : 'transparent',
                       }}
                     >
                       <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center">

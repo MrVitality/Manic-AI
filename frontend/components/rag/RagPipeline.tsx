@@ -101,9 +101,9 @@ export default function RagPipeline({ ragStats }: RagPipelineProps) {
                   onClick={() => handleSelectDoc(doc.id)}
                   className="w-full text-left p-2 rounded-lg text-xs transition-colors"
                   style={{
-                    background: selectedDoc === doc.id ? 'rgba(59,130,246,0.1)' : 'transparent',
+                    background: selectedDoc === doc.id ? 'rgba(129,140,248,0.1)' : 'transparent',
                     color: selectedDoc === doc.id ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                    border: selectedDoc === doc.id ? '1px solid rgba(59,130,246,0.2)' : '1px solid transparent',
+                    border: selectedDoc === doc.id ? '1px solid rgba(129,140,248,0.2)' : '1px solid transparent',
                   }}
                 >
                   <div className="font-medium truncate">{doc.filename}</div>

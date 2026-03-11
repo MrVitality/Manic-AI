@@ -43,40 +43,39 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
         {/* Header */}
         <div className="p-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-mono font-bold flex items-center gap-2.5">
-              <span className="text-cyan-400">&gt;_</span>
-              <span className="tracking-wider">MANIC_AI</span>
+            <h1 className="text-base font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              Manic AI
             </h1>
             <div className="flex items-center gap-1">
-              <button onClick={toggleTheme} className="p-1.5 rounded-sm transition-colors hover:bg-cyan-500/10 text-cyan-400" title={`Switch mode`}>
+              <button onClick={toggleTheme} className="p-1.5 rounded-md transition-colors hover:bg-white/5 text-zinc-400 hover:text-zinc-200" title={`Switch mode`}>
                 {theme === 'dark' ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
               </button>
-              <button onClick={onToggle} className="lg:hidden p-1.5 rounded-sm text-cyan-400 hover:bg-cyan-500/10">
+              <button onClick={onToggle} className="lg:hidden p-1.5 rounded-md text-zinc-400 hover:bg-white/5 hover:text-zinc-200">
                 <CloseIcon className="w-4 h-4" />
               </button>
             </div>
           </div>
           <button onClick={handleNewChat} className="w-full btn-primary flex items-center justify-center gap-2 py-2.5">
-            <PlusIcon className="w-4 h-4" /> [NEW_CHAT]
+            <PlusIcon className="w-4 h-4" /> New Chat
           </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="px-3 py-2" style={{ borderBottom: '1px solid var(--border-color)' }}>
-          <div className="flex gap-1">
-            {navItems.map((item) => (
-              <button key={item.view} onClick={() => setActiveView(item.view)}
-                className={`flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-sm text-xs font-mono transition-all uppercase border ${activeView === item.view ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-gray-500 hover:text-gray-400 hover:bg-gray-800'}`}
-                style={{
-                  background: activeView === item.view ? 'rgba(0, 240, 255, 0.05)' : 'transparent',
-                }}
-              >
-                {item.icon}
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Navigation */}
+        <nav className="px-2 py-2 space-y-0.5" style={{ borderBottom: '1px solid var(--border-color)' }}>
+          {navItems.map((item) => (
+            <button key={item.view} onClick={() => setActiveView(item.view)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-left"
+              style={{
+                background: activeView === item.view ? 'rgba(129, 140, 248, 0.1)' : 'transparent',
+                color: activeView === item.view ? 'var(--accent-indigo)' : 'var(--text-secondary)',
+              }}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+              {item.hint && <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>{item.hint}</span>}
+            </button>
+          ))}
+        </nav>
 
         {/* Model Selector (chat view) */}
         {activeView === 'chat' && (
@@ -140,16 +139,21 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
 function ConversationItem({ conversation, isActive, onSelect, onDelete }: { conversation: { id: string; title: string; messages: Array<{ role: string }> }; isActive: boolean; onSelect: () => void; onDelete: () => void }) {
   const [showDelete, setShowDelete] = useState(false)
   return (
-    <div className={`group relative flex items-center gap-2 px-3 py-2 rounded-sm cursor-pointer transition-colors border font-mono`}
-      style={{ background: isActive ? 'rgba(0, 240, 255, 0.05)' : 'transparent', border: isActive ? '1px solid var(--accent-cyan)' : '1px solid transparent', color: isActive ? 'var(--accent-cyan)' : 'var(--text-primary)' }}
+    <div className="group relative flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors"
+      style={{
+        background: isActive ? 'rgba(129, 140, 248, 0.08)' : 'transparent',
+        borderLeft: isActive ? '2px solid var(--accent-indigo)' : '2px solid transparent',
+        paddingLeft: isActive ? 10 : 12,
+        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+      }}
       onClick={onSelect} onMouseEnter={() => setShowDelete(true)} onMouseLeave={() => setShowDelete(false)}>
       <ChatBubbleIcon className="w-4 h-4 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm truncate">{conversation.title}</p>
-        <p className="text-xs opacity-70">[{conversation.messages.length} msgs]</p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{conversation.messages.length} messages</p>
       </div>
       {showDelete && (
-        <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-1 rounded-sm opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 text-red-500">
+        <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 text-red-500">
           <TrashIcon className="w-3.5 h-3.5" />
         </button>
       )}

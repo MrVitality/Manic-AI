@@ -42,7 +42,7 @@ export default function AdvancedSettings() {
             onClick={() => setActiveSection(section.id)}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all text-left"
             style={{
-              background: activeSection === section.id ? 'rgba(59,130,246,0.1)' : 'transparent',
+              background: activeSection === section.id ? 'rgba(129,140,248,0.1)' : 'transparent',
               color: activeSection === section.id ? 'var(--accent-blue)' : 'var(--text-secondary)',
             }}
           >

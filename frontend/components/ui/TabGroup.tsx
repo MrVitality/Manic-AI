@@ -44,8 +44,8 @@ export default function TabGroup({ tabs, activeTab, onChange, size = 'md' }: Tab
         style={{
           left: indicator.left,
           width: indicator.width,
-          background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.2))',
-          border: '1px solid rgba(59,130,246,0.3)',
+          background: 'rgba(129,140,248,0.12)',
+          border: '1px solid rgba(129,140,248,0.25)',
         }}
       />
       {tabs.map((tab) => (
