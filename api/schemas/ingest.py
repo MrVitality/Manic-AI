@@ -1,5 +1,6 @@
 """Ingest / embed request and response schemas."""
 
+from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -42,3 +43,20 @@ class IngestResponse(BaseModel):
     filename: str
     chunks_created: int
     status: str
+
+
+class IngestAccepted(BaseModel):
+    """Returned immediately when an async ingest job is accepted."""
+    document_id: str
+    status: Literal["pending", "processing"] = "processing"
+
+
+class IngestStatusResponse(BaseModel):
+    """Returned by the status-polling endpoint."""
+    document_id: str
+    status: Literal["pending", "processing", "completed", "failed"]
+    filename: Optional[str] = None
+    chunks_created: Optional[int] = None
+    error: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

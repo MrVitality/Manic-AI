@@ -16,9 +16,103 @@ from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.schemas.ingest import IngestRequest, IngestResponse
 from api.services.chunking import chunk_document, chunk_text
 from api.services.embedding import generate_embedding
+from api.services.preprocessor import detect_and_extract
 
 logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# In-memory job tracker (supplement DB tracking for when DB is unavailable)
+# ---------------------------------------------------------------------------
+_job_status: Dict[str, Dict[str, Any]] = {}
+
+
+def _update_job(document_id: str, **fields: Any) -> None:
+    """Update the in-memory job record."""
+    if document_id not in _job_status:
+        _job_status[document_id] = {}
+    _job_status[document_id].update(fields, updated_at=datetime.now(timezone.utc).isoformat())
+
+
+def get_job_status(document_id: str) -> Optional[Dict[str, Any]]:
+    """Return the in-memory status dict for a job, or None."""
+    return _job_status.get(document_id)
+
+
+# ---------------------------------------------------------------------------
+# Database status helpers
+# ---------------------------------------------------------------------------
+
+async def _db_set_status(
+    db: asyncpg.Pool,
+    document_id: str,
+    status: str,
+    *,
+    chunks_created: Optional[int] = None,
+    error: Optional[str] = None,
+) -> None:
+    """Persist ingestion status to the ingest_jobs table."""
+    try:
+        async with db.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE public.ingest_jobs
+                SET status = $2,
+                    chunks_created = COALESCE($3, chunks_created),
+                    error = $4,
+                    updated_at = NOW()
+                WHERE document_id = $1
+                """,
+                document_id,
+                status,
+                chunks_created,
+                error,
+            )
+    except Exception:
+        logger.warning("Failed to update ingest_jobs status for %s", document_id)
+
+
+async def create_ingest_job(
+    db: asyncpg.Pool,
+    document_id: str,
+    filename: str,
+) -> None:
+    """Insert a new pending row in ingest_jobs."""
+    try:
+        async with db.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO public.ingest_jobs (document_id, filename, status)
+                VALUES ($1, $2, 'pending')
+                ON CONFLICT (document_id) DO NOTHING
+                """,
+                document_id,
+                filename,
+            )
+    except Exception:
+        logger.warning("Failed to create ingest_jobs row for %s", document_id)
+
+
+async def fetch_ingest_job(
+    db: asyncpg.Pool,
+    document_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Read a single ingest_jobs row."""
+    try:
+        async with db.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT * FROM public.ingest_jobs WHERE document_id = $1",
+                document_id,
+            )
+            return dict(row) if row else None
+    except Exception:
+        logger.warning("Failed to fetch ingest_jobs row for %s", document_id)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Core pipeline (runs synchronously or as a background task)
+# ---------------------------------------------------------------------------
 
 async def ingest_document(
     request: IngestRequest,
@@ -32,8 +126,11 @@ async def ingest_document(
     supabase_success = False
 
     try:
+        # Preprocess content based on content_type
+        content = detect_and_extract(request.content, request.content_type or "text/plain")
+
         chunks = chunk_document(
-            request.content,
+            content,
             strategy=request.chunking_strategy,
             chunk_size=request.chunk_size,
             chunk_overlap=request.chunk_overlap,
@@ -117,3 +214,41 @@ async def ingest_document(
                 logger.warning("Failed to update document status to 'failed' for %s", document_id)
         logger.exception("Document ingestion failed for %s", request.filename)
         raise
+
+
+# ---------------------------------------------------------------------------
+# Async background wrapper
+# ---------------------------------------------------------------------------
+
+async def run_ingest_background(
+    document_id: str,
+    request: IngestRequest,
+    db: Optional[asyncpg.Pool],
+    client: httpx.AsyncClient,
+) -> None:
+    """Execute the full ingestion pipeline as a background task.
+
+    Updates both in-memory tracker and (if available) the database.
+    """
+    _update_job(document_id, status="processing")
+    if db:
+        await _db_set_status(db, document_id, "processing")
+
+    try:
+        result = await ingest_document(request, db, client)
+        _update_job(
+            document_id,
+            status=result.status,
+            chunks_created=result.chunks_created,
+            filename=result.filename,
+        )
+        if db:
+            await _db_set_status(
+                db, document_id, result.status, chunks_created=result.chunks_created,
+            )
+    except Exception as exc:
+        error_msg = str(exc)
+        _update_job(document_id, status="failed", error=error_msg)
+        if db:
+            await _db_set_status(db, document_id, "failed", error=error_msg)
+        logger.exception("Background ingestion failed for %s", document_id)

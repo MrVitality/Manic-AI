@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.auth import require_api_key
 from api.config import settings
+from api.middleware.metrics import MetricsMiddleware
+from api.middleware.request_id import RequestIdMiddleware
 
 from api.database import init_pool, close_pool
 from api.http_client import init_client, close_client
@@ -71,6 +73,19 @@ async def _run_ddl():
                 checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
         """)
+        # ingest_jobs for async ingestion status tracking
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS public.ingest_jobs (
+                id BIGSERIAL PRIMARY KEY,
+                document_id TEXT UNIQUE NOT NULL,
+                filename TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                chunks_created INT,
+                error TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
 
 
 def create_app() -> FastAPI:
@@ -96,6 +111,11 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # --- Observability middleware ---
+    # Order matters: RequestId runs first (outermost), then Metrics.
+    _app.add_middleware(MetricsMiddleware)
+    _app.add_middleware(RequestIdMiddleware)
 
     # --- API versioning ---
     v1_router = APIRouter(prefix="/v1")
