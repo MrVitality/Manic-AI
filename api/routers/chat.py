@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 from typing import List, Dict, Optional
 
@@ -92,7 +92,7 @@ async def chat(
     client: httpx.AsyncClient = Depends(get_client),
 ):
     db = get_db_optional()
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
     model = request.model or CHAT_MODEL
     user_messages = [m for m in request.messages if m.role == "user"]
     last_user_message = user_messages[-1].content if user_messages else ""
@@ -137,7 +137,7 @@ async def chat(
     response_text = data.get("message", {}).get("content", "")
     prompt_tokens = data.get("prompt_eval_count", 0)
     completion_tokens = data.get("eval_count", 0)
-    latency_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+    latency_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
 
     await _log_chat(db, model, prompt_tokens, completion_tokens, latency_ms, bool(sources))
 
@@ -179,7 +179,7 @@ async def chat_stream(
             yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
 
         try:
-            start = datetime.utcnow()
+            start = datetime.now(timezone.utc)
             prompt_tokens = 0
             completion_tokens = 0
             async with client.stream(
@@ -204,7 +204,7 @@ async def chat_stream(
                         completion_tokens = chunk.get("eval_count", 0)
                         yield f"data: {json.dumps({'type': 'done'})}\n\n"
                         break
-            latency_ms = (datetime.utcnow() - start).total_seconds() * 1000
+            latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
             await _log_chat(db, model, prompt_tokens, completion_tokens, latency_ms, bool(sources))
         except Exception:
             logger.exception("Chat stream failed for model %s", model)

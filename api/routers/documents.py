@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
+from typing import Any, Dict, List, Optional
+import asyncpg
 import json
 import httpx
 
@@ -16,8 +17,8 @@ async def list_documents(
     collection_id: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = Query(default=50, ge=1, le=500),
-    db=Depends(get_db),
-):
+    db: asyncpg.Pool = Depends(get_db),
+) -> List[Dict[str, Any]]:
     async with db.acquire() as conn:
         results = await conn.fetch(
             """
@@ -64,9 +65,9 @@ async def list_documents(
 @router.delete("/documents/{document_id}")
 async def delete_document(
     document_id: str,
-    db=Depends(get_db),
+    db: asyncpg.Pool = Depends(get_db),
     client: httpx.AsyncClient = Depends(get_client),
-):
+) -> Dict[str, str]:
     async with db.acquire() as conn:
         result = await conn.execute(
             "DELETE FROM rag.documents WHERE id = $1", document_id

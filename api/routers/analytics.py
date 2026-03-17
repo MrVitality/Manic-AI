@@ -1,6 +1,7 @@
 import logging
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 
+import asyncpg
 import httpx
 from fastapi import APIRouter, Depends, Query
 
@@ -21,8 +22,8 @@ router = APIRouter()
 async def analytics_usage(
     period: str = Query("day", pattern="^(hour|day|week|month)$"),
     model: Optional[str] = None,
-    db=Depends(get_db_optional),
-):
+    db: Optional[asyncpg.Pool] = Depends(get_db_optional),
+) -> Dict[str, Any]:
     """Token usage aggregated by period, sourced from public.chat_log."""
     if not db:
         return {
@@ -93,8 +94,8 @@ async def analytics_usage(
 @router.get("/analytics/models")
 async def analytics_models(
     client: httpx.AsyncClient = Depends(get_client),
-    db=Depends(get_db_optional),
-):
+    db: Optional[asyncpg.Pool] = Depends(get_db_optional),
+) -> Dict[str, Any]:
     """Per-model usage stats from chat_log merged with installed Ollama models."""
     # Gather real usage stats from the database
     model_stats: Dict[str, Dict] = {}
@@ -152,7 +153,7 @@ async def analytics_models(
 # =============================================================================
 
 @router.get("/analytics/rag")
-async def analytics_rag(db=Depends(get_db_optional)):
+async def analytics_rag(db: Optional[asyncpg.Pool] = Depends(get_db_optional)) -> Dict[str, Any]:
     """RAG pipeline analytics with real document/chunk/collection queries."""
     empty = {
         "documents": {"total": 0, "by_status": {}},
@@ -227,8 +228,8 @@ async def analytics_rag(db=Depends(get_db_optional)):
 async def analytics_services_history(
     service: Optional[str] = None,
     hours: int = Query(24, ge=1, le=168),
-    db=Depends(get_db_optional),
-):
+    db: Optional[asyncpg.Pool] = Depends(get_db_optional),
+) -> Dict[str, Any]:
     """Historical service latency data from public.service_health_log."""
     if not db:
         return {"history": []}

@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
@@ -42,7 +42,7 @@ class IngestRequest(BaseModel):
     content_type: Optional[str] = "text/plain"
     user_id: Optional[str] = None
     collection_id: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = {}
+    metadata: Optional[Dict[str, Any]] = None
     chunk_size: int = Field(default=500, ge=1, le=10000)
     chunk_overlap: int = Field(default=50, ge=0)
     backend: Literal["supabase", "qdrant", "both"] = "both"
@@ -119,7 +119,7 @@ async def ingest_document(
                         request.content_type,
                         len(request.content),
                         len(chunks),
-                        json.dumps(request.metadata),
+                        json.dumps(request.metadata or {}),
                     )
                     if request.collection_id:
                         await conn.execute(
@@ -167,7 +167,7 @@ async def ingest_document(
                         "user_id": request.user_id,
                         "collection_id": request.collection_id,
                         "metadata": request.metadata or {},
-                        "created_at": datetime.utcnow().isoformat(),
+                        "created_at": datetime.now(timezone.utc).isoformat(),
                     },
                 })
             qdrant_success = await qdrant_upsert("documents", qdrant_points, client)

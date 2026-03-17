@@ -1,4 +1,8 @@
+import logging
+
 from api.config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
+
+logger = logging.getLogger(__name__)
 
 langfuse_client = None
 
@@ -13,11 +17,11 @@ def init_langfuse():
                 secret_key=LANGFUSE_SECRET_KEY,
                 host=LANGFUSE_HOST,
             )
-            print("Langfuse tracing enabled")
+            logger.info("Langfuse tracing enabled")
     except ImportError:
         pass
     except Exception as e:
-        print(f"[WARN] Langfuse init failed: {e}")
+        logger.warning("Langfuse init failed: %s", e)
 
 
 def get_langfuse():

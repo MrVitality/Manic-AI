@@ -60,7 +60,7 @@ const defaultSettings: Settings = {
   ragUseHybrid: true,
 }
 
-const generateId = () => Math.random().toString(36).substring(2, 15)
+const generateId = () => crypto.randomUUID()
 
 export const useChatStore = create<ChatState>()(
   persist(

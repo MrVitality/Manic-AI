@@ -33,6 +33,9 @@ interface DashboardState {
 
   lastRefresh: Date | null
   setLastRefresh: (date: Date) => void
+
+  error: string | null
+  setError: (error: string | null) => void
 }
 
 const MAX_HISTORY = 100
@@ -65,4 +68,7 @@ export const useDashboardStore = create<DashboardState>()((set) => ({
 
   lastRefresh: null,
   setLastRefresh: (date) => set({ lastRefresh: date }),
+
+  error: null,
+  setError: (error) => set({ error }),
 }))

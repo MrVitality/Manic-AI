@@ -1,10 +1,13 @@
 """Background health logger — logs service status to public.service_health_log every 60s."""
 import asyncio
+import logging
 from typing import Optional
 
 from api.services.rag import check_service
 from api.config import OLLAMA_URL, QDRANT_URL, SEARXNG_URL, LANGFUSE_HOST
 from api.database import get_db_optional
+
+logger = logging.getLogger(__name__)
 
 
 async def log_services_once(db, client) -> None:
@@ -47,4 +50,4 @@ async def health_log_loop() -> None:
             client = get_client()
             await log_services_once(db, client)
         except Exception as e:
-            print(f"Health log error: {e}")
+            logger.error("Health log error: %s", e)

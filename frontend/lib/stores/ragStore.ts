@@ -41,6 +41,9 @@ interface RagState {
   isLoadingStats: boolean
   setRagStats: (stats: RagStatsData) => void
   setIsLoadingStats: (loading: boolean) => void
+
+  error: string | null
+  setError: (error: string | null) => void
 }
 
 export const useRagStore = create<RagState>()((set) => ({
@@ -84,4 +87,7 @@ export const useRagStore = create<RagState>()((set) => ({
   isLoadingStats: false,
   setRagStats: (stats) => set({ ragStats: stats }),
   setIsLoadingStats: (loading) => set({ isLoadingStats: loading }),
+
+  error: null,
+  setError: (error) => set({ error }),
 }))

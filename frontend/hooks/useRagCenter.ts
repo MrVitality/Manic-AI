@@ -4,7 +4,6 @@ import { useRagStore } from '@/lib/stores/ragStore'
 import {
   fetchRagStats,
   fetchCollections,
-  fetchDocuments,
   fetchDocumentChunks,
   searchExplain,
 } from '@/lib/api'
@@ -13,42 +12,58 @@ import type { SearchConfig } from '@/types'
 export function useRagCenter() {
   const store = useRagStore()
 
+  // Zustand setters are stable references — safe to use without deps
+  const setRagStats = useRagStore((s) => s.setRagStats)
+  const setCollections = useRagStore((s) => s.setCollections)
+  const setSelectedDocumentId = useRagStore((s) => s.setSelectedDocumentId)
+  const setIsLoadingChunks = useRagStore((s) => s.setIsLoadingChunks)
+  const setDocumentChunks = useRagStore((s) => s.setDocumentChunks)
+  const setTotalChunks = useRagStore((s) => s.setTotalChunks)
+  const setIsSearching = useRagStore((s) => s.setIsSearching)
+  const setSearchQuery = useRagStore((s) => s.setSearchQuery)
+  const setSearchResults = useRagStore((s) => s.setSearchResults)
+  const setSearchLatency = useRagStore((s) => s.setSearchLatency)
+  const setError = useRagStore((s) => s.setError)
+
   const refreshStats = useCallback(async () => {
     try {
       const stats = await fetchRagStats()
-      store.setRagStats(stats)
+      setRagStats(stats)
     } catch (e) {
       console.error('Failed to fetch RAG stats:', e)
+      setError('Failed to fetch RAG stats')
     }
-  }, [])
+  }, [setRagStats, setError])
 
   const refreshCollections = useCallback(async () => {
     try {
       const collections = await fetchCollections()
-      store.setCollections(collections)
+      setCollections(collections)
     } catch (e) {
       console.error('Failed to fetch collections:', e)
+      setError('Failed to fetch collections')
     }
-  }, [])
+  }, [setCollections, setError])
 
   const loadChunks = useCallback(async (documentId: string, limit = 50, offset = 0) => {
-    store.setSelectedDocumentId(documentId)
-    store.setIsLoadingChunks(true)
+    setSelectedDocumentId(documentId)
+    setIsLoadingChunks(true)
     try {
       const data = await fetchDocumentChunks(documentId, limit, offset)
-      store.setDocumentChunks(data.chunks)
-      store.setTotalChunks(data.total)
+      setDocumentChunks(data.chunks)
+      setTotalChunks(data.total)
     } catch (e) {
       console.error('Failed to fetch chunks:', e)
+      setError('Failed to fetch document chunks')
     } finally {
-      store.setIsLoadingChunks(false)
+      setIsLoadingChunks(false)
     }
-  }, [])
+  }, [setSelectedDocumentId, setIsLoadingChunks, setDocumentChunks, setTotalChunks, setError])
 
   const performSearch = useCallback(async (query: string, config: SearchConfig) => {
     if (!query.trim()) return
-    store.setIsSearching(true)
-    store.setSearchQuery(query)
+    setIsSearching(true)
+    setSearchQuery(query)
     try {
       const response = await searchExplain({
         query,
@@ -59,15 +74,16 @@ export function useRagCenter() {
         include_vectors: config.includeVectors,
         backend: config.backend,
       })
-      store.setSearchResults(response.results)
-      store.setSearchLatency(response.search_latency_ms)
+      setSearchResults(response.results)
+      setSearchLatency(response.search_latency_ms)
     } catch (e) {
       console.error('Search failed:', e)
-      store.setSearchResults([])
+      setSearchResults([])
+      setError('Search failed')
     } finally {
-      store.setIsSearching(false)
+      setIsSearching(false)
     }
-  }, [])
+  }, [setIsSearching, setSearchQuery, setSearchResults, setSearchLatency, setError])
 
   const refreshAll = useCallback(async () => {
     await Promise.all([refreshStats(), refreshCollections()])
@@ -75,7 +91,7 @@ export function useRagCenter() {
 
   useEffect(() => {
     refreshAll()
-  }, [])
+  }, [refreshAll])
 
   return {
     ...store,

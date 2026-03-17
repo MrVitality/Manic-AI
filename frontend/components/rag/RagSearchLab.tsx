@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import GlassPanel from '@/components/ui/GlassPanel'
 import ScoreBar from '@/components/ui/ScoreBar'
 import Badge from '@/components/ui/Badge'
@@ -37,6 +37,11 @@ export default function RagSearchLab({
       }, 300)
     }
   }, [searchConfig, onSearch])
+
+  // Clean up debounce timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(debounceRef.current)
+  }, [])
 
   const handleConfigChange = useCallback((updates: Partial<SearchConfig>) => {
     onConfigChange(updates)

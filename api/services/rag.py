@@ -1,10 +1,13 @@
 import json
-from datetime import datetime
+import logging
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 import asyncpg
 import httpx
 
 from api.config import OLLAMA_URL, QDRANT_URL
+
+logger = logging.getLogger(__name__)
 
 
 async def vector_search(
@@ -139,7 +142,7 @@ async def qdrant_search(
             for r in response.json().get("result", [])
         ]
     except Exception as e:
-        print(f"[ERROR] Qdrant search: {e}")
+        logger.error("Qdrant search: %s", e)
         return []
 
 
@@ -157,7 +160,7 @@ async def qdrant_upsert(
         response.raise_for_status()
         return True
     except Exception as e:
-        print(f"[ERROR] Qdrant upsert: {e}")
+        logger.error("Qdrant upsert: %s", e)
         return False
 
 
@@ -179,7 +182,7 @@ async def qdrant_delete_by_document(
         response.raise_for_status()
         return True
     except Exception as e:
-        print(f"[ERROR] Qdrant delete: {e}")
+        logger.error("Qdrant delete: %s", e)
         return False
 
 
@@ -199,7 +202,7 @@ async def ensure_qdrant_collection(
         )
         return r.status_code in [200, 201]
     except Exception as e:
-        print(f"[ERROR] Qdrant ensure collection: {e}")
+        logger.error("Qdrant ensure collection: %s", e)
         return False
 
 
@@ -209,9 +212,9 @@ async def check_service(
     timeout: float = 5.0,
 ) -> Dict[str, Any]:
     try:
-        start = datetime.utcnow()
+        start = datetime.now(timezone.utc)
         r = await client.get(url, timeout=timeout)
-        latency = (datetime.utcnow() - start).total_seconds() * 1000
+        latency = (datetime.now(timezone.utc) - start).total_seconds() * 1000
         return {
             "status": "healthy" if r.status_code == 200 else "degraded",
             "latency_ms": round(latency, 1),

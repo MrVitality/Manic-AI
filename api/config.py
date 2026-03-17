@@ -1,7 +1,16 @@
+import logging
 import os
 
+logger = logging.getLogger(__name__)
+
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
-SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL", "postgresql://postgres:postgres@supabase-db:5432/postgres")
+SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL", "")
+
+if "postgres:postgres@" in SUPABASE_DB_URL:
+    logger.warning(
+        "SUPABASE_DB_URL contains default credentials (postgres:postgres). "
+        "Set a strong password before deploying to production."
+    )
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 CHAT_MODEL = os.getenv("CHAT_MODEL", "llama3.2:3b")
 VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", "768"))

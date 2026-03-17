@@ -16,6 +16,17 @@ export function useDashboardData() {
   const settings = useChatStore((s) => s.settings)
   const sseRef = useRef<EventSource | null>(null)
 
+  // Zustand setters are stable references — safe to use without deps
+  const addServiceSnapshot = useDashboardStore((s) => s.addServiceSnapshot)
+  const setIsLoadingAnalytics = useDashboardStore((s) => s.setIsLoadingAnalytics)
+  const setUsageAnalytics = useDashboardStore((s) => s.setUsageAnalytics)
+  const setModelAnalytics = useDashboardStore((s) => s.setModelAnalytics)
+  const setRagAnalytics = useDashboardStore((s) => s.setRagAnalytics)
+  const setSystemInfo = useDashboardStore((s) => s.setSystemInfo)
+  const setLastRefresh = useDashboardStore((s) => s.setLastRefresh)
+  const setIsStreaming = useDashboardStore((s) => s.setIsStreaming)
+  const setError = useDashboardStore((s) => s.setError)
+
   const refreshServices = useCallback(async () => {
     try {
       const data = await fetchServicesStatus()
@@ -23,15 +34,16 @@ export function useDashboardData() {
       for (const [key, svc] of Object.entries(data.services)) {
         snapshot.services[key] = { status: svc.status, latency_ms: svc.latency_ms }
       }
-      store.addServiceSnapshot(snapshot)
+      addServiceSnapshot(snapshot)
       useChatStore.getState().setServiceStatuses(data.services)
     } catch (e) {
       console.error('Failed to refresh services:', e)
+      setError('Failed to refresh services')
     }
-  }, [])
+  }, [addServiceSnapshot, setError])
 
   const refreshAnalytics = useCallback(async () => {
-    store.setIsLoadingAnalytics(true)
+    setIsLoadingAnalytics(true)
     try {
       const [usage, models, rag, sysInfo] = await Promise.allSettled([
         fetchUsageAnalytics('day'),
@@ -39,17 +51,18 @@ export function useDashboardData() {
         fetchRagAnalytics(),
         fetchSystemInfo(),
       ])
-      if (usage.status === 'fulfilled') store.setUsageAnalytics(usage.value)
-      if (models.status === 'fulfilled') store.setModelAnalytics(models.value)
-      if (rag.status === 'fulfilled') store.setRagAnalytics(rag.value)
-      if (sysInfo.status === 'fulfilled') store.setSystemInfo(sysInfo.value)
-      store.setLastRefresh(new Date())
+      if (usage.status === 'fulfilled') setUsageAnalytics(usage.value)
+      if (models.status === 'fulfilled') setModelAnalytics(models.value)
+      if (rag.status === 'fulfilled') setRagAnalytics(rag.value)
+      if (sysInfo.status === 'fulfilled') setSystemInfo(sysInfo.value)
+      setLastRefresh(new Date())
     } catch (e) {
       console.error('Failed to refresh analytics:', e)
+      setError('Failed to refresh analytics')
     } finally {
-      store.setIsLoadingAnalytics(false)
+      setIsLoadingAnalytics(false)
     }
-  }, [])
+  }, [setIsLoadingAnalytics, setUsageAnalytics, setModelAnalytics, setRagAnalytics, setSystemInfo, setLastRefresh, setError])
 
   const refreshAll = useCallback(async () => {
     await Promise.all([refreshServices(), refreshAnalytics()])
@@ -69,15 +82,15 @@ export function useDashboardData() {
             for (const [key, svc] of Object.entries(data.services) as any) {
               snapshot.services[key] = { status: svc.status, latency_ms: svc.latency_ms }
             }
-            store.addServiceSnapshot(snapshot)
+            addServiceSnapshot(snapshot)
             useChatStore.getState().setServiceStatuses(data.services)
-            store.setIsStreaming(true)
+            setIsStreaming(true)
           }
         } catch {}
       }
 
       sse.onerror = () => {
-        store.setIsStreaming(false)
+        setIsStreaming(false)
       }
     } catch {
       // SSE not available, fall back to polling
@@ -89,14 +102,14 @@ export function useDashboardData() {
         sseRef.current = null
       }
     }
-  }, [])
+  }, [addServiceSnapshot, setIsStreaming])
 
   // Polling fallback
   useEffect(() => {
     refreshAll()
     const interval = setInterval(refreshServices, settings.dashboardRefreshRate)
     return () => clearInterval(interval)
-  }, [settings.dashboardRefreshRate])
+  }, [refreshAll, refreshServices, settings.dashboardRefreshRate])
 
   return {
     ...store,

@@ -1,9 +1,12 @@
 import json
+import logging
 from hashlib import sha256
 from typing import List, Optional
 import httpx
 
 from api.config import OLLAMA_URL, EMBEDDING_MODEL, REDIS_URL
+
+logger = logging.getLogger(__name__)
 
 _redis = None
 
@@ -15,9 +18,9 @@ async def init_redis():
         _redis = aioredis.from_url(REDIS_URL)
         # Test connection
         await _redis.ping()
-        print("Redis embedding cache enabled")
+        logger.info("Redis embedding cache enabled")
     except Exception as e:
-        print(f"[WARN] Redis unavailable, embedding cache disabled: {e}")
+        logger.warning("Redis unavailable, embedding cache disabled: %s", e)
         _redis = None
 
 
@@ -35,7 +38,7 @@ async def generate_embedding(
             if cached:
                 return json.loads(cached)
         except Exception as e:
-            print(f"[WARN] Redis get failed: {e}")
+            logger.warning("Redis get failed: %s", e)
 
     own_client = client is None
     if own_client:
@@ -55,6 +58,6 @@ async def generate_embedding(
         try:
             await _redis.setex(cache_key, 3600, json.dumps(embedding))
         except Exception as e:
-            print(f"[WARN] Redis set failed: {e}")
+            logger.warning("Redis set failed: %s", e)
 
     return embedding

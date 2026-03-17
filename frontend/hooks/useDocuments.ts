@@ -20,6 +20,26 @@ export function useDocuments() {
   }, [setDocuments, setIsLoadingDocuments, setError])
 
   const uploadDocument = useCallback(async (file: File) => {
+    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+    const ALLOWED_TEXT_EXTENSIONS = ['.txt', '.md', '.csv', '.json', '.html', '.xml']
+    const ALLOWED_MIME_PREFIXES = ['text/', 'application/json', 'application/xml']
+
+    if (file.size > MAX_FILE_SIZE) {
+      const errMsg = `File too large: ${(file.size / (1024 * 1024)).toFixed(1)}MB exceeds the 10MB limit`
+      setError(errMsg)
+      throw new Error(errMsg)
+    }
+
+    const extension = file.name.includes('.') ? '.' + file.name.split('.').pop()!.toLowerCase() : ''
+    const isAllowedExt = ALLOWED_TEXT_EXTENSIONS.includes(extension)
+    const isAllowedMime = ALLOWED_MIME_PREFIXES.some((prefix) => (file.type || '').startsWith(prefix))
+
+    if (!isAllowedExt && !isAllowedMime) {
+      const errMsg = `Unsupported file type "${extension || file.type || 'unknown'}". Allowed: ${ALLOWED_TEXT_EXTENSIONS.join(', ')}`
+      setError(errMsg)
+      throw new Error(errMsg)
+    }
+
     try {
       const content = await file.text()
       const result = await ingestDocument(content, file.name, file.type || 'text/plain')
@@ -28,7 +48,7 @@ export function useDocuments() {
       return result
     } catch (error) {
       console.error('Failed to upload document:', error)
-      setError('Failed to upload document')
+      setError(error instanceof Error ? error.message : 'Failed to upload document')
       throw error
     }
   }, [loadDocuments, setError])

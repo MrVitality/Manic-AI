@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional
+from typing import Any, Dict, List, Optional
+import asyncpg
 import json
 from uuid import uuid4
 
@@ -9,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/collections")
-async def list_collections(user_id: Optional[str] = None, db=Depends(get_db)):
+async def list_collections(user_id: Optional[str] = None, db: asyncpg.Pool = Depends(get_db)) -> List[Dict[str, Any]]:
     async with db.acquire() as conn:
         results = await conn.fetch(
             """
@@ -51,8 +52,8 @@ async def create_collection(
     description: Optional[str] = None,
     user_id: Optional[str] = None,
     is_public: bool = False,
-    db=Depends(get_db),
-):
+    db: asyncpg.Pool = Depends(get_db),
+) -> Dict[str, str]:
     collection_id = str(uuid4())
     async with db.acquire() as conn:
         await conn.execute(
@@ -70,7 +71,7 @@ async def create_collection(
 
 
 @router.delete("/collections/{collection_id}")
-async def delete_collection(collection_id: str, db=Depends(get_db)):
+async def delete_collection(collection_id: str, db: asyncpg.Pool = Depends(get_db)) -> Dict[str, str]:
     async with db.acquire() as conn:
         result = await conn.execute(
             "DELETE FROM rag.collections WHERE id = $1", collection_id

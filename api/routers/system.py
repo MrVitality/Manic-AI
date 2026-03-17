@@ -1,7 +1,9 @@
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Any, Dict
 
+import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.config import (
@@ -25,7 +27,7 @@ _startup_time = time.time()
 
 
 @router.get("/system/info")
-async def system_info():
+async def system_info() -> Dict[str, Any]:
     """Deployment info and configuration."""
     uptime = time.time() - _startup_time
     db_pool = get_db_optional()
@@ -37,7 +39,7 @@ async def system_info():
     return {
         "version": "2.0.0",
         "uptime_seconds": round(uptime, 1),
-        "start_time": datetime.utcfromtimestamp(_startup_time).isoformat(),
+        "start_time": datetime.fromtimestamp(_startup_time, tz=timezone.utc).isoformat(),
         "config": {
             "chat_model": CHAT_MODEL,
             "embedding_model": EMBEDDING_MODEL,
@@ -55,7 +57,7 @@ async def system_info():
 
 
 @router.post("/system/cache/clear")
-async def clear_cache():
+async def clear_cache() -> Dict[str, Any]:
     """Flush all Redis manic:* keys."""
     keys_removed = 0
     try:
@@ -76,7 +78,7 @@ async def clear_cache():
 
 
 @router.get("/rag/stats")
-async def rag_stats():
+async def rag_stats() -> Dict[str, Any]:
     """Comprehensive RAG system statistics."""
     db_pool = get_db_optional()
     if not db_pool:
@@ -143,8 +145,8 @@ async def get_document_chunks(
     document_id: str,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    db=Depends(get_db),
-):
+    db: asyncpg.Pool = Depends(get_db),
+) -> Dict[str, Any]:
     """Paginated chunk viewer for a document."""
     async with db.acquire() as conn:
         total = await conn.fetchval(

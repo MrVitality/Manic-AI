@@ -1,6 +1,8 @@
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Any, Dict
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 import httpx
@@ -14,12 +16,12 @@ router = APIRouter()
 
 
 @router.get("/health")
-async def health_check(client: httpx.AsyncClient = Depends(get_client)):
+async def health_check(client: httpx.AsyncClient = Depends(get_client)) -> Dict[str, Any]:
     db_pool = get_db_optional()
     ollama = await check_service(f"{OLLAMA_URL}/api/tags", client)
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "services": {
             "database": "connected" if db_pool else "disconnected",
             "ollama": ollama["status"],
@@ -43,16 +45,16 @@ async def _get_all_services(client: httpx.AsyncClient) -> dict:
     db_status = {"status": "offline", "latency_ms": None}
     if db_pool:
         try:
-            start = datetime.utcnow()
+            start = datetime.now(timezone.utc)
             async with db_pool.acquire() as conn:
                 await conn.fetchval("SELECT 1")
-            latency = (datetime.utcnow() - start).total_seconds() * 1000
+            latency = (datetime.now(timezone.utc) - start).total_seconds() * 1000
             db_status = {"status": "healthy", "latency_ms": round(latency, 1)}
         except Exception:
             db_status = {"status": "offline", "latency_ms": None}
 
     return {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "services": {
             "ollama": {"name": "Ollama", "url": OLLAMA_URL, **ollama},
             "database": {"name": "PostgreSQL", "url": "supabase-db:5432", **db_status},
@@ -64,20 +66,23 @@ async def _get_all_services(client: httpx.AsyncClient) -> dict:
 
 
 @router.get("/services/status")
-async def services_status(client: httpx.AsyncClient = Depends(get_client)):
+async def services_status(client: httpx.AsyncClient = Depends(get_client)) -> Dict[str, Any]:
     return await _get_all_services(client)
 
 
 @router.get("/services/status/stream")
-async def services_status_stream(client: httpx.AsyncClient = Depends(get_client)):
+async def services_status_stream(client: httpx.AsyncClient = Depends(get_client)) -> StreamingResponse:
     async def event_generator():
-        while True:
-            try:
-                data = await _get_all_services(client)
-                yield f"data: {json.dumps(data)}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            await asyncio.sleep(10)
+        try:
+            while True:
+                try:
+                    data = await _get_all_services(client)
+                    yield f"data: {json.dumps(data)}\n\n"
+                except Exception as e:
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            return
 
     return StreamingResponse(
         event_generator(),
