@@ -7,9 +7,10 @@ Creates collections for RAG document storage
 import requests
 import json
 import sys
+import os
 
 # Configuration
-QDRANT_URL = "http://100.111.244.124:6333"
+QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 VECTOR_DIMENSION = 768  # nomic-embed-text dimension
 
 # Collection configurations
@@ -183,7 +184,7 @@ def setup_collections():
     print("Qdrant setup complete!")
     print("=" * 60)
     print()
-    print("Dashboard: http://100.111.244.124:6333/dashboard")
+    print(f"Dashboard: {QDRANT_URL}/dashboard")
     print()
 
 

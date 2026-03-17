@@ -63,13 +63,16 @@ services:
     plugins:
       - name: cors
 
+# SECURITY: These JWT keys MUST be regenerated per deployment.
+# Set ANON_KEY and SERVICE_ROLE_KEY in your .env file.
+# Generate new keys at: https://supabase.com/docs/guides/self-hosting#api-keys
 consumers:
   - username: anon
     keyauth_credentials:
-      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY5MTQ0NDAwLCJleHAiOjE5MjY5MTA4MDB9.Uaa5wgZ5-5lBoQPsPhe7nzJITm1ikepeIWEgg8sf6oA
+      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY5MTQ0NDAwLCJleHAiOjE5MjY5MTA4MDB9.Uaa5wgZ5-5lBoQPsPhe7nzJITm1ikepeIWEgg8sf6oA  # REGENERATE: must match ANON_KEY in .env
   - username: service_role
     keyauth_credentials:
-      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjkxNDQ0MDAsImV4cCI6MTkyNjkxMDgwMH0.YUMWUKatT_kzdg4HkinJSSzbo1jtVT7SBd0tZ3wNGRg
+      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjkxNDQ0MDAsImV4cCI6MTkyNjkxMDgwMH0.YUMWUKatT_kzdg4HkinJSSzbo1jtVT7SBd0tZ3wNGRg  # REGENERATE: must match SERVICE_ROLE_KEY in .env
 
 plugins:
   - name: cors

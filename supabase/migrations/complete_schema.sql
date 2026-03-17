@@ -1,6 +1,22 @@
 -- =============================================================================
+-- DEPRECATED - DO NOT USE
+-- =============================================================================
+-- This file is superseded by supabase/init.sql which is the single canonical
+-- schema. That file is mounted as the Docker entrypoint init script and
+-- contains ALL tables, functions, triggers, RLS policies, and permissions
+-- consolidated from every schema source in the project.
+--
+-- This file is kept for historical reference only. Any schema changes should
+-- be made in supabase/init.sql.
+--
+-- Canonical source: supabase/init.sql
+-- Deprecated: 2026-03-17
+-- =============================================================================
+--
+-- (Original content follows for reference)
+-- =============================================================================
 -- Manic AI - Complete Database Schema (Single User)
--- Run in Supabase Studio SQL Editor: http://100.111.244.124:3001
+-- Run in Supabase Studio SQL Editor
 -- =============================================================================
 
 -- ========================
