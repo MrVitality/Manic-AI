@@ -61,16 +61,35 @@ const getApiUrl = (): string => {
   return DEFAULT_API_URL
 }
 
+/** Return the versioned API base, e.g. ``http://localhost:8081/v1``. */
+const getApiV1 = (): string => `${getApiUrl()}/v1`
+
+/**
+ * Unwrap the standard API envelope ``{ success, data, error, meta }``.
+ * Throws when ``success`` is false or when the envelope is missing.
+ */
+async function unwrap<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}: ${response.statusText}`)
+  }
+  const envelope = await response.json()
+  if (envelope && typeof envelope.success === 'boolean') {
+    if (!envelope.success) {
+      throw new Error(envelope.error || 'Unknown API error')
+    }
+    return envelope.data as T
+  }
+  // Fallback: response is not wrapped (e.g. streaming endpoints or legacy)
+  return envelope as T
+}
+
 // =============================================================================
 // Models
 // =============================================================================
 
 export async function fetchModels(): Promise<Model[]> {
-  const response = await fetch(`${getApiUrl()}/models`)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch models: ${response.statusText}`)
-  }
-  const data: ModelsResponse = await response.json()
+  const response = await fetch(`${getApiV1()}/models`)
+  const data = await unwrap<ModelsResponse>(response)
   return data.models || []
 }
 
@@ -78,7 +97,7 @@ export async function pullModel(
   modelName: string,
   onProgress?: (progress: PullProgress) => void
 ): Promise<void> {
-  const response = await fetch(`${getApiUrl()}/models/pull`, {
+  const response = await fetch(`${getApiV1()}/models/pull`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: modelName }),
@@ -115,12 +134,10 @@ export async function pullModel(
 }
 
 export async function deleteModel(modelName: string): Promise<void> {
-  const response = await fetch(`${getApiUrl()}/models/${encodeURIComponent(modelName)}`, {
+  const response = await fetch(`${getApiV1()}/models/${encodeURIComponent(modelName)}`, {
     method: 'DELETE',
   })
-  if (!response.ok) {
-    throw new Error(`Failed to delete model: ${response.statusText}`)
-  }
+  await unwrap<unknown>(response)
 }
 
 // =============================================================================
@@ -154,7 +171,7 @@ export async function* streamChat(
     ? [{ role: 'system', content: systemPrompt }, ...messages]
     : messages
 
-  const response = await fetch(`${getApiUrl()}/chat/stream`, {
+  const response = await fetch(`${getApiV1()}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -208,7 +225,7 @@ export async function chat(options: ChatOptions): Promise<{ content: string; sou
     ? [{ role: 'system', content: systemPrompt }, ...messages]
     : messages
 
-  const response = await fetch(`${getApiUrl()}/chat`, {
+  const response = await fetch(`${getApiV1()}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -220,11 +237,7 @@ export async function chat(options: ChatOptions): Promise<{ content: string; sou
     }),
   })
 
-  if (!response.ok) {
-    throw new Error(`Chat request failed: ${response.statusText}`)
-  }
-
-  const data = await response.json()
+  const data = await unwrap<any>(response)
   return {
     content: data.message?.content || '',
     sources: data.sources || [],
@@ -236,9 +249,8 @@ export async function chat(options: ChatOptions): Promise<{ content: string; sou
 // =============================================================================
 
 export async function fetchDocuments(): Promise<DocumentInfo[]> {
-  const response = await fetch(`${getApiUrl()}/documents`)
-  if (!response.ok) throw new Error(`Failed to fetch documents: ${response.statusText}`)
-  return response.json()
+  const response = await fetch(`${getApiV1()}/documents`)
+  return unwrap<DocumentInfo[]>(response)
 }
 
 export async function ingestDocument(
@@ -246,20 +258,19 @@ export async function ingestDocument(
   filename: string,
   contentType: string = 'text/plain'
 ): Promise<{ document_id: string; chunks_created: number }> {
-  const response = await fetch(`${getApiUrl()}/ingest`, {
+  const response = await fetch(`${getApiV1()}/ingest`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content, filename, content_type: contentType }),
   })
-  if (!response.ok) throw new Error(`Failed to ingest document: ${response.statusText}`)
-  return response.json()
+  return unwrap<{ document_id: string; chunks_created: number }>(response)
 }
 
 export async function deleteDocument(documentId: string): Promise<void> {
-  const response = await fetch(`${getApiUrl()}/documents/${documentId}`, {
+  const response = await fetch(`${getApiV1()}/documents/${documentId}`, {
     method: 'DELETE',
   })
-  if (!response.ok) throw new Error(`Failed to delete document: ${response.statusText}`)
+  await unwrap<unknown>(response)
 }
 
 // =============================================================================
@@ -268,8 +279,7 @@ export async function deleteDocument(documentId: string): Promise<void> {
 
 export async function fetchServicesStatus(): Promise<ServicesStatusResponse> {
   const response = await fetch(`${getApiUrl()}/services/status`)
-  if (!response.ok) throw new Error(`Failed to fetch service status: ${response.statusText}`)
-  return response.json()
+  return unwrap<ServicesStatusResponse>(response)
 }
 
 export async function checkHealth(): Promise<boolean> {
@@ -277,7 +287,9 @@ export async function checkHealth(): Promise<boolean> {
     const response = await fetch(`${getApiUrl()}/health`, {
       signal: AbortSignal.timeout(5000),
     })
-    return response.ok
+    if (!response.ok) return false
+    const envelope = await response.json()
+    return envelope?.success === true
   } catch {
     return false
   }
@@ -288,13 +300,12 @@ export async function checkHealth(): Promise<boolean> {
 // =============================================================================
 
 export async function generateEmbedding(text: string, model?: string): Promise<number[]> {
-  const response = await fetch(`${getApiUrl()}/embed`, {
+  const response = await fetch(`${getApiV1()}/embed`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, model }),
   })
-  if (!response.ok) throw new Error(`Failed to generate embedding: ${response.statusText}`)
-  const data = await response.json()
+  const data = await unwrap<{ embedding: number[]; model: string; dimensions: number }>(response)
   return data.embedding
 }
 
@@ -343,21 +354,18 @@ export async function fetchUsageAnalytics(
   if (startDate) params.set('start_date', startDate)
   if (endDate) params.set('end_date', endDate)
   if (model) params.set('model', model)
-  const response = await fetch(`${getApiUrl()}/analytics/usage?${params}`)
-  if (!response.ok) throw new Error(`Failed to fetch usage analytics: ${response.statusText}`)
-  return response.json()
+  const response = await fetch(`${getApiV1()}/analytics/usage?${params}`)
+  return unwrap<UsageAnalyticsData>(response)
 }
 
 export async function fetchModelAnalytics(): Promise<ModelAnalyticsData> {
-  const response = await fetch(`${getApiUrl()}/analytics/models`)
-  if (!response.ok) throw new Error(`Failed to fetch model analytics: ${response.statusText}`)
-  return response.json()
+  const response = await fetch(`${getApiV1()}/analytics/models`)
+  return unwrap<ModelAnalyticsData>(response)
 }
 
 export async function fetchRagAnalytics(): Promise<RagAnalyticsData> {
-  const response = await fetch(`${getApiUrl()}/analytics/rag`)
-  if (!response.ok) throw new Error(`Failed to fetch RAG analytics: ${response.statusText}`)
-  return response.json()
+  const response = await fetch(`${getApiV1()}/analytics/rag`)
+  return unwrap<RagAnalyticsData>(response)
 }
 
 export async function fetchServiceHistory(
@@ -366,9 +374,8 @@ export async function fetchServiceHistory(
 ): Promise<{ history: ServiceHealthSnapshot[] }> {
   const params = new URLSearchParams({ hours: hours.toString() })
   if (service) params.set('service', service)
-  const response = await fetch(`${getApiUrl()}/analytics/services/history?${params}`)
-  if (!response.ok) throw new Error(`Failed to fetch service history: ${response.statusText}`)
-  return response.json()
+  const response = await fetch(`${getApiV1()}/analytics/services/history?${params}`)
+  return unwrap<{ history: ServiceHealthSnapshot[] }>(response)
 }
 
 // =============================================================================
@@ -381,9 +388,8 @@ export async function fetchDocumentChunks(
   offset: number = 0
 ): Promise<{ chunks: ChunkInfo[]; total: number }> {
   const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() })
-  const response = await fetch(`${getApiUrl()}/documents/${documentId}/chunks?${params}`)
-  if (!response.ok) throw new Error(`Failed to fetch chunks: ${response.statusText}`)
-  return response.json()
+  const response = await fetch(`${getApiV1()}/documents/${documentId}/chunks?${params}`)
+  return unwrap<{ chunks: ChunkInfo[]; total: number }>(response)
 }
 
 export async function searchExplain(request: {
@@ -395,25 +401,22 @@ export async function searchExplain(request: {
   include_vectors?: boolean
   backend?: string
 }): Promise<SearchExplainResponse> {
-  const response = await fetch(`${getApiUrl()}/search/explain`, {
+  const response = await fetch(`${getApiV1()}/search/explain`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
   })
-  if (!response.ok) throw new Error(`Search explain failed: ${response.statusText}`)
-  return response.json()
+  return unwrap<SearchExplainResponse>(response)
 }
 
 export async function fetchRagStats(): Promise<RagStatsData> {
-  const response = await fetch(`${getApiUrl()}/rag/stats`)
-  if (!response.ok) throw new Error(`Failed to fetch RAG stats: ${response.statusText}`)
-  return response.json()
+  const response = await fetch(`${getApiV1()}/rag/stats`)
+  return unwrap<RagStatsData>(response)
 }
 
 export async function fetchCollections(): Promise<CollectionInfo[]> {
-  const response = await fetch(`${getApiUrl()}/collections`)
-  if (!response.ok) throw new Error(`Failed to fetch collections: ${response.statusText}`)
-  return response.json()
+  const response = await fetch(`${getApiV1()}/collections`)
+  return unwrap<CollectionInfo[]>(response)
 }
 
 // =============================================================================
@@ -421,15 +424,13 @@ export async function fetchCollections(): Promise<CollectionInfo[]> {
 // =============================================================================
 
 export async function fetchSystemInfo(): Promise<SystemInfo> {
-  const response = await fetch(`${getApiUrl()}/system/info`)
-  if (!response.ok) throw new Error(`Failed to fetch system info: ${response.statusText}`)
-  return response.json()
+  const response = await fetch(`${getApiV1()}/system/info`)
+  return unwrap<SystemInfo>(response)
 }
 
 export async function clearCache(): Promise<{ cleared: boolean; keys_removed: number }> {
-  const response = await fetch(`${getApiUrl()}/system/cache/clear`, { method: 'POST' })
-  if (!response.ok) throw new Error(`Failed to clear cache: ${response.statusText}`)
-  return response.json()
+  const response = await fetch(`${getApiV1()}/system/cache/clear`, { method: 'POST' })
+  return unwrap<{ cleared: boolean; keys_removed: number }>(response)
 }
 
 export function streamServiceStatus(): EventSource {

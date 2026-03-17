@@ -111,6 +111,9 @@ export default function AppearanceSettings() {
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Transitions, counters, and effects</p>
             </div>
             <button
+              role="switch"
+              aria-checked={settings.enableAnimations}
+              aria-label="Enable Animations"
               onClick={() => updateSettings({ enableAnimations: !settings.enableAnimations })}
               className="w-10 h-5 rounded-full transition-colors relative"
               style={{ background: settings.enableAnimations ? 'var(--accent-blue)' : 'var(--bg-tertiary)' }}

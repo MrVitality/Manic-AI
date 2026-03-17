@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useCallback, useRef } from 'react'
 import { useDashboardStore } from '@/lib/stores/dashboardStore'
-import { useChatStore } from '@/lib/store'
+import { uiStoreApi } from '@/lib/store'
+import { useUiStore } from '@/lib/stores/uiStore'
 import {
   fetchServicesStatus,
   fetchUsageAnalytics,
@@ -13,7 +14,7 @@ import {
 
 export function useDashboardData() {
   const store = useDashboardStore()
-  const settings = useChatStore((s) => s.settings)
+  const settings = useUiStore((s) => s.settings)
   const sseRef = useRef<EventSource | null>(null)
 
   // Zustand setters are stable references — safe to use without deps
@@ -35,7 +36,7 @@ export function useDashboardData() {
         snapshot.services[key] = { status: svc.status, latency_ms: svc.latency_ms }
       }
       addServiceSnapshot(snapshot)
-      useChatStore.getState().setServiceStatuses(data.services)
+      uiStoreApi.getState().setServiceStatuses(data.services)
     } catch (e) {
       console.error('Failed to refresh services:', e)
       setError('Failed to refresh services')
@@ -83,7 +84,7 @@ export function useDashboardData() {
               snapshot.services[key] = { status: svc.status, latency_ms: svc.latency_ms }
             }
             addServiceSnapshot(snapshot)
-            useChatStore.getState().setServiceStatuses(data.services)
+            uiStoreApi.getState().setServiceStatuses(data.services)
             setIsStreaming(true)
           }
         } catch {}
@@ -104,12 +105,18 @@ export function useDashboardData() {
     }
   }, [addServiceSnapshot, setIsStreaming])
 
-  // Polling fallback
+  // Polling fallback — only poll services when SSE is not streaming
   useEffect(() => {
-    refreshAll()
-    const interval = setInterval(refreshServices, settings.dashboardRefreshRate)
-    return () => clearInterval(interval)
-  }, [refreshAll, refreshServices, settings.dashboardRefreshRate])
+    // Always fetch analytics on mount (SSE only covers service status)
+    refreshAnalytics()
+
+    // Only poll services if SSE is not actively streaming
+    if (!store.isStreaming) {
+      refreshServices()
+      const interval = setInterval(refreshServices, settings.dashboardRefreshRate)
+      return () => clearInterval(interval)
+    }
+  }, [refreshServices, refreshAnalytics, store.isStreaming, settings.dashboardRefreshRate])
 
   return {
     ...store,

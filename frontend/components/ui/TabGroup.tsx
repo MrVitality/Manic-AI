@@ -36,11 +36,14 @@ export default function TabGroup({ tabs, activeTab, onChange, size = 'md' }: Tab
   return (
     <div
       ref={containerRef}
+      role="tablist"
+      aria-label="Tab navigation"
       className="relative flex gap-1 p-1 rounded-lg"
       style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
     >
       <div
         className="absolute top-1 bottom-1 rounded-md transition-all duration-300 ease-out"
+        aria-hidden="true"
         style={{
           left: indicator.left,
           width: indicator.width,
@@ -52,7 +55,28 @@ export default function TabGroup({ tabs, activeTab, onChange, size = 'md' }: Tab
         <button
           key={tab.key}
           data-tab={tab.key}
+          role="tab"
+          aria-selected={activeTab === tab.key}
+          aria-controls={`tabpanel-${tab.key}`}
+          id={`tab-${tab.key}`}
+          tabIndex={activeTab === tab.key ? 0 : -1}
           onClick={() => onChange(tab.key)}
+          onKeyDown={(e) => {
+            const keys = tabs.map(t => t.key)
+            const currentIndex = keys.indexOf(tab.key)
+            let nextIndex = -1
+            if (e.key === 'ArrowRight') nextIndex = (currentIndex + 1) % keys.length
+            else if (e.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + keys.length) % keys.length
+            else if (e.key === 'Home') nextIndex = 0
+            else if (e.key === 'End') nextIndex = keys.length - 1
+            if (nextIndex >= 0) {
+              e.preventDefault()
+              onChange(keys[nextIndex])
+              const container = containerRef.current
+              const nextEl = container?.querySelector(`[data-tab="${keys[nextIndex]}"]`) as HTMLElement
+              nextEl?.focus()
+            }
+          }}
           className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-md ${textSize} font-medium transition-colors duration-200`}
           style={{
             color: activeTab === tab.key ? 'var(--accent-blue)' : 'var(--text-muted)',

@@ -69,6 +69,9 @@ export default function RagSettingsPanel() {
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Combine vector + keyword search</p>
             </div>
             <button
+              role="switch"
+              aria-checked={settings.ragUseHybrid}
+              aria-label="Hybrid Search"
               onClick={() => updateSettings({ ragUseHybrid: !settings.ragUseHybrid })}
               className="w-10 h-5 rounded-full transition-colors relative"
               style={{ background: settings.ragUseHybrid ? 'var(--accent-blue)' : 'var(--bg-tertiary)' }}

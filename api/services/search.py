@@ -12,6 +12,7 @@ from api.repositories.qdrant_vector import QdrantVectorRepository
 from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.repositories.supabase_vector import SupabaseVectorRepository
 from api.services.embedding import generate_embedding
+from api.services.reranker import rerank_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,11 @@ async def unified_search(
     user_id: Optional[str],
     db: Optional[asyncpg.Pool],
     client: httpx.AsyncClient,
+    rerank: bool = False,
 ) -> List[Dict[str, Any]]:
-    """Run search across the requested backend(s) and deduplicate."""
+    """Run search across the requested backend(s), deduplicate, and optionally rerank."""
+    # When reranking, retrieve more candidates for better selection
+    retrieval_top_k = 20 if rerank else top_k
     results: List[Dict[str, Any]] = []
 
     if backend in ["supabase", "both"] and db:
@@ -36,7 +40,7 @@ async def unified_search(
         if use_hybrid:
             rows = await sb_vector.hybrid_search(
                 query_text, query_embedding,
-                top_k=top_k,
+                top_k=retrieval_top_k,
                 keyword_weight=settings.RAG_KEYWORD_WEIGHT,
                 collection_id=collection_id,
                 user_id=user_id,
@@ -44,7 +48,7 @@ async def unified_search(
         else:
             rows = await sb_vector.vector_search(
                 query_embedding,
-                top_k=top_k,
+                top_k=retrieval_top_k,
                 threshold=threshold,
                 collection_id=collection_id,
                 user_id=user_id,
@@ -63,7 +67,7 @@ async def unified_search(
         qdrant_results = await qdrant.search(
             query_embedding,
             collection_name="documents",
-            top_k=top_k,
+            top_k=retrieval_top_k,
             threshold=threshold,
             filters=filters or None,
         )
@@ -77,7 +81,18 @@ async def unified_search(
             if h not in seen:
                 seen.add(h)
                 unique.append(r)
-        results = unique[:top_k]
+        results = unique
+
+    # Cross-encoder reranking (optional)
+    if rerank and results:
+        results = await rerank_chunks(
+            query=query_text,
+            chunks=results,
+            client=client,
+            top_n=top_k,
+        )
+    else:
+        results = results[:top_k]
 
     return results
 

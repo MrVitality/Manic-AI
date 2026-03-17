@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import type { Message, RagSource } from '@/types'
 
 interface MessageListProps {
@@ -11,17 +12,69 @@ interface MessageListProps {
   onRegenerate?: () => void
 }
 
+/** Estimated height per message for virtualizer */
+const ESTIMATED_MESSAGE_HEIGHT = 150
+
 export default function MessageList({ messages, onRegenerate }: MessageListProps) {
+  const parentRef = useRef<HTMLDivElement>(null)
+
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_MESSAGE_HEIGHT,
+    overscan: 5,
+  })
+
+  // Auto-scroll to bottom when new messages arrive or content streams
+  const lastMessage = messages[messages.length - 1]
+  const shouldAutoScroll = lastMessage?.isStreaming || false
+
+  useEffect(() => {
+    if (shouldAutoScroll && messages.length > 0) {
+      virtualizer.scrollToIndex(messages.length - 1, { align: 'end' })
+    }
+  }, [shouldAutoScroll, messages.length, lastMessage?.content?.length, virtualizer])
+
   return (
-    <div className="py-4">
-      {messages.map((message, index) => (
-        <MessageItem
-          key={message.id}
-          message={message}
-          isLast={index === messages.length - 1}
-          onRegenerate={message.role === 'assistant' && index === messages.length - 1 ? onRegenerate : undefined}
-        />
-      ))}
+    <div
+      ref={parentRef}
+      className="h-full overflow-auto"
+      style={{ contain: 'strict' }}
+    >
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const message = messages[virtualRow.index]
+          const isLast = virtualRow.index === messages.length - 1
+          return (
+            <div
+              key={virtualRow.key}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <MemoizedMessageItem
+                message={message}
+                isLast={isLast}
+                onRegenerate={
+                  message.role === 'assistant' && isLast ? onRegenerate : undefined
+                }
+              />
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -32,16 +85,20 @@ interface MessageItemProps {
   onRegenerate?: () => void
 }
 
-function MessageItem({ message, isLast, onRegenerate }: MessageItemProps) {
+const MemoizedMessageItem = memo(function MessageItem({
+  message,
+  isLast,
+  onRegenerate,
+}: MessageItemProps) {
   const [copied, setCopied] = useState(false)
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(message.content)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }
+  }, [message.content])
 
   return (
     <div
@@ -179,10 +236,20 @@ function MessageItem({ message, isLast, onRegenerate }: MessageItemProps) {
       </div>
     </div>
   )
-}
+}, (prev, next) => {
+  // Custom comparison: re-render only when message content or streaming state changes
+  return (
+    prev.message.id === next.message.id &&
+    prev.message.content === next.message.content &&
+    prev.message.isStreaming === next.message.isStreaming &&
+    prev.message.error === next.message.error &&
+    prev.isLast === next.isLast &&
+    prev.onRegenerate === next.onRegenerate
+  )
+})
 
 // RAG Source Citations Component
-function SourceCitations({ sources }: { sources: RagSource[] }) {
+const SourceCitations = memo(function SourceCitations({ sources }: { sources: RagSource[] }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
@@ -224,7 +291,7 @@ function SourceCitations({ sources }: { sources: RagSource[] }) {
       )}
     </div>
   )
-}
+})
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
@@ -280,4 +347,3 @@ function RefreshIcon({ className }: { className?: string }) {
     </svg>
   )
 }
-

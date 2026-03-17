@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo } from 'react'
-import { useChatStore } from '@/lib/store'
 import DonutChart from '@/components/ui/DonutChart'
 import Sparkline from '@/components/ui/Sparkline'
 import AnimatedCounter from '@/components/ui/AnimatedCounter'

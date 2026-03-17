@@ -26,10 +26,11 @@ class IngestRequest(BaseModel):
     chunk_size: int = Field(default=500, ge=1, le=10000)
     chunk_overlap: int = Field(default=50, ge=0)
     backend: Literal["supabase", "qdrant", "both"] = "both"
+    chunking_strategy: Literal["simple", "semantic"] = "simple"
 
     @model_validator(mode="after")
     def validate_overlap_less_than_size(self):
-        if self.chunk_overlap >= self.chunk_size:
+        if self.chunking_strategy == "simple" and self.chunk_overlap >= self.chunk_size:
             raise ValueError(
                 f"chunk_overlap ({self.chunk_overlap}) must be less than chunk_size ({self.chunk_size})"
             )

@@ -177,6 +177,9 @@ export default function CommandPalette() {
 
       {/* Palette */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         className="relative w-full max-w-lg mx-4 rounded-xl overflow-hidden shadow-2xl animate-palette-enter"
         style={{
           background: 'var(--bg-elevated)',
@@ -187,7 +190,7 @@ export default function CommandPalette() {
       >
         {/* Search Input */}
         <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
-          <SearchIcon className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
+          <SearchIcon className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} aria-hidden="true" />
           <input
             ref={inputRef}
             value={query}
@@ -198,6 +201,12 @@ export default function CommandPalette() {
             style={{ color: 'var(--text-primary)' }}
             autoComplete="off"
             spellCheck={false}
+            role="combobox"
+            aria-expanded={true}
+            aria-controls="command-palette-listbox"
+            aria-activedescendant={filtered[selectedIndex] ? `command-${filtered[selectedIndex].id}` : undefined}
+            aria-autocomplete="list"
+            aria-label="Search commands"
           />
           <kbd
             className="px-1.5 py-0.5 rounded text-[10px] font-mono"
@@ -210,6 +219,9 @@ export default function CommandPalette() {
         {/* Results */}
         <div
           ref={listRef}
+          id="command-palette-listbox"
+          role="listbox"
+          aria-label="Commands"
           className="max-h-80 overflow-y-auto scrollbar-hide py-2"
         >
           {filtered.length === 0 ? (
@@ -233,7 +245,10 @@ export default function CommandPalette() {
                   return (
                     <button
                       key={cmd.id}
+                      id={`command-${cmd.id}`}
                       data-command-item
+                      role="option"
+                      aria-selected={isSelected}
                       onClick={() => executeCommand(cmd)}
                       onMouseEnter={() => setSelectedIndex(idx)}
                       className="w-full flex items-center gap-3 px-4 py-2 text-left transition-colors"

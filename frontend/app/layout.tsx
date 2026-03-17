@@ -14,13 +14,35 @@ export const metadata: Metadata = {
   },
 }
 
+// Inline script to set theme before first paint, avoiding flash
+const themeInitScript = `
+(function() {
+  try {
+    var stored = JSON.parse(localStorage.getItem('manic-ai-storage') || '{}');
+    var theme = stored && stored.state && stored.state.settings && stored.state.settings.theme;
+    if (theme === 'light' || theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', theme);
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  } catch(e) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+`
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" data-theme="dark">
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body suppressHydrationWarning className={`${inter.variable} ${jetbrains.variable} font-sans antialiased`} style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
         <AppShell>{children}</AppShell>
       </body>

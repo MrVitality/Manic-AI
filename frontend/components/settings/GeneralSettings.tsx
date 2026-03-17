@@ -58,6 +58,9 @@ export default function GeneralSettings() {
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Show tokens as they arrive</p>
             </div>
             <button
+              role="switch"
+              aria-checked={settings.streamResponses}
+              aria-label="Stream Responses"
               onClick={() => updateSettings({ streamResponses: !settings.streamResponses })}
               className="w-10 h-5 rounded-full transition-colors relative"
               style={{ background: settings.streamResponses ? 'var(--accent-blue)' : 'var(--bg-tertiary)' }}

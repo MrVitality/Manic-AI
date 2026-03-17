@@ -14,7 +14,7 @@ from api.config import settings
 from api.repositories.qdrant_vector import QdrantVectorRepository
 from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.schemas.ingest import IngestRequest, IngestResponse
-from api.services.chunking import chunk_text
+from api.services.chunking import chunk_document, chunk_text
 from api.services.embedding import generate_embedding
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,12 @@ async def ingest_document(
     supabase_success = False
 
     try:
-        chunks = chunk_text(request.content, request.chunk_size, request.chunk_overlap)
+        chunks = chunk_document(
+            request.content,
+            strategy=request.chunking_strategy,
+            chunk_size=request.chunk_size,
+            chunk_overlap=request.chunk_overlap,
+        )
 
         chunk_embeddings = await asyncio.gather(
             *[generate_embedding(chunk["content"], client=client) for chunk in chunks],
@@ -56,6 +61,7 @@ async def ingest_document(
                 collection_id=request.collection_id,
                 chunks=chunks,
                 chunk_embeddings=chunk_embeddings,
+                raw_content=request.content,
             )
             supabase_success = True
 

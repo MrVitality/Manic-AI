@@ -135,16 +135,17 @@ class SupabaseDocumentRepository:
         collection_id: Optional[str],
         chunks: List[Dict[str, Any]],
         chunk_embeddings: List[List[float]],
+        raw_content: Optional[str] = None,
     ) -> None:
         """Transactionally insert a document and all its chunks."""
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 await conn.execute(
                     """
-                    INSERT INTO rag.documents (id, user_id, filename, content_type, file_size, status, chunk_count, metadata)
-                    VALUES ($1, $2, $3, $4, $5, 'processing', $6, $7)
+                    INSERT INTO rag.documents (id, user_id, filename, content_type, file_size, status, chunk_count, metadata, raw_content)
+                    VALUES ($1, $2, $3, $4, $5, 'processing', $6, $7, $8)
                     """,
-                    document_id, user_id, filename, content_type, file_size, chunk_count, metadata_json,
+                    document_id, user_id, filename, content_type, file_size, chunk_count, metadata_json, raw_content,
                 )
                 if collection_id:
                     await conn.execute(
@@ -156,6 +157,14 @@ class SupabaseDocumentRepository:
                     )
                 for i, chunk in enumerate(chunks):
                     embedding_str = "[" + ",".join(str(x) for x in chunk_embeddings[i]) + "]"
+                    chunk_meta: Dict[str, Any] = {
+                        "start": chunk["start"],
+                        "end": chunk["end"],
+                    }
+                    if "parent_content" in chunk:
+                        chunk_meta["parent_content"] = chunk["parent_content"]
+                    if "header" in chunk:
+                        chunk_meta["header"] = chunk["header"]
                     await conn.execute(
                         """
                         INSERT INTO rag.chunks (document_id, chunk_index, content, content_tokens, embedding, metadata)
@@ -166,7 +175,7 @@ class SupabaseDocumentRepository:
                         chunk["content"],
                         len(chunk["content"]) // 4,
                         embedding_str,
-                        json.dumps({"start": chunk["start"], "end": chunk["end"]}),
+                        json.dumps(chunk_meta),
                     )
                 await conn.execute(
                     "UPDATE rag.documents SET status = 'completed' WHERE id = $1",

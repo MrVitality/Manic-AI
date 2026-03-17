@@ -25,6 +25,7 @@ CREATE TABLE rag.documents (
     error_message TEXT,
     chunk_count INTEGER DEFAULT 0,
     processing_time_ms INTEGER,
+    raw_content TEXT,
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

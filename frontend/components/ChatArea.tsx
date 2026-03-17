@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect } from 'react'
-import { useChatStore } from '@/lib/store'
+import { useChatStore, uiStoreApi } from '@/lib/store'
 import { useChat } from '@/hooks/useChat'
 import MessageList from './MessageList'
 import MessageInput from './MessageInput'
@@ -51,7 +51,7 @@ export default function ChatArea() {
         <div className="mx-4 mb-2 p-3 rounded-sm text-sm flex items-center gap-2 border border-red-500/30 bg-red-500/10 text-red-400 font-mono">
           <ErrorIcon className="w-5 h-5 flex-shrink-0" />
           <span>ERR: {error}</span>
-          <button onClick={() => useChatStore.getState().setError(null)} className="ml-auto hover:text-red-300">
+          <button onClick={() => uiStoreApi.getState().setError(null)} className="ml-auto hover:text-red-300">
             <CloseIcon className="w-4 h-4" />
           </button>
         </div>

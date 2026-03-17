@@ -13,6 +13,7 @@ class SearchRequest(BaseModel):
     collection_id: Optional[str] = None
     user_id: Optional[str] = None
     backend: Literal["supabase", "qdrant", "both"] = "supabase"
+    rerank: Optional[bool] = False
 
 
 class SearchResult(BaseModel):

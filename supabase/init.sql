@@ -373,10 +373,13 @@ CREATE TABLE IF NOT EXISTS rag.documents (
     error_message TEXT,
     chunk_count INTEGER DEFAULT 0,
     processing_time_ms INTEGER,
+    raw_content TEXT,
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+COMMENT ON COLUMN rag.documents.raw_content IS 'Full original document text stored at ingestion time';
 
 CREATE INDEX IF NOT EXISTS idx_rag_documents_user_id ON rag.documents(user_id);
 CREATE INDEX IF NOT EXISTS idx_rag_documents_status ON rag.documents(status);

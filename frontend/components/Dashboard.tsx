@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useDashboardStore } from '@/lib/stores/dashboardStore'
 import { useDashboardData } from '@/hooks/useDashboardData'
-import { useChatStore } from '@/lib/store'
+import { useUiStore } from '@/lib/stores/uiStore'
 import TabGroup from '@/components/ui/TabGroup'
 import DashboardOverview from '@/components/dashboard/DashboardOverview'
 import DashboardServices from '@/components/dashboard/DashboardServices'
@@ -30,7 +30,7 @@ export default function Dashboard() {
     lastRefresh,
     refreshAll,
   } = useDashboardData()
-  const serviceStatuses = useChatStore((s) => s.serviceStatuses)
+  const serviceStatuses = useUiStore((s) => s.serviceStatuses)
 
   const services = Object.entries(serviceStatuses)
   const healthyCount = services.filter(([, s]) => s.status === 'healthy').length

@@ -1,90 +1,74 @@
-from typing import List, Dict, Any, Optional
+"""Qdrant collection management and search routes."""
 
+from fastapi import APIRouter, Depends, HTTPException
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.config import QDRANT_URL
-from api.http_client import get_client
+from api.dependencies import get_http_client, get_qdrant_repo
+from api.repositories.qdrant_vector import QdrantVectorRepository
+from api.schemas.envelope import ok
 from api.services.embedding import generate_embedding
-from api.services.rag import qdrant_search
 
 router = APIRouter()
 
 
-@router.get("/qdrant/collections")
-async def list_qdrant_collections(client: httpx.AsyncClient = Depends(get_client)):
+@router.get("/qdrant/collections", response_model=None, tags=["qdrant"])
+async def list_qdrant_collections(
+    qdrant: QdrantVectorRepository = Depends(get_qdrant_repo),
+):
     try:
-        response = await client.get(f"{QDRANT_URL}/collections")
-        response.raise_for_status()
-        return response.json()
+        return ok(await qdrant.list_collections())
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Qdrant error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Qdrant error: {e}")
 
 
-@router.post("/qdrant/collections/{collection_name}")
+@router.post("/qdrant/collections/{collection_name}", response_model=None, tags=["qdrant"])
 async def create_qdrant_collection(
     collection_name: str,
     vector_size: int = 768,
-    client: httpx.AsyncClient = Depends(get_client),
+    qdrant: QdrantVectorRepository = Depends(get_qdrant_repo),
 ):
     try:
-        response = await client.put(
-            f"{QDRANT_URL}/collections/{collection_name}",
-            json={"vectors": {"size": vector_size, "distance": "Cosine"}},
-        )
-        if response.status_code in [200, 201]:
-            return {"status": "created", "collection": collection_name}
-        elif response.status_code == 409:
-            return {"status": "exists", "collection": collection_name}
-        raise HTTPException(status_code=response.status_code, detail=response.text)
+        result = await qdrant.create_collection(collection_name, vector_size)
+        return ok(result)
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Qdrant error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Qdrant error: {e}")
 
 
-@router.get("/qdrant/collections/{collection_name}")
+@router.get("/qdrant/collections/{collection_name}", response_model=None, tags=["qdrant"])
 async def get_qdrant_collection(
     collection_name: str,
-    client: httpx.AsyncClient = Depends(get_client),
+    qdrant: QdrantVectorRepository = Depends(get_qdrant_repo),
 ):
     try:
-        response = await client.get(f"{QDRANT_URL}/collections/{collection_name}")
-        response.raise_for_status()
-        return response.json()
+        return ok(await qdrant.get_collection(collection_name))
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Qdrant error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Qdrant error: {e}")
 
 
-@router.delete("/qdrant/collections/{collection_name}")
+@router.delete("/qdrant/collections/{collection_name}", response_model=None, tags=["qdrant"])
 async def delete_qdrant_collection(
     collection_name: str,
-    client: httpx.AsyncClient = Depends(get_client),
+    qdrant: QdrantVectorRepository = Depends(get_qdrant_repo),
 ):
     try:
-        response = await client.delete(f"{QDRANT_URL}/collections/{collection_name}")
-        if response.status_code in [200, 204]:
-            return {"status": "deleted", "collection": collection_name}
-        raise HTTPException(status_code=response.status_code, detail=response.text)
+        result = await qdrant.delete_collection(collection_name)
+        return ok(result)
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Qdrant error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Qdrant error: {e}")
 
 
-@router.post("/qdrant/search/{collection_name}")
+@router.post("/qdrant/search/{collection_name}", response_model=None, tags=["qdrant"])
 async def search_qdrant_collection(
     collection_name: str,
     query: str,
     top_k: int = 5,
     threshold: float = 0.7,
-    client: httpx.AsyncClient = Depends(get_client),
+    client: httpx.AsyncClient = Depends(get_http_client),
+    qdrant: QdrantVectorRepository = Depends(get_qdrant_repo),
 ):
     try:
         query_embedding = await generate_embedding(query, client=client)
-        results = await qdrant_search(
-            query_embedding,
-            client,
-            collection_name=collection_name,
-            top_k=top_k,
-            threshold=threshold,
-        )
-        return {"results": results, "count": len(results)}
+        results = await qdrant.search(query_embedding, collection_name, top_k, threshold)
+        return ok({"results": results, "count": len(results)})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

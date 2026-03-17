@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useRef } from 'react'
-import { useChatStore } from '@/lib/store'
+import { useChatStore, conversationStoreApi } from '@/lib/store'
 import { streamChat, generateMessageId } from '@/lib/api'
 import type { Message, RagSource } from '@/types'
 
@@ -57,8 +57,8 @@ export function useChat() {
     abortControllerRef.current = controller
 
     try {
-      const state = useChatStore.getState()
-      const conversation = state.conversations.find(c => c.id === conversationId)
+      const convState = conversationStoreApi.getState()
+      const conversation = convState.conversations.find(c => c.id === conversationId)
       const messages = conversation?.messages
         .filter(m => m.role !== 'system' && m.id !== assistantMessageId)
         .map(m => ({ role: m.role, content: m.content })) || []
@@ -144,7 +144,7 @@ export function useChat() {
     const lastUserMessage = messages[lastUserMessageIndex]
     const lastAssistantMessage = messages[messages.length - 1]
     if (lastAssistantMessage.role === 'assistant') {
-      useChatStore.getState().deleteMessage(currentConversation.id, lastAssistantMessage.id)
+      conversationStoreApi.getState().deleteMessage(currentConversation.id, lastAssistantMessage.id)
     }
 
     await sendMessage(lastUserMessage.content)

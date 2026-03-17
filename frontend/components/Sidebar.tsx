@@ -74,6 +74,8 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
   return (
     <>
       <aside
+        role="navigation"
+        aria-label="Main navigation"
         className={`fixed lg:relative inset-y-0 left-0 z-30 w-72 flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:border-0 lg:overflow-hidden'}`}
         style={{ background: 'var(--bg-secondary)', borderRight: '1px solid var(--border-color)' }}
       >
@@ -84,10 +86,10 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
               Manic AI
             </h1>
             <div className="flex items-center gap-1">
-              <button onClick={toggleTheme} className="p-1.5 rounded-md transition-colors hover:bg-white/5 text-zinc-400 hover:text-zinc-200" title={`Switch mode`}>
+              <button onClick={toggleTheme} className="p-1.5 rounded-md transition-colors hover:bg-white/5 text-zinc-400 hover:text-zinc-200" title={`Switch mode`} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
                 {theme === 'dark' ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
               </button>
-              <button onClick={onToggle} className="lg:hidden p-1.5 rounded-md text-zinc-400 hover:bg-white/5 hover:text-zinc-200">
+              <button onClick={onToggle} className="lg:hidden p-1.5 rounded-md text-zinc-400 hover:bg-white/5 hover:text-zinc-200" aria-label="Close sidebar">
                 <CloseIcon className="w-4 h-4" />
               </button>
             </div>
@@ -98,9 +100,10 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
         </div>
 
         {/* Navigation */}
-        <nav className="px-2 py-2 space-y-0.5" style={{ borderBottom: '1px solid var(--border-color)' }}>
+        <nav aria-label="Page navigation" className="px-2 py-2 space-y-0.5" style={{ borderBottom: '1px solid var(--border-color)' }}>
           {navItems.map((item) => (
             <button key={item.path} onClick={() => navigateTo(item.path)}
+              aria-current={isActive(item.path) ? 'page' : undefined}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors text-left"
               style={{
                 background: isActive(item.path) ? 'rgba(129, 140, 248, 0.1)' : 'transparent',
@@ -158,9 +161,9 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
       </aside>
 
       {showClearConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="clear-confirm-title">
           <div className="rounded-xl p-6 max-w-sm mx-4" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}>
-            <h3 className="text-lg font-semibold mb-2">Clear All Conversations?</h3>
+            <h3 id="clear-confirm-title" className="text-lg font-semibold mb-2">Clear All Conversations?</h3>
             <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>This will permanently delete all chat history.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowClearConfirm(false)} className="flex-1 btn-secondary">Cancel</button>
@@ -190,7 +193,7 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete }: { conv
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{conversation.messages.length} messages</p>
       </div>
       {showDelete && (
-        <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 text-red-500">
+        <button onClick={(e) => { e.stopPropagation(); onDelete() }} aria-label={`Delete conversation: ${conversation.title}`} className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 text-red-500">
           <TrashIcon className="w-3.5 h-3.5" />
         </button>
       )}

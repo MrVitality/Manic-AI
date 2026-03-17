@@ -1,13 +1,28 @@
-import json
+"""RAG service -- backward-compatible functions delegating to repositories.
+
+The ``check_service`` utility is kept here because it is used by the
+health router and background health logger (not strictly a "repository"
+concern).  The vector/hybrid search functions are retained as thin wrappers
+for any caller that hasn't migrated to the repository layer yet.
+"""
+
 import logging
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 import asyncpg
 import httpx
 
-from api.config import OLLAMA_URL, QDRANT_URL
+from api.config import settings
+from api.repositories.qdrant_vector import QdrantVectorRepository
+from api.repositories.supabase_vector import SupabaseVectorRepository
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Thin wrappers (delegate to repository classes)
+# ---------------------------------------------------------------------------
 
 
 async def vector_search(
@@ -18,38 +33,8 @@ async def vector_search(
     collection_id: str = None,
     user_id: str = None,
 ) -> List[Dict]:
-    embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
-    async with db.acquire() as conn:
-        results = await conn.fetch(
-            """
-            SELECT
-                c.id::text,
-                c.document_id::text,
-                c.content,
-                c.metadata,
-                1 - (c.embedding <=> $1::vector) as similarity
-            FROM rag.chunks c
-            JOIN rag.documents d ON c.document_id = d.id
-            LEFT JOIN rag.document_collections dc ON c.document_id = dc.document_id
-            WHERE
-                ($2::uuid IS NULL OR dc.collection_id = $2::uuid)
-                AND ($3::uuid IS NULL OR d.user_id = $3::uuid)
-                AND 1 - (c.embedding <=> $1::vector) > $4
-            ORDER BY c.embedding <=> $1::vector
-            LIMIT $5
-            """,
-            embedding_str, collection_id, user_id, threshold, top_k,
-        )
-    return [
-        {
-            "id": r["id"],
-            "document_id": r["document_id"],
-            "content": r["content"],
-            "metadata": json.loads(r["metadata"]) if r["metadata"] else {},
-            "score": float(r["similarity"]),
-        }
-        for r in results
-    ]
+    repo = SupabaseVectorRepository(db)
+    return await repo.vector_search(query_embedding, top_k, threshold, collection_id, user_id)
 
 
 async def hybrid_search(
@@ -61,47 +46,13 @@ async def hybrid_search(
     collection_id: str = None,
     user_id: str = None,
 ) -> List[Dict]:
-    embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
-    async with db.acquire() as conn:
-        results = await conn.fetch(
-            """
-            SELECT
-                id::text,
-                document_id::text,
-                content,
-                metadata,
-                vector_score,
-                keyword_score,
-                combined_score as score
-            FROM rag.hybrid_search($1, $2::vector, $3, $4, $5::uuid, $6::uuid)
-            """,
-            query_text, embedding_str, top_k, keyword_weight, collection_id, user_id,
-        )
-    return [
-        {
-            "id": r["id"],
-            "document_id": r["document_id"],
-            "content": r["content"],
-            "metadata": json.loads(r["metadata"]) if r["metadata"] else {},
-            "score": float(r["score"]),
-            "vector_score": float(r["vector_score"]),
-            "keyword_score": float(r["keyword_score"]),
-        }
-        for r in results
-    ]
+    repo = SupabaseVectorRepository(db)
+    return await repo.hybrid_search(query_text, query_embedding, top_k, keyword_weight, collection_id, user_id)
 
 
 def build_rag_prompt(query: str, context_chunks: List[Dict]) -> str:
-    if not context_chunks:
-        return query
-    context = "\n\n---\n\n".join(
-        [f"[Source {i+1}]: {chunk['content']}" for i, chunk in enumerate(context_chunks)]
-    )
-    return (
-        "Use the following context to answer the question. "
-        "If the context doesn't contain relevant information, say so and answer based on your general knowledge.\n\n"
-        f"Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
-    )
+    from api.services.chat import build_rag_prompt as _build
+    return _build(query, context_chunks)
 
 
 async def qdrant_search(
@@ -112,38 +63,8 @@ async def qdrant_search(
     threshold: float = 0.7,
     filters: Dict[str, Any] = None,
 ) -> List[Dict]:
-    payload: Dict[str, Any] = {
-        "vector": query_embedding,
-        "limit": top_k,
-        "score_threshold": threshold,
-        "with_payload": True,
-        "with_vectors": False,
-    }
-    if filters:
-        payload["filter"] = {
-            "must": [{"key": k, "match": {"value": v}} for k, v in filters.items() if v]
-        }
-    try:
-        response = await client.post(
-            f"{QDRANT_URL}/collections/{collection_name}/points/search",
-            json=payload,
-            timeout=30.0,
-        )
-        response.raise_for_status()
-        return [
-            {
-                "id": str(r["id"]),
-                "document_id": r.get("payload", {}).get("document_id", ""),
-                "content": r.get("payload", {}).get("content", ""),
-                "metadata": r.get("payload", {}).get("metadata", {}),
-                "score": float(r["score"]),
-                "backend": "qdrant",
-            }
-            for r in response.json().get("result", [])
-        ]
-    except Exception as e:
-        logger.error("Qdrant search: %s", e)
-        return []
+    repo = QdrantVectorRepository(settings.QDRANT_URL, client)
+    return await repo.search(query_embedding, collection_name, top_k, threshold, filters)
 
 
 async def qdrant_upsert(
@@ -151,17 +72,8 @@ async def qdrant_upsert(
     points: List[Dict],
     client: httpx.AsyncClient,
 ) -> bool:
-    try:
-        response = await client.put(
-            f"{QDRANT_URL}/collections/{collection_name}/points",
-            json={"points": points},
-            timeout=60.0,
-        )
-        response.raise_for_status()
-        return True
-    except Exception as e:
-        logger.error("Qdrant upsert: %s", e)
-        return False
+    repo = QdrantVectorRepository(settings.QDRANT_URL, client)
+    return await repo.upsert(collection_name, points)
 
 
 async def qdrant_delete_by_document(
@@ -169,21 +81,8 @@ async def qdrant_delete_by_document(
     document_id: str,
     client: httpx.AsyncClient,
 ) -> bool:
-    try:
-        response = await client.post(
-            f"{QDRANT_URL}/collections/{collection_name}/points/delete",
-            json={
-                "filter": {
-                    "must": [{"key": "document_id", "match": {"value": document_id}}]
-                }
-            },
-            timeout=30.0,
-        )
-        response.raise_for_status()
-        return True
-    except Exception as e:
-        logger.error("Qdrant delete: %s", e)
-        return False
+    repo = QdrantVectorRepository(settings.QDRANT_URL, client)
+    return await repo.delete_by_document(collection_name, document_id)
 
 
 async def ensure_qdrant_collection(
@@ -191,19 +90,13 @@ async def ensure_qdrant_collection(
     vector_size: int,
     client: httpx.AsyncClient,
 ) -> bool:
-    try:
-        r = await client.get(f"{QDRANT_URL}/collections/{collection_name}", timeout=10.0)
-        if r.status_code == 200:
-            return True
-        r = await client.put(
-            f"{QDRANT_URL}/collections/{collection_name}",
-            json={"vectors": {"size": vector_size, "distance": "Cosine"}},
-            timeout=10.0,
-        )
-        return r.status_code in [200, 201]
-    except Exception as e:
-        logger.error("Qdrant ensure collection: %s", e)
-        return False
+    repo = QdrantVectorRepository(settings.QDRANT_URL, client)
+    return await repo.ensure_collection(collection_name, vector_size)
+
+
+# ---------------------------------------------------------------------------
+# Utility -- still owned by this module
+# ---------------------------------------------------------------------------
 
 
 async def check_service(
