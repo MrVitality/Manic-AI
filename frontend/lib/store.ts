@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Conversation, Message, Model, Settings, ActiveView, DocumentInfo, ServiceStatus } from '@/types'
 
+const HEALTH_CHECK_INTERVAL_MS = 30_000
+const DASHBOARD_REFRESH_INTERVAL_MS = 10_000
+
 interface ChatState {
   conversations: Conversation[]
   currentConversationId: string | null
@@ -54,8 +57,8 @@ const defaultSettings: Settings = {
   accentColor: 'blue',
   fontSize: 'base',
   enableAnimations: true,
-  healthCheckInterval: 30000,
-  dashboardRefreshRate: 10000,
+  healthCheckInterval: HEALTH_CHECK_INTERVAL_MS,
+  dashboardRefreshRate: DASHBOARD_REFRESH_INTERVAL_MS,
   ragBackend: 'supabase',
   ragUseHybrid: true,
 }

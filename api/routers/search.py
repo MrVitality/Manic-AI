@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import asyncpg
 import httpx
@@ -30,7 +30,7 @@ class SearchRequest(BaseModel):
     use_hybrid: Optional[bool] = True
     collection_id: Optional[str] = None
     user_id: Optional[str] = None
-    backend: Optional[str] = "supabase"
+    backend: Literal["supabase", "qdrant", "both"] = "supabase"
 
 
 class SearchResult(BaseModel):
@@ -48,7 +48,7 @@ class SearchExplainRequest(BaseModel):
     use_hybrid: Optional[bool] = True
     collection_id: Optional[str] = None
     include_vectors: Optional[bool] = False
-    backend: Optional[str] = "supabase"
+    backend: Literal["supabase", "qdrant", "both"] = "supabase"
 
 
 # ---------------------------------------------------------------------------

@@ -10,6 +10,7 @@ export default function CommandPalette() {
   const {
     conversations, documents, models,
     createConversation, setActiveView, updateSettings, settings,
+    useRag, setUseRag,
   } = useChatStore()
 
   const inputRef = useRef<HTMLInputElement>(null)
@@ -28,7 +29,7 @@ export default function CommandPalette() {
       // Actions
       { id: 'action-new-chat', label: 'New Chat', description: 'Start a new conversation', category: 'action', shortcut: 'Ctrl+N', action: () => { createConversation(); setActiveView('chat') } },
       { id: 'action-toggle-theme', label: 'Toggle Theme', description: `Switch to ${settings.theme === 'dark' ? 'light' : 'dark'} mode`, category: 'action', action: () => updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' }) },
-      { id: 'action-toggle-rag', label: 'Toggle RAG', description: 'Enable or disable RAG for chat', category: 'action', action: () => {} },
+      { id: 'action-toggle-rag', label: 'Toggle RAG', description: `${useRag ? 'Disable' : 'Enable'} RAG for chat`, category: 'action', action: () => setUseRag(!useRag) },
       { id: 'action-refresh', label: 'Refresh View', description: 'Reload current view data', category: 'action', shortcut: 'Ctrl+.', action: () => window.dispatchEvent(new CustomEvent('manic-refresh')) },
     ]
 
@@ -72,7 +73,7 @@ export default function CommandPalette() {
     })
 
     return cmds
-  }, [conversations, documents, models, settings.theme, createConversation, setActiveView, updateSettings])
+  }, [conversations, documents, models, settings.theme, useRag, createConversation, setActiveView, updateSettings, setUseRag])
 
   // Fuzzy filter
   const filtered = useMemo(() => {

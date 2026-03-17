@@ -69,7 +69,7 @@ async def _log_chat(
     prompt_tokens: int,
     completion_tokens: int,
     latency_ms: float,
-    used_rag: bool,
+    has_rag: bool,
 ):
     if not db:
         return
@@ -77,10 +77,10 @@ async def _log_chat(
         async with db.acquire() as conn:
             await conn.execute(
                 """INSERT INTO public.chat_log
-                   (model, prompt_tokens, completion_tokens, total_tokens, latency_ms, used_rag)
+                   (model, prompt_tokens, completion_tokens, total_tokens, latency_ms, has_rag)
                    VALUES ($1, $2, $3, $4, $5, $6)""",
                 model, prompt_tokens, completion_tokens,
-                prompt_tokens + completion_tokens, latency_ms, used_rag,
+                prompt_tokens + completion_tokens, latency_ms, has_rag,
             )
     except Exception:
         logger.warning("chat_log write failed", exc_info=True)
