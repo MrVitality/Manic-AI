@@ -1,12 +1,13 @@
 import asyncio
 import json
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from api.config import EMBEDDING_MODEL, VECTOR_DIMENSION
 from api.database import get_db_optional
@@ -14,6 +15,8 @@ from api.http_client import get_client
 from api.services.chunking import chunk_text
 from api.services.embedding import generate_embedding
 from api.services.rag import ensure_qdrant_collection, qdrant_upsert
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -44,6 +47,14 @@ class IngestRequest(BaseModel):
     chunk_overlap: int = Field(default=50, ge=0)
     backend: Literal["supabase", "qdrant", "both"] = "both"
 
+    @model_validator(mode="after")
+    def validate_overlap_less_than_size(self):
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError(
+                f"chunk_overlap ({self.chunk_overlap}) must be less than chunk_size ({self.chunk_size})"
+            )
+        return self
+
 
 class IngestResponse(BaseModel):
     document_id: str
@@ -66,7 +77,8 @@ async def create_embedding(
         embedding = await generate_embedding(request.text, model, client=client)
         return EmbedResponse(embedding=embedding, model=model, dimensions=len(embedding))
     except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Ollama error: {str(e)}")
+        logger.exception("Embedding generation failed via Ollama")
+        raise HTTPException(status_code=502, detail="Embedding service unavailable")
 
 
 @router.post("/ingest", response_model=IngestResponse)
@@ -190,5 +202,6 @@ async def ingest_document(
                         str(e),
                     )
             except Exception:
-                pass
-        raise HTTPException(status_code=500, detail=str(e))
+                logger.warning("Failed to update document status to 'failed' for %s", document_id)
+        logger.exception("Document ingestion failed for %s", request.filename)
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -52,6 +52,10 @@ export function useChat() {
     setIsGenerating(true)
     setError(null)
 
+    // Create a new AbortController for this stream so stopGeneration can cancel it
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
       const state = useChatStore.getState()
       const conversation = state.conversations.find(c => c.id === conversationId)
@@ -68,7 +72,7 @@ export function useChat() {
         temperature: settings.temperature,
         systemPrompt: settings.systemPrompt,
         useRag,
-      })) {
+      }, controller.signal)) {
         if (event.type === 'content' && event.content) {
           fullContent += event.content
           updateMessage(conversationId, assistantMessageId, {
@@ -90,15 +94,23 @@ export function useChat() {
         sources: sources.length > 0 ? sources : undefined,
       })
     } catch (error) {
-      console.error('Chat error:', error)
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred'
-      updateMessage(conversationId, assistantMessageId, {
-        content: '',
-        isStreaming: false,
-        error: errorMessage,
-      })
-      setError(errorMessage)
+      // If the user aborted, don't treat it as a real error
+      if (controller.signal.aborted) {
+        updateMessage(conversationId, assistantMessageId, {
+          isStreaming: false,
+        })
+      } else {
+        console.error('Chat error:', error)
+        const errorMessage = error instanceof Error ? error.message : 'An error occurred'
+        updateMessage(conversationId, assistantMessageId, {
+          content: '',
+          isStreaming: false,
+          error: errorMessage,
+        })
+        setError(errorMessage)
+      }
     } finally {
+      abortControllerRef.current = null
       setIsGenerating(false)
     }
   }, [

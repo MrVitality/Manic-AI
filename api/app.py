@@ -1,9 +1,13 @@
 import asyncio
+import logging
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.auth import require_api_key
 from api.config import SUPABASE_DB_URL
+
 from api.database import init_pool, close_pool
 from api.http_client import init_client, close_client
 from api.services.embedding import init_redis
@@ -12,6 +16,8 @@ from api.services.health_logger import health_log_loop
 
 # Import all routers
 from api.routers import health, chat, ingest, documents, collections, qdrant, search, analytics, system, models
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -68,6 +74,21 @@ async def _run_ddl():
         """)
 
 
+def _parse_cors_origins() -> list[str]:
+    """Read allowed CORS origins from CORS_ORIGINS env var (comma-separated).
+
+    Falls back to localhost defaults for local development.
+    """
+    raw = os.getenv("CORS_ORIGINS", "").strip()
+    if raw:
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    logger.warning(
+        "CORS_ORIGINS is not set — defaulting to localhost origins. "
+        "Set this environment variable in production."
+    )
+    return ["http://localhost:3000", "http://localhost:3006"]
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Manic AI API",
@@ -75,25 +96,38 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # --- CORS configuration (secure defaults) ---
+    cors_origins = _parse_cors_origins()
+    allow_credentials = "*" not in cors_origins
+    if not allow_credentials:
+        logger.warning(
+            "CORS allow_origins contains wildcard '*' — "
+            "allow_credentials has been forced to False."
+        )
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=cors_origins,
+        allow_credentials=allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # Mount routers
+    # --- Authentication dependency applied globally ---
+    # Health router is public (needed for uptime checks / load balancers).
     app.include_router(health.router)
-    app.include_router(chat.router)
-    app.include_router(ingest.router)
-    app.include_router(documents.router)
-    app.include_router(collections.router)
-    app.include_router(qdrant.router)
-    app.include_router(search.router)
-    app.include_router(analytics.router)
-    app.include_router(system.router)
-    app.include_router(models.router)
+
+    # All other routers require API key authentication.
+    auth_dep = [Depends(require_api_key)]
+    app.include_router(chat.router, dependencies=auth_dep)
+    app.include_router(ingest.router, dependencies=auth_dep)
+    app.include_router(documents.router, dependencies=auth_dep)
+    app.include_router(collections.router, dependencies=auth_dep)
+    app.include_router(qdrant.router, dependencies=auth_dep)
+    app.include_router(search.router, dependencies=auth_dep)
+    app.include_router(analytics.router, dependencies=auth_dep)
+    app.include_router(system.router, dependencies=auth_dep)
+    app.include_router(models.router, dependencies=auth_dep)
 
     return app
 

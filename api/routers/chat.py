@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime
 from uuid import uuid4
 from typing import List, Dict, Optional
@@ -16,6 +17,8 @@ from api.http_client import get_client
 from api.services.embedding import generate_embedding
 from api.services.rag import hybrid_search, build_rag_prompt
 from api.services.langfuse import get_langfuse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -79,8 +82,8 @@ async def _log_chat(
                 model, prompt_tokens, completion_tokens,
                 prompt_tokens + completion_tokens, latency_ms, used_rag,
             )
-    except Exception as e:
-        print(f"[WARN] chat_log write failed: {e}")
+    except Exception:
+        logger.warning("chat_log write failed", exc_info=True)
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -120,14 +123,16 @@ async def chat(
         )
         response.raise_for_status()
         data = response.json()
-    except httpx.HTTPError as e:
+    except httpx.HTTPError:
+        logger.exception("Ollama chat request failed")
         if trace:
-            trace.update(level="ERROR", status_message=str(e))
-        raise HTTPException(status_code=502, detail=f"Ollama error: {e}")
-    except Exception as e:
+            trace.update(level="ERROR", status_message="Chat service unavailable")
+        raise HTTPException(status_code=502, detail="Chat service unavailable")
+    except Exception:
+        logger.exception("Unexpected error during chat")
         if trace:
-            trace.update(level="ERROR", status_message=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+            trace.update(level="ERROR", status_message="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
     response_text = data.get("message", {}).get("content", "")
     prompt_tokens = data.get("prompt_eval_count", 0)
@@ -201,7 +206,8 @@ async def chat_stream(
                         break
             latency_ms = (datetime.utcnow() - start).total_seconds() * 1000
             await _log_chat(db, model, prompt_tokens, completion_tokens, latency_ms, bool(sources))
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+        except Exception:
+            logger.exception("Chat stream failed for model %s", model)
+            yield f"data: {json.dumps({'type': 'error', 'error': 'Chat stream failed'})}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")

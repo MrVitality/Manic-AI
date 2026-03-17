@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, Dict
 
 import httpx
@@ -6,6 +7,8 @@ from fastapi import APIRouter, Depends, Query
 from api.config import OLLAMA_URL
 from api.database import get_db_optional
 from api.http_client import get_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -139,7 +142,7 @@ async def analytics_models(
                 }
             )
     except Exception:
-        pass
+        logger.warning("Failed to fetch Ollama model list for analytics", exc_info=True)
 
     return {"models": models}
 
@@ -284,4 +287,5 @@ async def analytics_services_history(
         history = sorted(snapshots.values(), key=lambda x: x["timestamp"])
         return {"history": history}
     except Exception:
+        logger.exception("Failed to fetch service health history")
         return {"history": []}

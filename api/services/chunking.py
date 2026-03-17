@@ -2,6 +2,9 @@ from typing import List, Dict
 
 
 def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[Dict]:
+    # Guard against infinite loop: overlap must be strictly less than chunk_size
+    if overlap >= chunk_size:
+        overlap = chunk_size - 1
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = " ".join(text.split())
     if len(text) <= chunk_size:

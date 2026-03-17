@@ -1,4 +1,7 @@
-// Supabase client for authentication
+// Supabase client for authentication — uses the official @supabase/supabase-js SDK
+// which handles token storage, rotation, and refresh automatically.
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+
 const getSupabaseUrl = (): string => {
   if (typeof window !== 'undefined') {
     try {
@@ -17,6 +20,11 @@ const getSupabaseUrl = (): string => {
 const getAnonKey = (): string => {
   return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 }
+
+// ---------------------------------------------------------------------------
+// Public types — kept identical to the previous hand-rolled versions so that
+// every call-site continues to work without changes.
+// ---------------------------------------------------------------------------
 
 export interface User {
   id: string
@@ -37,148 +45,121 @@ export interface AuthError {
   status?: number
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Map a Supabase SDK user object to our public User type. */
+const toUser = (u: { id: string; email?: string; created_at: string }): User => ({
+  id: u.id,
+  email: u.email ?? '',
+  created_at: u.created_at,
+})
+
+/** Map a Supabase SDK session to our public Session type. */
+const toSession = (s: {
+  access_token: string
+  refresh_token: string
+  expires_in: number
+  expires_at?: number
+  user: { id: string; email?: string; created_at: string }
+}): Session => ({
+  access_token: s.access_token,
+  refresh_token: s.refresh_token,
+  expires_in: s.expires_in,
+  expires_at: s.expires_at,
+  user: toUser(s.user),
+})
+
+// ---------------------------------------------------------------------------
+// SupabaseAuth — thin wrapper that delegates to the official SDK client
+// ---------------------------------------------------------------------------
+
 class SupabaseAuth {
-  private baseUrl: string
-  private anonKey: string
+  private client: SupabaseClient
 
   constructor() {
-    this.baseUrl = getSupabaseUrl()
-    this.anonKey = getAnonKey()
+    this.client = createClient(getSupabaseUrl(), getAnonKey(), {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
   }
 
-  private getHeaders(accessToken?: string): HeadersInit {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      'apikey': this.anonKey,
+  async signUp(
+    email: string,
+    password: string,
+  ): Promise<{ user: User | null; session: Session | null; error: AuthError | null }> {
+    const { data, error } = await this.client.auth.signUp({ email, password })
+
+    if (error) {
+      return { user: null, session: null, error: { message: error.message, status: error.status } }
     }
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`
-    }
-    return headers
+
+    const user = data.user ? toUser(data.user as { id: string; email?: string; created_at: string }) : null
+    const session = data.session
+      ? toSession(data.session as unknown as Parameters<typeof toSession>[0])
+      : null
+
+    return { user, session, error: null }
   }
 
-  async signUp(email: string, password: string): Promise<{ user: User | null; session: Session | null; error: AuthError | null }> {
-    try {
-      const response = await fetch(`${this.baseUrl}/auth/v1/signup`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({ email, password }),
-      })
+  async signIn(
+    email: string,
+    password: string,
+  ): Promise<{ user: User | null; session: Session | null; error: AuthError | null }> {
+    const { data, error } = await this.client.auth.signInWithPassword({ email, password })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        return { user: null, session: null, error: { message: data.message || data.msg || 'Signup failed', status: response.status } }
-      }
-
-      if (data.access_token) {
-        const session: Session = {
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-          expires_in: data.expires_in,
-          expires_at: Date.now() + (data.expires_in * 1000),
-          user: data.user,
-        }
-        return { user: data.user, session, error: null }
-      }
-
-      return { user: data.user || data, session: null, error: null }
-    } catch (err) {
-      return { user: null, session: null, error: { message: 'Network error' } }
+    if (error) {
+      return { user: null, session: null, error: { message: error.message, status: error.status } }
     }
+
+    const user = data.user ? toUser(data.user as { id: string; email?: string; created_at: string }) : null
+    const session = data.session
+      ? toSession(data.session as unknown as Parameters<typeof toSession>[0])
+      : null
+
+    return { user, session, error: null }
   }
 
-  async signIn(email: string, password: string): Promise<{ user: User | null; session: Session | null; error: AuthError | null }> {
-    try {
-      const response = await fetch(`${this.baseUrl}/auth/v1/token?grant_type=password`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({ email, password }),
-      })
+  async signOut(_accessToken?: string): Promise<{ error: AuthError | null }> {
+    const { error } = await this.client.auth.signOut()
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        return { user: null, session: null, error: { message: data.message || data.msg || data.error_description || 'Login failed', status: response.status } }
-      }
-
-      const session: Session = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_in: data.expires_in,
-        expires_at: Date.now() + (data.expires_in * 1000),
-        user: data.user,
-      }
-
-      return { user: data.user, session, error: null }
-    } catch (err) {
-      return { user: null, session: null, error: { message: 'Network error' } }
+    if (error) {
+      return { error: { message: error.message, status: error.status } }
     }
+
+    return { error: null }
   }
 
-  async signOut(accessToken: string): Promise<{ error: AuthError | null }> {
-    try {
-      const response = await fetch(`${this.baseUrl}/auth/v1/logout`, {
-        method: 'POST',
-        headers: this.getHeaders(accessToken),
-      })
+  async getUser(_accessToken?: string): Promise<{ user: User | null; error: AuthError | null }> {
+    const { data, error } = await this.client.auth.getUser()
 
-      if (!response.ok) {
-        const data = await response.json()
-        return { error: { message: data.message || 'Logout failed', status: response.status } }
-      }
-
-      return { error: null }
-    } catch (err) {
-      return { error: { message: 'Network error' } }
+    if (error) {
+      return { user: null, error: { message: error.message, status: error.status } }
     }
+
+    const user = data.user
+      ? toUser(data.user as { id: string; email?: string; created_at: string })
+      : null
+
+    return { user, error: null }
   }
 
-  async getUser(accessToken: string): Promise<{ user: User | null; error: AuthError | null }> {
-    try {
-      const response = await fetch(`${this.baseUrl}/auth/v1/user`, {
-        method: 'GET',
-        headers: this.getHeaders(accessToken),
-      })
+  async refreshToken(_refreshToken?: string): Promise<{ session: Session | null; error: AuthError | null }> {
+    const { data, error } = await this.client.auth.refreshSession()
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        return { user: null, error: { message: data.message || 'Failed to get user', status: response.status } }
-      }
-
-      return { user: data, error: null }
-    } catch (err) {
-      return { user: null, error: { message: 'Network error' } }
+    if (error) {
+      return { session: null, error: { message: error.message, status: error.status } }
     }
-  }
 
-  async refreshToken(refreshToken: string): Promise<{ session: Session | null; error: AuthError | null }> {
-    try {
-      const response = await fetch(`${this.baseUrl}/auth/v1/token?grant_type=refresh_token`, {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      })
+    const session = data.session
+      ? toSession(data.session as unknown as Parameters<typeof toSession>[0])
+      : null
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        return { session: null, error: { message: data.message || 'Token refresh failed', status: response.status } }
-      }
-
-      const session: Session = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_in: data.expires_in,
-        expires_at: Date.now() + (data.expires_in * 1000),
-        user: data.user,
-      }
-
-      return { session, error: null }
-    } catch (err) {
-      return { session: null, error: { message: 'Network error' } }
-    }
+    return { session, error: null }
   }
 }
 

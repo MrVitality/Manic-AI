@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Any, Dict, List, Optional
 
@@ -11,6 +12,8 @@ from api.database import get_db_optional
 from api.http_client import get_client
 from api.services.embedding import generate_embedding
 from api.services.rag import hybrid_search, qdrant_search, vector_search
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -146,8 +149,9 @@ async def search_documents(
             client=client,
         )
         return [SearchResult(**r) for r in results]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Search failed for query: %s", request.query[:100])
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/search/explain")
@@ -196,7 +200,7 @@ async def search_explain(
                     )
                     filename_map = {r["id"]: r["filename"] for r in rows}
             except Exception:
-                pass
+                logger.warning("Failed to fetch filenames for search explain", exc_info=True)
 
         for r in raw:
             doc_filename = filename_map.get(r["document_id"], "unknown")

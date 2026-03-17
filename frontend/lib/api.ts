@@ -9,6 +9,32 @@ import type {
   CollectionInfo,
 } from '@/types'
 
+const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+
+// Configurable allowlist of permitted API hostnames.
+// Extend this array to allow additional trusted hosts.
+const ALLOWED_HOSTNAMES: string[] = [
+  'localhost',
+  '127.0.0.1',
+  '0.0.0.0',
+  '::1',
+]
+
+function isValidApiUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false
+    }
+    if (ALLOWED_HOSTNAMES.includes(parsed.hostname)) {
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 const getApiUrl = (): string => {
   // Check localStorage for user-configured API URL (from settings)
   if (typeof window !== 'undefined') {
@@ -16,8 +42,15 @@ const getApiUrl = (): string => {
       const stored = localStorage.getItem('manic-ai-storage')
       if (stored) {
         const parsed = JSON.parse(stored)
-        if (parsed?.state?.settings?.apiUrl) {
-          return parsed.state.settings.apiUrl
+        const candidate = parsed?.state?.settings?.apiUrl
+        if (candidate) {
+          if (isValidApiUrl(candidate)) {
+            return candidate
+          }
+          console.warn(
+            `[Manic AI] Invalid API URL found in localStorage: "${candidate}". ` +
+            'Falling back to default. Only http/https URLs on localhost or allowed hosts are permitted.'
+          )
         }
       }
     } catch {
@@ -25,7 +58,7 @@ const getApiUrl = (): string => {
     }
   }
   // Fallback to env var or default
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+  return DEFAULT_API_URL
 }
 
 // =============================================================================
@@ -111,7 +144,10 @@ export interface StreamEvent {
   error?: string
 }
 
-export async function* streamChat(options: ChatOptions): AsyncGenerator<StreamEvent, void, unknown> {
+export async function* streamChat(
+  options: ChatOptions,
+  signal?: AbortSignal,
+): AsyncGenerator<StreamEvent, void, unknown> {
   const { model, messages, temperature = 0.7, systemPrompt, useRag = false } = options
 
   const allMessages = systemPrompt
@@ -127,6 +163,7 @@ export async function* streamChat(options: ChatOptions): AsyncGenerator<StreamEv
       temperature,
       use_rag: useRag,
     }),
+    signal,
   })
 
   if (!response.ok) {
