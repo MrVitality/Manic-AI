@@ -1,27 +1,118 @@
 import logging
-import os
+from typing import List
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434")
-SUPABASE_DB_URL = os.getenv("SUPABASE_DB_URL", "")
 
-if "postgres:postgres@" in SUPABASE_DB_URL:
-    logger.warning(
-        "SUPABASE_DB_URL contains default credentials (postgres:postgres). "
-        "Set a strong password before deploying to production."
-    )
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "llama3.2:3b")
-VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", "768"))
-REDIS_URL = os.getenv("REDIS_URL", "redis://ai-redis:6379")
-QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
-SEARXNG_URL = os.getenv("SEARXNG_URL", "http://ai-searxng:8080")
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables.
 
-RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
-RAG_THRESHOLD = float(os.getenv("RAG_THRESHOLD", "0.7"))
-RAG_KEYWORD_WEIGHT = float(os.getenv("RAG_KEYWORD_WEIGHT", "0.3"))
+    All fields use the same env-var names as the old ``os.getenv`` calls so
+    existing deployments keep working without changes.
+    """
 
-LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
-LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
-LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "http://langfuse:3000")
+    # --- Core service URLs ---
+    OLLAMA_URL: str = "http://ollama:11434"
+    SUPABASE_DB_URL: str = ""
+    REDIS_URL: str = "redis://ai-redis:6379"
+    QDRANT_URL: str = "http://qdrant:6333"
+    SEARXNG_URL: str = "http://ai-searxng:8080"
+
+    # --- Model defaults ---
+    EMBEDDING_MODEL: str = "nomic-embed-text"
+    CHAT_MODEL: str = "llama3.2:3b"
+    VECTOR_DIMENSION: int = 768
+
+    # --- RAG tuning ---
+    RAG_TOP_K: int = 5
+    RAG_THRESHOLD: float = 0.7
+    RAG_KEYWORD_WEIGHT: float = 0.3
+
+    # --- Langfuse observability ---
+    LANGFUSE_PUBLIC_KEY: str = ""
+    LANGFUSE_SECRET_KEY: str = ""
+    LANGFUSE_HOST: str = "http://langfuse:3000"
+
+    # --- Auth ---
+    API_SECRET_KEY: str = ""
+
+    # --- CORS ---
+    CORS_ORIGINS: str = ""
+
+    @field_validator("SUPABASE_DB_URL")
+    @classmethod
+    def warn_default_db_credentials(cls, v: str) -> str:
+        if "postgres:postgres@" in v:
+            logger.warning(
+                "SUPABASE_DB_URL contains default credentials (postgres:postgres). "
+                "Set a strong password before deploying to production."
+            )
+        return v
+
+    @field_validator("VECTOR_DIMENSION")
+    @classmethod
+    def dimension_must_be_positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("VECTOR_DIMENSION must be a positive integer")
+        return v
+
+    @field_validator("RAG_TOP_K")
+    @classmethod
+    def top_k_must_be_positive(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("RAG_TOP_K must be a positive integer")
+        return v
+
+    @field_validator("RAG_THRESHOLD")
+    @classmethod
+    def threshold_in_range(cls, v: float) -> float:
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("RAG_THRESHOLD must be between 0.0 and 1.0")
+        return v
+
+    @field_validator("RAG_KEYWORD_WEIGHT")
+    @classmethod
+    def keyword_weight_in_range(cls, v: float) -> float:
+        if not 0.0 <= v <= 1.0:
+            raise ValueError("RAG_KEYWORD_WEIGHT must be between 0.0 and 1.0")
+        return v
+
+    def parse_cors_origins(self) -> List[str]:
+        """Parse comma-separated CORS_ORIGINS into a list.
+
+        Falls back to localhost defaults for local development.
+        """
+        raw = self.CORS_ORIGINS.strip()
+        if raw:
+            return [origin.strip() for origin in raw.split(",") if origin.strip()]
+        logger.warning(
+            "CORS_ORIGINS is not set -- defaulting to localhost origins. "
+            "Set this environment variable in production."
+        )
+        return ["http://localhost:3000", "http://localhost:3006"]
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
+
+
+settings = Settings()
+
+# ---------------------------------------------------------------------------
+# Convenience aliases (preserves every existing ``from api.config import X``)
+# ---------------------------------------------------------------------------
+OLLAMA_URL = settings.OLLAMA_URL
+SUPABASE_DB_URL = settings.SUPABASE_DB_URL
+REDIS_URL = settings.REDIS_URL
+QDRANT_URL = settings.QDRANT_URL
+SEARXNG_URL = settings.SEARXNG_URL
+EMBEDDING_MODEL = settings.EMBEDDING_MODEL
+CHAT_MODEL = settings.CHAT_MODEL
+VECTOR_DIMENSION = settings.VECTOR_DIMENSION
+RAG_TOP_K = settings.RAG_TOP_K
+RAG_THRESHOLD = settings.RAG_THRESHOLD
+RAG_KEYWORD_WEIGHT = settings.RAG_KEYWORD_WEIGHT
+LANGFUSE_PUBLIC_KEY = settings.LANGFUSE_PUBLIC_KEY
+LANGFUSE_SECRET_KEY = settings.LANGFUSE_SECRET_KEY
+LANGFUSE_HOST = settings.LANGFUSE_HOST

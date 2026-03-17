@@ -1,11 +1,13 @@
 'use client'
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useChatStore } from '@/lib/store'
 import { useCommandPaletteStore } from '@/lib/stores/commandPaletteStore'
 
 export function useKeyboardShortcuts() {
-  const { createConversation, setActiveView } = useChatStore()
+  const { createConversation } = useChatStore()
   const { toggle: togglePalette, isOpen: paletteOpen, close: closePalette } = useCommandPaletteStore()
+  const router = useRouter()
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -28,7 +30,7 @@ export function useKeyboardShortcuts() {
           return
         }
         if (!isInput) {
-          setActiveView('chat')
+          router.push('/chat')
         }
         return
       }
@@ -39,22 +41,22 @@ export function useKeyboardShortcuts() {
       if (ctrl && e.key === 'n') {
         e.preventDefault()
         createConversation()
-        setActiveView('chat')
+        router.push('/chat')
       } else if (ctrl && e.key === 'd') {
         e.preventDefault()
-        setActiveView('documents')
+        router.push('/documents')
       } else if (ctrl && e.key === 'm') {
         e.preventDefault()
-        setActiveView('models')
+        router.push('/models')
       } else if (ctrl && e.key === 'h') {
         e.preventDefault()
-        setActiveView('dashboard')
+        router.push('/dashboard')
       } else if (ctrl && e.key === 'r') {
         e.preventDefault()
-        setActiveView('rag')
+        router.push('/rag')
       } else if (ctrl && e.key === ',') {
         e.preventDefault()
-        setActiveView('settings')
+        router.push('/settings')
       } else if (ctrl && e.key === '.') {
         e.preventDefault()
         window.dispatchEvent(new CustomEvent('manic-refresh'))
@@ -63,5 +65,5 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [createConversation, setActiveView, togglePalette, paletteOpen, closePalette])
+  }, [createConversation, togglePalette, paletteOpen, closePalette, router])
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
+import AppShell from '@/components/AppShell'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const jetbrains = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
@@ -21,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="dark">
       <body suppressHydrationWarning className={`${inter.variable} ${jetbrains.variable} font-sans antialiased`} style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-        {children}
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   )

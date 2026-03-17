@@ -16,14 +16,24 @@ services:
       resources:
         limits:
           memory: 8G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     networks:
-      - ai-network
+      - app-network
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -39,7 +49,18 @@ services:
         limits:
           memory: 2G
     networks:
-      - ai-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
@@ -55,12 +76,17 @@ services:
         limits:
           memory: 512M
     networks:
-      - ai-network
+      - db-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ===========================================================================
   # Supabase Stack
@@ -93,13 +119,18 @@ services:
         limits:
           memory: 2G
     networks:
-      - ai-network
+      - db-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   supabase-auth:
     image: supabase/gotrue:v2.143.0
@@ -111,7 +142,19 @@ services:
     env_file:
       - .env
     networks:
-      - ai-network
+      - db-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9999/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   supabase-rest:
     image: postgrest/postgrest:v12.0.1
@@ -123,7 +166,19 @@ services:
     env_file:
       - .env
     networks:
-      - ai-network
+      - db-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   supabase-meta:
     image: supabase/postgres-meta:v0.80.0
@@ -136,7 +191,19 @@ services:
       PG_META_PORT: "8080"
       PG_META_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/postgres
     networks:
-      - ai-network
+      - db-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   supabase-storage:
     image: supabase/storage-api:v0.46.4
@@ -150,7 +217,19 @@ services:
     volumes:
       - supabase-storage-data:/var/lib/storage
     networks:
-      - ai-network
+      - db-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   supabase-kong:
     image: kong:2.8.1
@@ -164,7 +243,19 @@ services:
     volumes:
       - ./supabase/kong.yml:/var/lib/kong/kong.yml:ro
     networks:
-      - ai-network
+      - db-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "kong health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   supabase-studio:
     image: supabase/studio:20240101-8e4a094
@@ -175,7 +266,18 @@ services:
     env_file:
       - .env
     networks:
-      - ai-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   studio-auth:
     image: nginx:alpine
@@ -189,7 +291,18 @@ services:
     depends_on:
       - supabase-studio
     networks:
-      - ai-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ===========================================================================
   # Workflow & Automation
@@ -222,7 +335,18 @@ services:
         limits:
           memory: 1G
     networks:
-      - ai-network
+      - tools-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ===========================================================================
   # Chat & Search UIs
@@ -243,7 +367,19 @@ services:
         limits:
           memory: 2G
     networks:
-      - ai-network
+      - tools-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   searxng:
     image: searxng/searxng:latest
@@ -258,7 +394,18 @@ services:
         limits:
           memory: 512M
     networks:
-      - ai-network
+      - tools-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ===========================================================================
   # Observability & LLM Tools
@@ -278,7 +425,18 @@ services:
         limits:
           memory: 512M
     networks:
-      - ai-network
+      - db-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   langfuse:
     image: langfuse/langfuse:2
@@ -287,7 +445,8 @@ services:
     ports:
       - "${BIND_IP}:3007:3000"
     depends_on:
-      - langfuse-db
+      langfuse-db:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://langfuse:${LANGFUSE_DB_PASSWORD}@langfuse-db:5432/langfuse
       - NEXTAUTH_SECRET=${LANGFUSE_SECRET}
@@ -299,7 +458,19 @@ services:
         limits:
           memory: 1G
     networks:
-      - ai-network
+      - db-network
+      - tools-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/public/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   flowise:
     image: flowiseai/flowise:latest
@@ -317,7 +488,18 @@ services:
         limits:
           memory: 1G
     networks:
-      - ai-network
+      - tools-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ===========================================================================
   # Manic AI - Unified API
@@ -361,7 +543,14 @@ services:
         limits:
           memory: 1G
     networks:
-      - ai-network
+      - db-network
+      - app-network
+      - tools-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ===========================================================================
   # Manic AI - Frontend
@@ -387,10 +576,104 @@ services:
         limits:
           memory: 512M
     networks:
-      - ai-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Obsidian AI Agent (Paddy) - Sidecar
+  # ===========================================================================
+  paddy-agent:
+    build:
+      context: ./obsidian-agent
+      dockerfile: Dockerfile
+    container_name: paddy-agent
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:8123:8123"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB}
+      - OBSIDIAN_VAULT_PATH=/vault
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ${OBSIDIAN_VAULT_PATH:-./obsidian-vault}:/vault:rw
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - db-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8123/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  paddy-rag-pipeline:
+    build: ./obsidian-agent/backend_rag_pipeline
+    container_name: paddy-rag-pipeline
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - RAG_PIPELINE_TYPE=local
+      - RUN_MODE=continuous
+      - RAG_PIPELINE_ID=${RAG_PIPELINE_ID:-obsidian-vault-rag}
+      - RAG_WATCH_DIRECTORY=/vault
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-http://ollama:11434/v1}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-ollama}
+      - EMBEDDING_MODEL_CHOICE=${EMBEDDING_MODEL_CHOICE:-nomic-embed-text}
+    volumes:
+      - ${OBSIDIAN_VAULT_PATH:-./obsidian-vault}:/vault:ro
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - db-network
+      - app-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; import sys; sys.exit(0 if os.path.exists('/vault') else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
-  ai-network:
+  db-network:
+    driver: bridge
+  app-network:
+    driver: bridge
+  tools-network:
     driver: bridge
 
 volumes:

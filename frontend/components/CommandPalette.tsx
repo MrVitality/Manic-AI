@@ -1,33 +1,42 @@
 'use client'
 
 import { useEffect, useRef, useMemo, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCommandPaletteStore } from '@/lib/stores/commandPaletteStore'
 import { useChatStore } from '@/lib/store'
-import type { Command, ActiveView } from '@/types'
+import { useConversationStore } from '@/lib/stores/conversationStore'
+import { useModelStore } from '@/lib/stores/modelStore'
+import type { Command } from '@/types'
+import { SearchIcon } from '@/components/ui/Icons'
 
 export default function CommandPalette() {
   const { isOpen, query, selectedIndex, close, setQuery, setSelectedIndex } = useCommandPaletteStore()
   const {
     conversations, documents, models,
-    createConversation, setActiveView, updateSettings, settings,
+    createConversation, updateSettings, settings,
     useRag, setUseRag,
   } = useChatStore()
+  const router = useRouter()
 
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+
+  const navigateTo = useCallback((path: string) => {
+    router.push(path)
+  }, [router])
 
   // Build command list
   const commands = useMemo((): Command[] => {
     const cmds: Command[] = [
       // Navigation
-      { id: 'nav-chat', label: 'Go to Chat', description: 'Open the chat view', category: 'navigation', shortcut: 'Escape', action: () => setActiveView('chat') },
-      { id: 'nav-docs', label: 'Go to Documents', description: 'Browse uploaded documents', category: 'navigation', shortcut: 'Ctrl+D', action: () => setActiveView('documents') },
-      { id: 'nav-models', label: 'Go to Models', description: 'Manage AI models', category: 'navigation', shortcut: 'Ctrl+M', action: () => setActiveView('models') },
-      { id: 'nav-dashboard', label: 'Go to Dashboard', description: 'System command center', category: 'navigation', shortcut: 'Ctrl+H', action: () => setActiveView('dashboard') },
-      { id: 'nav-rag', label: 'Go to RAG Center', description: 'Knowledge base management', category: 'navigation', shortcut: 'Ctrl+R', action: () => setActiveView('rag') },
-      { id: 'nav-settings', label: 'Go to Settings', description: 'Advanced configuration', category: 'navigation', shortcut: 'Ctrl+,', action: () => setActiveView('settings') },
+      { id: 'nav-chat', label: 'Go to Chat', description: 'Open the chat view', category: 'navigation', shortcut: 'Escape', action: () => navigateTo('/chat') },
+      { id: 'nav-docs', label: 'Go to Documents', description: 'Browse uploaded documents', category: 'navigation', shortcut: 'Ctrl+D', action: () => navigateTo('/documents') },
+      { id: 'nav-models', label: 'Go to Models', description: 'Manage AI models', category: 'navigation', shortcut: 'Ctrl+M', action: () => navigateTo('/models') },
+      { id: 'nav-dashboard', label: 'Go to Dashboard', description: 'System command center', category: 'navigation', shortcut: 'Ctrl+H', action: () => navigateTo('/dashboard') },
+      { id: 'nav-rag', label: 'Go to RAG Center', description: 'Knowledge base management', category: 'navigation', shortcut: 'Ctrl+R', action: () => navigateTo('/rag') },
+      { id: 'nav-settings', label: 'Go to Settings', description: 'Advanced configuration', category: 'navigation', shortcut: 'Ctrl+,', action: () => navigateTo('/settings') },
       // Actions
-      { id: 'action-new-chat', label: 'New Chat', description: 'Start a new conversation', category: 'action', shortcut: 'Ctrl+N', action: () => { createConversation(); setActiveView('chat') } },
+      { id: 'action-new-chat', label: 'New Chat', description: 'Start a new conversation', category: 'action', shortcut: 'Ctrl+N', action: () => { createConversation(); navigateTo('/chat') } },
       { id: 'action-toggle-theme', label: 'Toggle Theme', description: `Switch to ${settings.theme === 'dark' ? 'light' : 'dark'} mode`, category: 'action', action: () => updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' }) },
       { id: 'action-toggle-rag', label: 'Toggle RAG', description: `${useRag ? 'Disable' : 'Enable'} RAG for chat`, category: 'action', action: () => setUseRag(!useRag) },
       { id: 'action-refresh', label: 'Refresh View', description: 'Reload current view data', category: 'action', shortcut: 'Ctrl+.', action: () => window.dispatchEvent(new CustomEvent('manic-refresh')) },
@@ -41,8 +50,8 @@ export default function CommandPalette() {
         description: `${conv.messages.length} messages`,
         category: 'conversation',
         action: () => {
-          useChatStore.getState().selectConversation(conv.id)
-          setActiveView('chat')
+          useConversationStore.getState().selectConversation(conv.id)
+          navigateTo('/chat')
         },
       })
     })
@@ -54,7 +63,7 @@ export default function CommandPalette() {
         label: doc.filename,
         description: `${doc.content_type} · ${doc.chunk_count} chunks`,
         category: 'document',
-        action: () => setActiveView('documents'),
+        action: () => navigateTo('/documents'),
       })
     })
 
@@ -66,14 +75,14 @@ export default function CommandPalette() {
         description: model.details ? `${model.details.parameter_size} · ${model.details.quantization_level}` : 'AI Model',
         category: 'model',
         action: () => {
-          useChatStore.getState().setSelectedModel(model.name)
-          setActiveView('chat')
+          useModelStore.getState().setSelectedModel(model.name)
+          navigateTo('/chat')
         },
       })
     })
 
     return cmds
-  }, [conversations, documents, models, settings.theme, useRag, createConversation, setActiveView, updateSettings, setUseRag])
+  }, [conversations, documents, models, settings.theme, useRag, createConversation, navigateTo, updateSettings, setUseRag])
 
   // Fuzzy filter
   const filtered = useMemo(() => {
@@ -178,7 +187,7 @@ export default function CommandPalette() {
       >
         {/* Search Input */}
         <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--border-color)' }}>
-          <SearchIcon />
+          <SearchIcon className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
           <input
             ref={inputRef}
             value={query}
@@ -284,14 +293,6 @@ export default function CommandPalette() {
 }
 
 // Icons
-function SearchIcon() {
-  return (
-    <svg className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  )
-}
-
 function CategoryIcon({ category }: { category: string }) {
   const style = { color: 'var(--text-muted)' }
   switch (category) {

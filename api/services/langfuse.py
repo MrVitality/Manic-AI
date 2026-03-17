@@ -1,23 +1,32 @@
+"""Langfuse tracing integration."""
+
 import logging
 
-from api.config import LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
+from api.config import settings
 
 logger = logging.getLogger(__name__)
 
-langfuse_client = None
+_langfuse_client = None
 
 
-def init_langfuse():
-    global langfuse_client
+def _set_langfuse(client):
+    import api.services.langfuse as _mod
+    _mod._langfuse_client = client
+
+
+def init_langfuse(*, app=None):
     try:
         from langfuse import Langfuse
-        if LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY:
-            langfuse_client = Langfuse(
-                public_key=LANGFUSE_PUBLIC_KEY,
-                secret_key=LANGFUSE_SECRET_KEY,
-                host=LANGFUSE_HOST,
+        if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
+            client = Langfuse(
+                public_key=settings.LANGFUSE_PUBLIC_KEY,
+                secret_key=settings.LANGFUSE_SECRET_KEY,
+                host=settings.LANGFUSE_HOST,
             )
+            _set_langfuse(client)
             logger.info("Langfuse tracing enabled")
+            if app is not None:
+                app.state.langfuse = client
     except ImportError:
         pass
     except Exception as e:
@@ -25,4 +34,4 @@ def init_langfuse():
 
 
 def get_langfuse():
-    return langfuse_client
+    return _langfuse_client

@@ -29,6 +29,9 @@ venv/
 .env.*
 !.env.example
 
+# Cloned subprojects
+obsidian-agent/
+
 # OS
 .DS_Store
 Thumbs.db
