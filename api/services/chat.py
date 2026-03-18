@@ -14,6 +14,7 @@ from api.repositories.supabase_vector import SupabaseVectorRepository
 from api.schemas.chat import ChatMessage, ChatRequest, ChatResponse, Citation
 from api.services.embedding import generate_embedding
 from api.services.reranker import rerank_chunks
+from api.services.model_router import chat_completion as routed_chat_completion, chat_completion_stream
 from api.services.token_counter import (
     compute_budgets,
     truncate_messages_to_budget,
@@ -152,20 +153,12 @@ async def complete_chat(
     citations = _build_citations(sources) if sources else []
 
     try:
-        response = await client.post(
-            f"{settings.OLLAMA_URL}/api/chat",
-            json={
-                "model": model,
-                "messages": messages,
-                "stream": False,
-                "options": {"temperature": request.temperature},
-            },
-            timeout=120.0,
+        result = await routed_chat_completion(
+            messages, model, stream=False, http_client=client,
+            temperature=request.temperature,
         )
-        response.raise_for_status()
-        data = response.json()
     except httpx.HTTPError:
-        logger.exception("Ollama chat request failed")
+        logger.exception("Chat request failed via model router")
         if trace:
             trace.update(level="ERROR", status_message="Chat service unavailable")
         raise
@@ -175,9 +168,9 @@ async def complete_chat(
             trace.update(level="ERROR", status_message="Internal server error")
         raise
 
-    response_text = data.get("message", {}).get("content", "")
-    prompt_tokens = data.get("prompt_eval_count", 0)
-    completion_tokens = data.get("eval_count", 0)
+    response_text = result["content"]
+    prompt_tokens = result["prompt_tokens"]
+    completion_tokens = result["completion_tokens"]
     latency_ms = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
 
     await log_chat(db, model, prompt_tokens, completion_tokens, latency_ms, bool(sources))
@@ -232,28 +225,16 @@ async def stream_chat(
         start = datetime.now(timezone.utc)
         prompt_tokens = 0
         completion_tokens = 0
-        async with client.stream(
-            "POST",
-            f"{settings.OLLAMA_URL}/api/chat",
-            json={
-                "model": model,
-                "messages": messages,
-                "stream": True,
-                "options": {"temperature": request.temperature},
-            },
-        ) as response:
-            async for line in response.aiter_lines():
-                if not line:
-                    continue
-                chunk = json.loads(line)
-                content = chunk.get("message", {}).get("content", "")
-                if content:
-                    yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
-                if chunk.get("done"):
-                    prompt_tokens = chunk.get("prompt_eval_count", 0)
-                    completion_tokens = chunk.get("eval_count", 0)
-                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
-                    break
+        async for chunk in chat_completion_stream(
+            messages, model, client, temperature=request.temperature,
+        ):
+            if chunk["type"] == "content":
+                yield f"data: {json.dumps({'type': 'content', 'content': chunk['content']})}\n\n"
+            elif chunk["type"] == "done":
+                prompt_tokens = chunk.get("prompt_tokens", 0)
+                completion_tokens = chunk.get("completion_tokens", 0)
+                yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                break
         latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
         await log_chat(db, model, prompt_tokens, completion_tokens, latency_ms, bool(sources))
     except Exception:

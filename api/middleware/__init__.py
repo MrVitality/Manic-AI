@@ -1,1 +1,1 @@
-"""Request middleware for observability and tracing."""
+"""Request middleware for observability, tracing, and security."""

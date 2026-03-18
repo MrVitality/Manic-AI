@@ -22,9 +22,15 @@ class Settings(BaseSettings):
     SEARXNG_URL: str = "http://ai-searxng:8080"
 
     # --- Model defaults ---
-    EMBEDDING_MODEL: str = "nomic-embed-text"
+    # BGE-M3 produces 1024-dim embeddings. Requires: ollama pull bge-m3
+    EMBEDDING_MODEL: str = "bge-m3"
+    EMBEDDING_MODEL_LEGACY: str = "nomic-embed-text"  # backward compat reference
     CHAT_MODEL: str = "llama3.2:3b"
-    VECTOR_DIMENSION: int = 768
+    VECTOR_DIMENSION: int = 1024
+
+    # --- Inference backend ---
+    INFERENCE_BACKEND: str = "ollama"  # "ollama" or "vllm"
+    VLLM_URL: str = ""  # empty = disabled, use Ollama
 
     # --- RAG tuning ---
     RAG_TOP_K: int = 5
@@ -39,6 +45,10 @@ class Settings(BaseSettings):
 
     # --- Auth ---
     API_SECRET_KEY: str = ""
+
+    # --- Security guardrails ---
+    GUARDRAILS_ENABLED: bool = True
+    PII_REDACTION_ENABLED: bool = False
 
     # --- CORS ---
     CORS_ORIGINS: str = ""
@@ -109,6 +119,7 @@ REDIS_URL = settings.REDIS_URL
 QDRANT_URL = settings.QDRANT_URL
 SEARXNG_URL = settings.SEARXNG_URL
 EMBEDDING_MODEL = settings.EMBEDDING_MODEL
+EMBEDDING_MODEL_LEGACY = settings.EMBEDDING_MODEL_LEGACY
 CHAT_MODEL = settings.CHAT_MODEL
 VECTOR_DIMENSION = settings.VECTOR_DIMENSION
 RAG_TOP_K = settings.RAG_TOP_K
@@ -118,3 +129,5 @@ RAG_CONTEXT_WINDOW = settings.RAG_CONTEXT_WINDOW
 LANGFUSE_PUBLIC_KEY = settings.LANGFUSE_PUBLIC_KEY
 LANGFUSE_SECRET_KEY = settings.LANGFUSE_SECRET_KEY
 LANGFUSE_HOST = settings.LANGFUSE_HOST
+INFERENCE_BACKEND = settings.INFERENCE_BACKEND
+VLLM_URL = settings.VLLM_URL

@@ -2,20 +2,31 @@
 
 After hybrid search retrieves candidate chunks, this module reranks them
 by asking the LLM to score each chunk's relevance to the query.
+
+Supports two modes:
+- "batch" (default): Scores all candidates in a single LLM call via
+  cross_encoder.cross_encode_rerank(). Much faster for large candidate sets.
+- "individual" (legacy): Scores each candidate with a separate LLM call.
+  Used as a fallback when batch scoring fails.
+
+Configure via the ``reranker_mode`` parameter or settings.
 """
 
+import asyncio
 import json
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal, Optional
 
 import httpx
 
 from api.config import settings
+from api.services.cross_encoder import cross_encode_rerank
 
 logger = logging.getLogger(__name__)
 
 # Default reranking parameters
 DEFAULT_RERANK_TOP_N = 5
+DEFAULT_RERANKER_MODE: Literal["batch", "individual"] = "batch"
 RERANK_MODEL = None  # uses settings.CHAT_MODEL if not overridden
 
 _SCORING_PROMPT_TEMPLATE = (
@@ -35,7 +46,7 @@ async def _score_chunk(
     client: httpx.AsyncClient,
     model: str,
 ) -> float:
-    """Score a single chunk's relevance to the query using Ollama."""
+    """Score a single chunk's relevance to the query using Ollama (individual mode)."""
     prompt = _SCORING_PROMPT_TEMPLATE.format(
         query=query,
         chunk=chunk.get("content", "")[:1000],  # limit chunk size sent to LLM
@@ -65,12 +76,38 @@ async def _score_chunk(
         return 0.0
 
 
+async def _rerank_individual(
+    query: str,
+    chunks: List[Dict[str, Any]],
+    client: httpx.AsyncClient,
+    top_n: int,
+    model: str,
+) -> List[Dict[str, Any]]:
+    """Legacy individual scoring: one LLM call per candidate chunk."""
+    scores = await asyncio.gather(
+        *[_score_chunk(query, chunk, client, model) for chunk in chunks],
+        return_exceptions=True,
+    )
+
+    scored_chunks: List[Dict[str, Any]] = []
+    for chunk, score in zip(chunks, scores):
+        rerank_score = score if isinstance(score, float) else 0.0
+        scored_chunks.append({**chunk, "rerank_score": rerank_score})
+
+    scored_chunks.sort(
+        key=lambda c: (c.get("rerank_score", 0), c.get("score", 0)),
+        reverse=True,
+    )
+    return scored_chunks[:top_n]
+
+
 async def rerank_chunks(
     query: str,
     chunks: List[Dict[str, Any]],
     client: httpx.AsyncClient,
     top_n: int = DEFAULT_RERANK_TOP_N,
-    model: str = None,
+    model: Optional[str] = None,
+    reranker_mode: Literal["batch", "individual"] = DEFAULT_RERANKER_MODE,
 ) -> List[Dict[str, Any]]:
     """Rerank search result chunks by LLM-scored relevance.
 
@@ -79,29 +116,41 @@ async def rerank_chunks(
 
     Each returned chunk gets an additional ``rerank_score`` field (0-10).
     The original ``score`` from the retrieval stage is preserved.
+
+    Parameters
+    ----------
+    query : str
+        The user query.
+    chunks : list of dict
+        Candidate chunks from retrieval.
+    client : httpx.AsyncClient
+        Shared HTTP client.
+    top_n : int
+        Number of top results to return.
+    model : str, optional
+        Override the scoring model.
+    reranker_mode : "batch" | "individual"
+        "batch" (default): single LLM call for all candidates.
+        "individual" (legacy): one LLM call per candidate.
     """
     if not chunks:
         return []
 
     rerank_model = model or RERANK_MODEL or settings.CHAT_MODEL
 
-    # Score all chunks concurrently
-    import asyncio
-    scores = await asyncio.gather(
-        *[_score_chunk(query, chunk, client, rerank_model) for chunk in chunks],
-        return_exceptions=True,
-    )
+    if reranker_mode == "batch":
+        try:
+            return await cross_encode_rerank(
+                query=query,
+                chunks=chunks,
+                top_n=top_n,
+                http_client=client,
+                model=rerank_model,
+            )
+        except RuntimeError:
+            logger.warning(
+                "Batch reranking failed, falling back to individual scoring"
+            )
+            # Fall through to individual mode
 
-    scored_chunks: List[Dict[str, Any]] = []
-    for chunk, score in zip(chunks, scores):
-        rerank_score = score if isinstance(score, float) else 0.0
-        scored_chunk = {**chunk, "rerank_score": rerank_score}
-        scored_chunks.append(scored_chunk)
-
-    # Sort by rerank score descending, break ties with original retrieval score
-    scored_chunks.sort(
-        key=lambda c: (c.get("rerank_score", 0), c.get("score", 0)),
-        reverse=True,
-    )
-
-    return scored_chunks[:top_n]
+    return await _rerank_individual(query, chunks, client, top_n, rerank_model)

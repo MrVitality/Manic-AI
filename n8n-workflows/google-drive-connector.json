@@ -1,0 +1,239 @@
+{
+  "name": "Google Drive → Manic AI Ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "list",
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.google_drive_folder_id || 'root' }}"
+        },
+        "returnAll": true,
+        "options": {
+          "fields": ["id", "name", "mimeType", "modifiedTime", "webViewLink"]
+        }
+      },
+      "id": "gdrive-list-files",
+      "name": "Google Drive - List Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [460, 300],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Drive OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "filter-type",
+              "leftValue": "={{ $json.mimeType }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "oneOf",
+                "rightType": "array"
+              },
+              "rightValueArray": [
+                "application/vnd.google-apps.document",
+                "text/plain",
+                "text/markdown",
+                "text/html",
+                "application/pdf"
+              ]
+            },
+            {
+              "id": "filter-modified",
+              "leftValue": "={{ $json.modifiedTime }}",
+              "rightValue": "={{ $('Store Last Run').item.json.last_run || '2000-01-01T00:00:00Z' }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-supported",
+      "name": "Filter Supported & Recent",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "text/plain"
+            }
+          }
+        }
+      },
+      "id": "gdrive-download",
+      "name": "Google Drive - Download Content",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [900, 300],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "Google Drive OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8081/v1/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $('Google Drive - List Files').item.json.name, content: $binary.data ? Buffer.from($binary.data.data, 'base64').toString('utf-8') : '', collection: 'google-drive', content_type: $('Google Drive - List Files').item.json.mimeType === 'application/vnd.google-apps.document' ? 'text/plain' : $('Google Drive - List Files').item.json.mimeType, metadata: { source: 'google-drive', file_id: $('Google Drive - List Files').item.json.id, file_name: $('Google Drive - List Files').item.json.name, modified_time: $('Google Drive - List Files').item.json.modifiedTime, web_link: $('Google Drive - List Files').item.json.webViewLink } }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "ingest-api",
+      "name": "POST to Manic AI Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "last_run",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "store-last-run",
+      "name": "Store Last Run",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "content": "={{ 'Ingested ' + $input.all().length + ' files from Google Drive at ' + new Date().toISOString() }}"
+      },
+      "id": "log-result",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1340, 480]
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - List Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - List Files": {
+      "main": [
+        [
+          {
+            "node": "Filter Supported & Recent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Supported & Recent": {
+      "main": [
+        [
+          {
+            "node": "Google Drive - Download Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive - Download Content": {
+      "main": [
+        [
+          {
+            "node": "POST to Manic AI Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to Manic AI Ingest": {
+      "main": [
+        [
+          {
+            "node": "Store Last Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateId": "manic-ai-google-drive-connector"
+  },
+  "tags": [
+    {
+      "name": "manic-ai",
+      "id": "manic-ai"
+    },
+    {
+      "name": "knowledge-source",
+      "id": "knowledge-source"
+    }
+  ]
+}

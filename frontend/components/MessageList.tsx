@@ -5,7 +5,9 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import type { Message, RagSource } from '@/types'
+import ToolCallCard from './ToolCallCard'
+import type { ToolCallData } from './ToolCallCard'
+import type { Message, RagSource, ToolCallInfo } from '@/types'
 
 interface MessageListProps {
   messages: Message[]
@@ -85,11 +87,11 @@ interface MessageItemProps {
   onRegenerate?: () => void
 }
 
-const MemoizedMessageItem = memo(function MessageItem({
+const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
   message,
   isLast,
   onRegenerate,
-}: MessageItemProps) {
+}) {
   const [copied, setCopied] = useState(false)
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
@@ -195,6 +197,42 @@ const MemoizedMessageItem = memo(function MessageItem({
             </div>
           )}
 
+          {/* Tool Call Status Cards */}
+          {isAssistant && message.toolCalls && message.toolCalls.length > 0 && (
+            <div className="mt-3">
+              {message.toolCalls.map((tc) => (
+                <ToolCallCard
+                  key={tc.id}
+                  toolCall={{
+                    id: tc.id,
+                    toolName: tc.toolName,
+                    status: tc.status,
+                    description: tc.description,
+                    sources: tc.sources,
+                    error: tc.error,
+                    startedAt: tc.startedAt,
+                    completedAt: tc.completedAt,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Searching indicator when streaming with RAG but no tool calls yet */}
+          {isAssistant && message.isStreaming && !message.content && !message.toolCalls?.length && (
+            <div className="mt-2">
+              <ToolCallCard
+                toolCall={{
+                  id: 'search-pending',
+                  toolName: 'RAG_SEARCH',
+                  status: 'pending',
+                  description: 'Searching knowledge base...',
+                  startedAt: Date.now(),
+                }}
+              />
+            </div>
+          )}
+
           {/* RAG Source Citations */}
           {isAssistant && !message.isStreaming && message.sources && message.sources.length > 0 && (
             <SourceCitations sources={message.sources} />
@@ -238,11 +276,16 @@ const MemoizedMessageItem = memo(function MessageItem({
   )
 }, (prev, next) => {
   // Custom comparison: re-render only when message content or streaming state changes
+  const toolCallsEqual =
+    (prev.message.toolCalls?.length ?? 0) === (next.message.toolCalls?.length ?? 0) &&
+    (prev.message.toolCalls ?? []).every((tc, i) => tc.status === next.message.toolCalls?.[i]?.status)
+
   return (
     prev.message.id === next.message.id &&
     prev.message.content === next.message.content &&
     prev.message.isStreaming === next.message.isStreaming &&
     prev.message.error === next.message.error &&
+    toolCallsEqual &&
     prev.isLast === next.isLast &&
     prev.onRegenerate === next.onRegenerate
   )

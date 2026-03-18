@@ -320,6 +320,22 @@
   animation: slideIn 0.2s ease-out;
 }
 
+@keyframes slideInRight {
+  from {
+    transform: translateX(40%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.25s ease-out;
+}
+
 @keyframes glow {
 
   0%,
@@ -575,6 +591,7 @@
   .animate-fade-in,
   .animate-pulse-slow,
   .animate-slide-in,
+  .animate-slide-in-right,
   .animate-glow {
     animation: none !important;
   }
@@ -600,6 +617,7 @@
 [data-reduced-motion="true"] .animate-fade-in,
 [data-reduced-motion="true"] .animate-pulse-slow,
 [data-reduced-motion="true"] .animate-slide-in,
+[data-reduced-motion="true"] .animate-slide-in-right,
 [data-reduced-motion="true"] .animate-glow {
   animation: none !important;
 }

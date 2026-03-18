@@ -6,8 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.auth import require_api_key
 from api.config import settings
+from api.middleware.guardrails import GuardrailsMiddleware
 from api.middleware.metrics import MetricsMiddleware
 from api.middleware.request_id import RequestIdMiddleware
+from api.middleware.security_headers import SecurityHeadersMiddleware
 
 from api.database import init_pool, close_pool
 from api.http_client import init_client, close_client
@@ -16,7 +18,7 @@ from api.services.langfuse import init_langfuse
 from api.services.health_logger import health_log_loop
 
 # Import all routers
-from api.routers import health, chat, ingest, documents, collections, qdrant, search, analytics, system, models
+from api.routers import health, chat, ingest, documents, collections, qdrant, search, analytics, system, models, agent
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +114,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # --- Observability middleware ---
-    # Order matters: RequestId runs first (outermost), then Metrics.
+    # --- Observability & security middleware ---
+    # Order matters: outermost runs first.
+    # RequestId -> SecurityHeaders -> Guardrails -> Metrics
     _app.add_middleware(MetricsMiddleware)
+    _app.add_middleware(GuardrailsMiddleware)
+    _app.add_middleware(SecurityHeadersMiddleware)
     _app.add_middleware(RequestIdMiddleware)
 
     # --- API versioning ---
@@ -135,6 +140,7 @@ def create_app() -> FastAPI:
     v1_router.include_router(analytics.router, dependencies=auth_dep, tags=["analytics"])
     v1_router.include_router(system.router, dependencies=auth_dep, tags=["system"])
     v1_router.include_router(models.router, dependencies=auth_dep, tags=["models"])
+    v1_router.include_router(agent.router, dependencies=auth_dep, tags=["agent"])
 
     _app.include_router(v1_router)
 

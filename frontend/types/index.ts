@@ -2,6 +2,20 @@
 // Manic AI - Type Definitions
 // =============================================================================
 
+// Tool call types
+export type ToolCallStatus = 'pending' | 'complete' | 'error'
+
+export interface ToolCallInfo {
+  id: string
+  toolName: string
+  status: ToolCallStatus
+  description: string
+  sources?: RagSource[]
+  error?: string
+  startedAt: number
+  completedAt?: number
+}
+
 // Message types
 export interface Message {
   id: string
@@ -12,6 +26,7 @@ export interface Message {
   isStreaming?: boolean
   error?: string
   sources?: RagSource[]
+  toolCalls?: ToolCallInfo[]
 }
 
 // Conversation types
@@ -123,7 +138,7 @@ export type ActiveView = 'chat' | 'documents' | 'models' | 'dashboard' | 'rag' |
 // Dashboard types
 export type DashboardTab = 'overview' | 'services' | 'performance'
 export type RagCenterTab = 'pipeline' | 'collections' | 'search-lab' | 'analytics'
-export type SettingsSection = 'general' | 'models' | 'rag' | 'inference' | 'appearance' | 'data' | 'shortcuts'
+export type SettingsSection = 'general' | 'models' | 'rag' | 'inference' | 'appearance' | 'data' | 'connectors' | 'shortcuts'
 
 // Service health snapshot
 export interface ServiceHealthSnapshot {

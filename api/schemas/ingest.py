@@ -28,6 +28,17 @@ class IngestRequest(BaseModel):
     chunk_overlap: int = Field(default=50, ge=0)
     backend: Literal["supabase", "qdrant", "both"] = "both"
     chunking_strategy: Literal["simple", "semantic"] = "simple"
+    enrich_context: bool = Field(
+        default=False,
+        description="When True, each chunk is enriched with a contextual summary "
+        "via LLM before embedding, improving retrieval quality.",
+    )
+    multimodal: bool = Field(
+        default=False,
+        description="When True and content_type is 'application/pdf', uses ColPali-style "
+        "multimodal ingestion: converts pages to images, describes via vision LLM, "
+        "then embeds the descriptions.",
+    )
 
     @model_validator(mode="after")
     def validate_overlap_less_than_size(self):

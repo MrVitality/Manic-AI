@@ -1,0 +1,243 @@
+{
+  "name": "Confluence → Manic AI Ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.confluence_base_url || 'https://your-domain.atlassian.net' }}/wiki/rest/api/content",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "expand",
+              "value": "body.storage,version,history.lastUpdated"
+            },
+            {
+              "name": "limit",
+              "value": "50"
+            },
+            {
+              "name": "orderby",
+              "value": "history.lastUpdated desc"
+            },
+            {
+              "name": "type",
+              "value": "page"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "confluence-list",
+      "name": "Confluence - List Pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "REPLACE_ME",
+          "name": "Confluence Basic Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = $input.all();\nconst results = [];\nconst lastRun = $('Store Last Run').item?.json?.last_run || '2000-01-01T00:00:00Z';\nconst lastRunDate = new Date(lastRun);\n\nfor (const item of items) {\n  const pages = item.json.results || [];\n  for (const page of pages) {\n    const lastUpdated = new Date(page.history?.lastUpdated?.when || page.version?.when || '2000-01-01');\n    if (lastUpdated > lastRunDate) {\n      results.push({\n        json: {\n          id: page.id,\n          title: page.title,\n          body_html: page.body?.storage?.value || '',\n          last_updated: lastUpdated.toISOString(),\n          space_key: page._expandable?.space?.split('/').pop() || 'unknown',\n          web_link: page._links?.webui || ''\n        }\n      });\n    }\n  }\n}\n\nreturn results.length > 0 ? results : [{ json: { _empty: true } }];"
+      },
+      "id": "filter-extract",
+      "name": "Filter Recent & Extract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "not-empty",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEqual"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "skip-empty",
+      "name": "Skip If Empty",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const html = item.json.body_html || '';\n  // Strip HTML tags, decode entities, normalize whitespace\n  const text = html\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/p>/gi, '\\n\\n')\n    .replace(/<\\/h[1-6]>/gi, '\\n\\n')\n    .replace(/<\\/li>/gi, '\\n')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n  \n  results.push({\n    json: {\n      ...item.json,\n      content_text: text\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "html-to-text",
+      "name": "Extract Text from HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8081/v1/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $json.title, content: $json.content_text, collection: 'confluence', content_type: 'text/plain', metadata: { source: 'confluence', page_id: $json.id, space_key: $json.space_key, last_updated: $json.last_updated, web_link: $json.web_link } }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "ingest-api",
+      "name": "POST to Manic AI Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "last_run",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "store-last-run",
+      "name": "Store Last Run",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "content": "={{ 'Ingested ' + $input.all().length + ' pages from Confluence at ' + new Date().toISOString() }}"
+      },
+      "id": "log-result",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1560, 480]
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Confluence - List Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confluence - List Pages": {
+      "main": [
+        [
+          {
+            "node": "Filter Recent & Extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Recent & Extract": {
+      "main": [
+        [
+          {
+            "node": "Skip If Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip If Empty": {
+      "main": [
+        [
+          {
+            "node": "Extract Text from HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Text from HTML": {
+      "main": [
+        [
+          {
+            "node": "POST to Manic AI Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to Manic AI Ingest": {
+      "main": [
+        [
+          {
+            "node": "Store Last Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateId": "manic-ai-confluence-connector"
+  },
+  "tags": [
+    {
+      "name": "manic-ai",
+      "id": "manic-ai"
+    },
+    {
+      "name": "knowledge-source",
+      "id": "knowledge-source"
+    }
+  ]
+}

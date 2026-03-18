@@ -155,10 +155,13 @@ export interface ChatOptions {
 }
 
 export interface StreamEvent {
-  type: 'content' | 'sources' | 'done' | 'error'
+  type: 'content' | 'sources' | 'done' | 'error' | 'tool_start' | 'tool_end'
   content?: string
   sources?: any[]
   error?: string
+  tool_name?: string
+  tool_call_id?: string
+  tool_description?: string
 }
 
 export async function* streamChat(

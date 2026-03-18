@@ -15,7 +15,9 @@ from api.repositories.qdrant_vector import QdrantVectorRepository
 from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.schemas.ingest import IngestRequest, IngestResponse
 from api.services.chunking import chunk_document, chunk_text
+from api.services.context_enricher import enrich_chunks_batch
 from api.services.embedding import generate_embedding
+from api.services.pii_detector import redact_pii
 from api.services.preprocessor import detect_and_extract
 
 logger = logging.getLogger(__name__)
@@ -129,12 +131,30 @@ async def ingest_document(
         # Preprocess content based on content_type
         content = detect_and_extract(request.content, request.content_type or "text/plain")
 
+        # Redact PII from content before chunking when enabled
+        if settings.PII_REDACTION_ENABLED:
+            content = redact_pii(content)
+
         chunks = chunk_document(
             content,
             strategy=request.chunking_strategy,
             chunk_size=request.chunk_size,
             chunk_overlap=request.chunk_overlap,
         )
+
+        # Optional contextual enrichment: prepend LLM-generated context to each chunk
+        if request.enrich_context:
+            logger.info(
+                "Enriching %d chunks with contextual summaries for %s",
+                len(chunks),
+                request.filename,
+            )
+            chunks = await enrich_chunks_batch(
+                chunks=chunks,
+                document_title=request.filename,
+                full_content=content,
+                http_client=client,
+            )
 
         chunk_embeddings = await asyncio.gather(
             *[generate_embedding(chunk["content"], client=client) for chunk in chunks],

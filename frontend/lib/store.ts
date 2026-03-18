@@ -85,6 +85,7 @@ export { useUiStore } from '@/lib/stores/uiStore'
 export { useCommandPaletteStore } from '@/lib/stores/commandPaletteStore'
 export { useDashboardStore } from '@/lib/stores/dashboardStore'
 export { useRagStore } from '@/lib/stores/ragStore'
+export { useArtifactStore } from '@/lib/stores/artifactStore'
 
 // Static access for non-hook contexts (e.g., inside callbacks)
 // Usage: chatStoreApi.getState().conversations

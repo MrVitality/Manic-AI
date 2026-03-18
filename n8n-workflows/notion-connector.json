@@ -1,0 +1,210 @@
+{
+  "name": "Notion → Manic AI Ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": "={{ $json.notion_database_id }}",
+        "returnAll": true,
+        "filterType": "string",
+        "filterJson": "={{ JSON.stringify({ filter: { timestamp: 'last_edited_time', last_edited_time: { on_or_after: $('Store Last Run').item.json.last_run || new Date(Date.now() - 6*60*60*1000).toISOString() } } }) }}",
+        "options": {}
+      },
+      "id": "notion-list-pages",
+      "name": "Notion - List Modified Pages",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [460, 300],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "filter-modified",
+              "leftValue": "={{ $json.last_edited_time }}",
+              "rightValue": "={{ $('Store Last Run').item.json.last_run || '2000-01-01T00:00:00Z' }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-recent",
+      "name": "Filter Recently Modified",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "resource": "block",
+        "operation": "getAll",
+        "blockId": "={{ $json.id }}",
+        "returnAll": true
+      },
+      "id": "notion-get-content",
+      "name": "Notion - Get Page Content",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [900, 300],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8081/v1/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $('Notion - List Modified Pages').item.json.properties.Name?.title?.[0]?.plain_text || $('Notion - List Modified Pages').item.json.properties.title?.title?.[0]?.plain_text || 'Untitled', content: $json.results.map(b => b.paragraph?.rich_text?.map(t => t.plain_text).join('') || '').filter(Boolean).join('\\n\\n'), collection: 'notion', content_type: 'text/markdown', metadata: { source: 'notion', page_id: $('Notion - List Modified Pages').item.json.id, last_edited: $('Notion - List Modified Pages').item.json.last_edited_time } }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "ingest-api",
+      "name": "POST to Manic AI Ingest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "last_run",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "store-last-run",
+      "name": "Store Last Run",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "content": "={{ 'Ingested ' + $input.all().length + ' pages from Notion at ' + new Date().toISOString() }}"
+      },
+      "id": "log-result",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1340, 480]
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Notion - List Modified Pages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion - List Modified Pages": {
+      "main": [
+        [
+          {
+            "node": "Filter Recently Modified",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Recently Modified": {
+      "main": [
+        [
+          {
+            "node": "Notion - Get Page Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion - Get Page Content": {
+      "main": [
+        [
+          {
+            "node": "POST to Manic AI Ingest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to Manic AI Ingest": {
+      "main": [
+        [
+          {
+            "node": "Store Last Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateId": "manic-ai-notion-connector"
+  },
+  "tags": [
+    {
+      "name": "manic-ai",
+      "id": "manic-ai"
+    },
+    {
+      "name": "knowledge-source",
+      "id": "knowledge-source"
+    }
+  ]
+}

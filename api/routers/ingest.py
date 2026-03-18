@@ -28,6 +28,7 @@ from api.services.ingestion import (
     run_ingest_background,
     _update_job,
 )
+from api.services.multimodal_ingest import ingest_pdf_as_images
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,55 @@ async def ingest_document_endpoint(
 
     Returns immediately with a ``document_id`` and ``status: processing``.
     Use ``GET /v1/ingest/{document_id}/status`` to poll for completion.
+
+    When ``multimodal=True`` and ``content_type`` is ``application/pdf``,
+    the ColPali-style multimodal pipeline is used instead: pages are converted
+    to images and described via a vision LLM before embedding.
     """
+    # Route to multimodal pipeline if requested
+    if request.multimodal and request.content_type == "application/pdf":
+        import base64
+
+        try:
+            pdf_bytes = base64.b64decode(request.content)
+        except Exception:
+            raise HTTPException(
+                status_code=400,
+                detail="For multimodal PDF ingestion, 'content' must be base64-encoded PDF bytes.",
+            )
+
+        document_id = str(uuid4())
+        _update_job(document_id, status="pending", filename=request.filename)
+        if db:
+            await create_ingest_job(db, document_id, request.filename)
+
+        async def _run_multimodal(doc_id: str):
+            from api.services.ingestion import _update_job as _uj, _db_set_status
+            _uj(doc_id, status="processing")
+            if db:
+                await _db_set_status(db, doc_id, "processing")
+            try:
+                result = await ingest_pdf_as_images(
+                    pdf_bytes,
+                    request.filename,
+                    db,
+                    client,
+                    collection_id=request.collection_id,
+                    user_id=request.user_id,
+                    metadata=request.metadata,
+                )
+                _uj(doc_id, status=result["status"], chunks_created=result.get("pages_processed", 0))
+                if db:
+                    await _db_set_status(db, doc_id, result["status"], chunks_created=result.get("pages_processed", 0))
+            except Exception as exc:
+                _uj(doc_id, status="failed", error=str(exc))
+                if db:
+                    await _db_set_status(db, doc_id, "failed", error=str(exc))
+                logger.exception("Multimodal ingestion failed for %s", doc_id)
+
+        background_tasks.add_task(_run_multimodal, document_id)
+        return ok(IngestAccepted(document_id=document_id, status="processing").model_dump())
+
     document_id = str(uuid4())
 
     # Seed in-memory tracker

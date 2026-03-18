@@ -527,6 +527,8 @@ services:
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
       LANGFUSE_HOST: http://langfuse:3000
+      INFERENCE_BACKEND: ${INFERENCE_BACKEND:-ollama}
+      VLLM_URL: ${VLLM_URL:-}
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -538,6 +540,47 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - db-network
+      - app-network
+      - tools-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Manic AI - MCP Server
+  # ===========================================================================
+  mcp-server:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: manic-ai-mcp
+    restart: unless-stopped
+    command: ["python", "-m", "api.mcp_main"]
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      CHAT_MODEL: ${CHAT_MODEL:-llama3.2:3b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      VECTOR_DIMENSION: ${VECTOR_DIMENSION:-768}
+      SUPABASE_DB_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://ai-redis:6379
+      QDRANT_URL: http://qdrant:6333
+      SEARXNG_URL: http://ai-searxng:8080
+      RAG_TOP_K: ${RAG_TOP_K:-5}
+      RAG_THRESHOLD: ${RAG_THRESHOLD:-0.7}
+      RAG_KEYWORD_WEIGHT: ${RAG_KEYWORD_WEIGHT:-0.3}
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -662,6 +705,39 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # vLLM Production Inference (optional -- enable with: docker compose --profile vllm up)
+  # ===========================================================================
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: ai-vllm
+    profiles: ["vllm"]
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:8000:8000"
+    environment:
+      - MODEL_NAME=${VLLM_MODEL:-meta-llama/Llama-3.2-3B-Instruct}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     logging:
       driver: json-file
       options:
