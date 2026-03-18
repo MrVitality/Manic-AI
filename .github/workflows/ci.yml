@@ -47,7 +47,16 @@ jobs:
           key: pip-${{ runner.os }}-${{ hashFiles('api/requirements.txt') }}
           restore-keys: pip-${{ runner.os }}-
       - run: pip install -r api/requirements.txt
-      - run: pip install ruff pytest pytest-asyncio pytest-cov
+      - run: pip install ruff pytest pytest-asyncio pytest-cov psycopg2-binary
+      - name: Run Alembic migrations (no-op when DB unreachable)
+        run: |
+          if [ -n "$SUPABASE_DB_URL" ]; then
+            python -m alembic upgrade head
+          else
+            echo "SUPABASE_DB_URL not set — skipping migration in CI"
+          fi
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       - run: cd api && python -m pytest --tb=short -q
 
   # ------------------------------------------------------------------
