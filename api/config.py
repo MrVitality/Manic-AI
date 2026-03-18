@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # --- Auth ---
     API_SECRET_KEY: str = ""
 
+    # --- Agent ---
+    AGENT_STATE_TTL_SECONDS: int = 86400  # 24 h (was hardcoded 1 h)
+
     # --- Security guardrails ---
     GUARDRAILS_ENABLED: bool = True
     PII_REDACTION_ENABLED: bool = False

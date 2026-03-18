@@ -42,7 +42,7 @@ async def _save_state(run_id: str, state: Dict[str, Any]) -> None:
         try:
             await redis.setex(
                 f"agent:run:{run_id}",
-                3600,  # 1 hour TTL
+                settings.AGENT_STATE_TTL_SECONDS,
                 json.dumps(state, default=str),
             )
         except Exception:
