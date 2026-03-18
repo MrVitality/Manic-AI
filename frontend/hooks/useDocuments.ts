@@ -1,23 +1,25 @@
 'use client'
-import { useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
+import useSWR from 'swr'
 import { useChatStore } from '@/lib/store'
 import { fetchDocuments, ingestDocument, deleteDocument as apiDeleteDocument } from '@/lib/api'
 
 export function useDocuments() {
-  const { documents, isLoadingDocuments, setDocuments, setIsLoadingDocuments, addDocument, removeDocument, setError } = useChatStore()
+  const { documents, isLoadingDocuments, setDocuments, removeDocument, setError } = useChatStore()
+
+  const { mutate } = useSWR('documents', fetchDocuments, {
+    dedupingInterval: 5_000,
+    onSuccess: (docs) => {
+      setDocuments(docs)
+    },
+    onError: () => {
+      setError('Failed to load documents')
+    },
+  })
 
   const loadDocuments = useCallback(async () => {
-    setIsLoadingDocuments(true)
-    try {
-      const docs = await fetchDocuments()
-      setDocuments(docs)
-    } catch (error) {
-      console.error('Failed to fetch documents:', error)
-      setError('Failed to load documents')
-    } finally {
-      setIsLoadingDocuments(false)
-    }
-  }, [setDocuments, setIsLoadingDocuments, setError])
+    await mutate()
+  }, [mutate])
 
   const uploadDocument = useCallback(async (file: File) => {
     const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -43,15 +45,14 @@ export function useDocuments() {
     try {
       const content = await file.text()
       const result = await ingestDocument(content, file.name, file.type || 'text/plain')
-      // Reload to get the full document info
-      await loadDocuments()
+      await mutate()
       return result
     } catch (error) {
       console.error('Failed to upload document:', error)
       setError(error instanceof Error ? error.message : 'Failed to upload document')
       throw error
     }
-  }, [loadDocuments, setError])
+  }, [mutate, setError])
 
   const deleteDoc = useCallback(async (id: string) => {
     try {
@@ -63,10 +64,6 @@ export function useDocuments() {
       throw error
     }
   }, [removeDocument, setError])
-
-  useEffect(() => {
-    loadDocuments()
-  }, [loadDocuments])
 
   return { documents, isLoadingDocuments, loadDocuments, uploadDocument, deleteDocument: deleteDoc }
 }

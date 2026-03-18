@@ -1,52 +1,35 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect } from 'react'
+import useSWR from 'swr'
 import { useChatStore } from '@/lib/store'
 import { fetchModels } from '@/lib/api'
 
 export function useModels() {
-  const { 
-    models, 
-    selectedModel, 
-    isLoadingModels,
-    setModels, 
-    setSelectedModel, 
-    setIsLoadingModels,
-    setError 
-  } = useChatStore()
+  const { models, selectedModel, setModels, setSelectedModel, setError } = useChatStore()
 
-  const loadModels = useCallback(async () => {
-    setIsLoadingModels(true)
-    setError(null)
-    
-    try {
-      const fetchedModels = await fetchModels()
-      setModels(fetchedModels)
-      
-      // Set default model if not set or if current model not available
-      if (fetchedModels.length > 0) {
-        const modelExists = fetchedModels.some(m => m.name === selectedModel)
-        if (!modelExists) {
-          setSelectedModel(fetchedModels[0].name)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch models:', error)
-      setError('Failed to connect to Ollama. Make sure it\'s running.')
-    } finally {
-      setIsLoadingModels(false)
-    }
-  }, [selectedModel, setModels, setSelectedModel, setIsLoadingModels, setError])
+  const { data, isLoading, mutate } = useSWR('models', fetchModels, {
+    refreshInterval: 30_000,
+    dedupingInterval: 5_000,
+    onError: () => {
+      setError("Failed to connect to Ollama. Make sure it's running.")
+    },
+  })
 
+  // Sync SWR data to Zustand store after each successful fetch
   useEffect(() => {
-    loadModels()
-  }, [loadModels])
+    if (!data) return
+    setModels(data)
+    if (data.length > 0 && !data.some((m) => m.name === selectedModel)) {
+      setSelectedModel(data[0].name)
+    }
+  }, [data, selectedModel, setModels, setSelectedModel])
 
   return {
     models,
     selectedModel,
-    isLoadingModels,
+    isLoadingModels: isLoading,
     setSelectedModel,
-    refreshModels: loadModels,
+    refreshModels: () => mutate(),
   }
 }
