@@ -8,8 +8,11 @@ from api.auth import require_api_key
 from api.config import settings
 from api.middleware.guardrails import GuardrailsMiddleware
 from api.middleware.metrics import MetricsMiddleware
+from api.middleware.rate_limit import limiter
 from api.middleware.request_id import RequestIdMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from api.database import init_pool, close_pool
 from api.http_client import init_client, close_client
@@ -113,6 +116,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # --- Rate limiting ---
+    _app.state.limiter = limiter
+    _app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # --- Observability & security middleware ---
     # Order matters: outermost runs first.

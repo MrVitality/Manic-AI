@@ -4,11 +4,12 @@ import logging
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 import asyncpg
 import httpx
 
 from api.config import settings
+from api.middleware.rate_limit import limiter
 from api.dependencies import get_db_optional, get_http_client
 from api.schemas.envelope import ok
 from api.schemas.ingest import (
@@ -50,7 +51,9 @@ async def create_embedding(
 
 
 @router.post("/ingest", response_model=None, tags=["ingest"])
+@limiter.limit(f"{settings.RATE_LIMIT_INGEST_PER_MINUTE}/minute")
 async def ingest_document_endpoint(
+    http_request: Request,
     request: IngestRequest,
     background_tasks: BackgroundTasks,
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),

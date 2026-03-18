@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # --- Agent ---
     AGENT_STATE_TTL_SECONDS: int = 86400  # 24 h (was hardcoded 1 h)
 
+    # --- Rate limiting ---
+    RATE_LIMIT_PER_MINUTE: int = 60
+    RATE_LIMIT_INGEST_PER_MINUTE: int = 10
+
     # --- Security guardrails ---
     GUARDRAILS_ENABLED: bool = True
     PII_REDACTION_ENABLED: bool = False

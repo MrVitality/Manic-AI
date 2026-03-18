@@ -3,11 +3,13 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 import asyncpg
 import httpx
 
+from api.config import settings
 from api.dependencies import get_db_optional, get_http_client
+from api.middleware.rate_limit import limiter
 from api.schemas.envelope import ok
 from api.schemas.search import SearchExplainRequest, SearchRequest, SearchResult
 from api.services.embedding import generate_embedding
@@ -19,7 +21,9 @@ router = APIRouter()
 
 
 @router.post("/search", response_model=None, tags=["search"])
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def search_documents(
+    http_request: Request,
     request: SearchRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),

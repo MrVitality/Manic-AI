@@ -3,12 +3,14 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 import asyncpg
 import httpx
 
+from api.config import settings
 from api.dependencies import get_db_optional, get_http_client, get_langfuse
+from api.middleware.rate_limit import limiter
 from api.schemas.chat import ChatRequest, ChatResponse
 from api.schemas.envelope import ok
 from api.services.chat import complete_chat, stream_chat
@@ -19,7 +21,9 @@ router = APIRouter()
 
 
 @router.post("/chat", response_model=None, tags=["chat"])
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def chat(
+    http_request: Request,
     request: ChatRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
@@ -36,7 +40,9 @@ async def chat(
 
 
 @router.post("/chat/stream", tags=["chat"])
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def chat_stream_endpoint(
+    http_request: Request,
     request: ChatRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
