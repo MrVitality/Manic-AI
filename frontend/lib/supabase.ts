@@ -79,11 +79,15 @@ class SupabaseAuth {
   private client: SupabaseClient
 
   constructor() {
+    const isServer = typeof window === 'undefined'
     this.client = createClient(getSupabaseUrl(), getAnonKey(), {
       auth: {
         persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
+        autoRefreshToken: !isServer,
+        detectSessionInUrl: !isServer,
+        storage: isServer
+          ? { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+          : undefined,
       },
     })
   }

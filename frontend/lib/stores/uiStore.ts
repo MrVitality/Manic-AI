@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Settings, ServiceStatus } from '@/types'
 
 const HEALTH_CHECK_INTERVAL_MS = 30_000
@@ -63,6 +63,8 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: 'manic-ai-ui',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
         settings: state.settings,

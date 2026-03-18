@@ -1,12 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import CommandPalette from '@/components/CommandPalette'
 import SettingsModal from '@/components/SettingsModal'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { MenuIcon } from '@/components/ui/Icons'
+import { useUiStore } from '@/lib/stores/uiStore'
+import { useModelStore } from '@/lib/stores/modelStore'
+import { useConversationStore } from '@/lib/stores/conversationStore'
+import { useConnectorStore } from '@/lib/stores/connectorStore'
 
 const viewTitleMap: Record<string, string> = {
   '/chat': 'Chat',
@@ -23,6 +27,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   useKeyboardShortcuts()
+
+  // Rehydrate persisted stores on client mount (skipHydration: true keeps SSR safe)
+  useEffect(() => {
+    useUiStore.persist.rehydrate()
+    useModelStore.persist.rehydrate()
+    useConversationStore.persist.rehydrate()
+    useConnectorStore.persist.rehydrate()
+  }, [])
 
   const title = viewTitleMap[pathname] || 'Manic AI'
 

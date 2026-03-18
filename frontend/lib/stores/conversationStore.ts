@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Conversation, Message } from '@/types'
 
 const generateId = () => crypto.randomUUID()
@@ -138,6 +138,8 @@ export const useConversationStore = create<ConversationState>()(
     }),
     {
       name: 'manic-ai-conversations',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
       partialize: (state) => ({
         conversations: state.conversations,
         currentConversationId: state.currentConversationId,

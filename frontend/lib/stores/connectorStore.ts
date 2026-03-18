@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export type ConnectorType = 'notion' | 'google-drive' | 'confluence'
 export type ConnectorStatus = 'connected' | 'disconnected'
@@ -57,6 +57,8 @@ export const useConnectorStore = create<ConnectorState>()(
     }),
     {
       name: 'manic-ai-connectors',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
       partialize: (state) => ({ connectors: state.connectors }),
     }
   )

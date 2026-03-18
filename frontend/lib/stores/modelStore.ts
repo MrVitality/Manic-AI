@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Model } from '@/types'
 
 interface ModelState {
@@ -25,6 +25,8 @@ export const useModelStore = create<ModelState>()(
     }),
     {
       name: 'manic-ai-models',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
       partialize: (state) => ({
         selectedModel: state.selectedModel,
       }),
