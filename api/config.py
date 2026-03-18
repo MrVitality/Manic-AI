@@ -29,8 +29,11 @@ class Settings(BaseSettings):
     VECTOR_DIMENSION: int = 1024
 
     # --- Inference backend ---
-    INFERENCE_BACKEND: str = "ollama"  # "ollama" or "vllm"
+    INFERENCE_BACKEND: str = "ollama"  # "ollama", "vllm", or "openai"
     VLLM_URL: str = ""  # empty = disabled, use Ollama
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
 
     # --- RAG tuning ---
     RAG_TOP_K: int = 5
@@ -138,3 +141,6 @@ LANGFUSE_SECRET_KEY = settings.LANGFUSE_SECRET_KEY
 LANGFUSE_HOST = settings.LANGFUSE_HOST
 INFERENCE_BACKEND = settings.INFERENCE_BACKEND
 VLLM_URL = settings.VLLM_URL
+OPENAI_API_KEY = settings.OPENAI_API_KEY
+ANTHROPIC_API_KEY = settings.ANTHROPIC_API_KEY
+OPENAI_BASE_URL = settings.OPENAI_BASE_URL

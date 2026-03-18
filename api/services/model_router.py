@@ -35,6 +35,8 @@ async def chat_completion(
     """
     backend = settings.INFERENCE_BACKEND
 
+    if backend == "openai" and settings.OPENAI_API_KEY:
+        return await _openai_chat(messages, model, http_client, temperature=temperature, max_tokens=max_tokens)
     if backend == "vllm" and settings.VLLM_URL:
         return await _vllm_chat(messages, model, http_client, temperature=temperature, max_tokens=max_tokens)
     # Default to Ollama
@@ -57,7 +59,10 @@ async def chat_completion_stream(
     """
     backend = settings.INFERENCE_BACKEND
 
-    if backend == "vllm" and settings.VLLM_URL:
+    if backend == "openai" and settings.OPENAI_API_KEY:
+        async for chunk in _openai_chat_stream(messages, model, http_client, temperature=temperature, max_tokens=max_tokens):
+            yield chunk
+    elif backend == "vllm" and settings.VLLM_URL:
         async for chunk in _vllm_chat_stream(messages, model, http_client, temperature=temperature, max_tokens=max_tokens):
             yield chunk
     else:
@@ -224,6 +229,104 @@ async def _vllm_chat_stream(
                 yield {"type": "content", "content": content}
 
             # vLLM may include usage in the final chunk
+            usage = chunk.get("usage")
+            if usage:
+                prompt_tokens = usage.get("prompt_tokens", prompt_tokens)
+                completion_tokens = usage.get("completion_tokens", completion_tokens)
+
+
+# ---------------------------------------------------------------------------
+# OpenAI backend (OpenAI-compatible API with API key auth)
+# ---------------------------------------------------------------------------
+
+
+async def _openai_chat(
+    messages: List[Dict[str, str]],
+    model: str,
+    client: httpx.AsyncClient,
+    *,
+    temperature: float = 0.7,
+    max_tokens: Optional[int] = None,
+) -> Dict[str, Any]:
+    """OpenAI /v1/chat/completions (non-streaming)."""
+    payload: Dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "stream": False,
+    }
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
+
+    response = await client.post(
+        f"{settings.OPENAI_BASE_URL}/chat/completions",
+        json=payload,
+        headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
+        timeout=120.0,
+    )
+    response.raise_for_status()
+    data = response.json()
+
+    choice = data.get("choices", [{}])[0]
+    usage = data.get("usage", {})
+
+    return {
+        "content": choice.get("message", {}).get("content", ""),
+        "prompt_tokens": usage.get("prompt_tokens", 0),
+        "completion_tokens": usage.get("completion_tokens", 0),
+        "model": data.get("model", model),
+        "raw": data,
+    }
+
+
+async def _openai_chat_stream(
+    messages: List[Dict[str, str]],
+    model: str,
+    client: httpx.AsyncClient,
+    *,
+    temperature: float = 0.7,
+    max_tokens: Optional[int] = None,
+) -> AsyncGenerator[Dict[str, Any], None]:
+    """OpenAI /v1/chat/completions (streaming, SSE)."""
+    payload: Dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "stream": True,
+    }
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
+
+    async with client.stream(
+        "POST",
+        f"{settings.OPENAI_BASE_URL}/chat/completions",
+        json=payload,
+        headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
+    ) as response:
+        prompt_tokens = 0
+        completion_tokens = 0
+        async for line in response.aiter_lines():
+            if not line or not line.startswith("data: "):
+                continue
+            data_str = line[len("data: "):]
+            if data_str.strip() == "[DONE]":
+                yield {
+                    "type": "done",
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                }
+                break
+            try:
+                chunk = json.loads(data_str)
+            except json.JSONDecodeError:
+                continue
+
+            delta = chunk.get("choices", [{}])[0].get("delta", {})
+            content = delta.get("content", "")
+            if content:
+                yield {"type": "content", "content": content}
+
+            # OpenAI includes usage in the final chunk (stream_options)
             usage = chunk.get("usage")
             if usage:
                 prompt_tokens = usage.get("prompt_tokens", prompt_tokens)
