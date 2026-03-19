@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { useChatStore } from '@/lib/store'
+import { validateUploadedFile } from '@/lib/validation'
 
 interface MessageInputProps {
   onSend: (message: string) => void
@@ -56,9 +57,14 @@ export default function MessageInput({
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      setAttachedFile(file)
+    if (!file) return
+    const result = validateUploadedFile(file)
+    if (!result.valid) {
+      alert(result.error)
+      e.target.value = ''
+      return
     }
+    setAttachedFile(file)
   }
 
   const removeAttachment = () => {

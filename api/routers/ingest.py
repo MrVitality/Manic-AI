@@ -77,7 +77,7 @@ async def ingest_document_endpoint(
         except Exception:
             raise HTTPException(
                 status_code=400,
-                detail="For multimodal PDF ingestion, 'content' must be base64-encoded PDF bytes.",
+                detail="Invalid content format for multimodal PDF ingestion.",
             )
 
         document_id = str(uuid4())

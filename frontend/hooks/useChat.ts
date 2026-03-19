@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useChatStore, conversationStoreApi } from '@/lib/store'
 import { useArtifactStore } from '@/lib/stores/artifactStore'
 import { streamChat, generateMessageId } from '@/lib/api'
@@ -22,6 +22,13 @@ export function useChat() {
   } = useChatStore()
 
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Cancel any in-flight stream when the component using this hook unmounts.
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort()
+    }
+  }, [])
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isGenerating) return

@@ -9,6 +9,17 @@ import asyncpg
 logger = logging.getLogger(__name__)
 
 
+def _parse_metadata(raw: Any) -> Dict[str, Any]:
+    """Safely parse a JSON metadata string, returning {} on failure."""
+    if not raw:
+        return {}
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        logger.warning("Failed to parse metadata JSON: %r", raw[:100] if isinstance(raw, str) else raw)
+        return {}
+
+
 class SupabaseDocumentRepository:
     """Encapsulates all raw SQL for documents, collections, and chunks."""
 
@@ -58,7 +69,7 @@ class SupabaseDocumentRepository:
                 "file_size": r["file_size"],
                 "status": r["status"],
                 "chunk_count": r["chunk_count"],
-                "metadata": json.loads(r["metadata"]) if r["metadata"] else {},
+                "metadata": _parse_metadata(r["metadata"]),
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
                 "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
             }
@@ -231,7 +242,7 @@ class SupabaseDocumentRepository:
                 "description": r["description"],
                 "is_public": r["is_public"],
                 "embedding_model": r["embedding_model"],
-                "metadata": json.loads(r["metadata"]) if r["metadata"] else {},
+                "metadata": _parse_metadata(r["metadata"]),
                 "document_count": r["document_count"],
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
             }
@@ -290,7 +301,7 @@ class SupabaseDocumentRepository:
                 "chunk_index": r["chunk_index"],
                 "content": r["content"],
                 "content_tokens": r["content_tokens"],
-                "metadata": json.loads(r["metadata"]) if r["metadata"] else {},
+                "metadata": _parse_metadata(r["metadata"]),
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,
             }
             for r in rows

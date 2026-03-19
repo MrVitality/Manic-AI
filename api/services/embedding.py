@@ -67,7 +67,7 @@ async def generate_embedding(
 
     if _redis:
         try:
-            await _redis.setex(cache_key, 3600, json.dumps(embedding))
+            await _redis.setex(cache_key, settings.EMBEDDING_CACHE_TTL, json.dumps(embedding))
         except Exception as e:
             logger.warning("Redis set failed: %s", e)
 

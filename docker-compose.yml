@@ -42,6 +42,8 @@ services:
     ports:
       - "${BIND_IP}:6333:6333"
       - "${BIND_IP}:6334:6334"
+    environment:
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:-}
     volumes:
       - qdrant-data:/qdrant/storage
     deploy:
@@ -70,7 +72,12 @@ services:
       - "${BIND_IP}:6380:6379"
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
     deploy:
       resources:
         limits:

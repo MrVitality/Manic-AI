@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class ChatMessage(BaseModel):
     role: str = Field(..., pattern="^(system|user|assistant)$")
-    content: str
+    content: str = Field(..., max_length=100_000)
 
 
 class Citation(BaseModel):

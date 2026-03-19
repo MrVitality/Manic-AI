@@ -11,7 +11,9 @@ import os
 
 # Configuration
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
-VECTOR_DIMENSION = 768  # nomic-embed-text dimension
+# Reads from the same env var used by the API service.
+# Default matches bge-m3 (1024 dims). Override via VECTOR_DIMENSION env var.
+VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", "1024"))
 
 # Collection configurations
 COLLECTIONS = [
