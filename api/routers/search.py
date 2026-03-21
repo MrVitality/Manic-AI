@@ -20,7 +20,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/search", response_model=None, tags=["search"])
+@router.post(
+    "/search",
+    response_model=None,
+    tags=["search"],
+    summary="Hybrid document search",
+    description="Unified hybrid search combining vector similarity and BM25 keyword matching. "
+    "Uses POST instead of GET to support complex query bodies with filtering, "
+    "backend selection, and reranking options.",
+)
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def search_documents(
     http_request: Request,
@@ -49,7 +57,14 @@ async def search_documents(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/search/explain", response_model=None, tags=["search"])
+@router.post(
+    "/search/explain",
+    response_model=None,
+    tags=["search"],
+    summary="Search with scoring explanation",
+    description="Search with detailed scoring breakdown for debugging relevance. "
+    "Uses POST to support the same complex query body as /search.",
+)
 async def search_explain(
     request: SearchExplainRequest,
     client: httpx.AsyncClient = Depends(get_http_client),

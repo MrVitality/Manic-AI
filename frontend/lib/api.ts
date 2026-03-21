@@ -70,12 +70,36 @@ const getApiV1 = (): string => `${getApiUrl()}/v1`
  */
 async function unwrap<T>(response: Response): Promise<T> {
   if (!response.ok) {
+    // Try to parse the envelope error from the response body
+    try {
+      const envelope = await response.json()
+      if (envelope?.error) {
+        const err = envelope.error
+        // Structured error: { code, message, details? }
+        const message = typeof err === 'string' ? err : err.message || 'Unknown API error'
+        const apiError = new Error(message) as Error & { code?: string; details?: unknown[] }
+        if (typeof err === 'object') {
+          apiError.code = err.code
+          apiError.details = err.details
+        }
+        throw apiError
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message !== 'Unknown API error') throw e
+    }
     throw new Error(`API error ${response.status}: ${response.statusText}`)
   }
   const envelope = await response.json()
   if (envelope && typeof envelope.success === 'boolean') {
     if (!envelope.success) {
-      throw new Error(envelope.error || 'Unknown API error')
+      const err = envelope.error
+      const message = typeof err === 'string' ? err : err?.message || 'Unknown API error'
+      const apiError = new Error(message) as Error & { code?: string; details?: unknown[] }
+      if (typeof err === 'object' && err !== null) {
+        apiError.code = err.code
+        apiError.details = err.details
+      }
+      throw apiError
     }
     return envelope.data as T
   }

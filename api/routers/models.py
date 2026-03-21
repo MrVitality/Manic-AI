@@ -2,11 +2,13 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 import httpx
 
+from api.config import settings
 from api.dependencies import get_http_client
+from api.middleware.rate_limit import limiter
 from api.schemas.envelope import ok
 from api.schemas.models import PullModelRequest
 from api.services.ollama import delete_model, list_models, stream_pull_model
@@ -37,7 +39,9 @@ async def list_models_compat(
 
 
 @router.post("/models/pull", tags=["models"])
+@limiter.limit(f"{settings.RATE_LIMIT_MUTATIONS_PER_MINUTE}/minute")
 async def pull_model(
+    http_request: Request,
     request: PullModelRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
 ):
@@ -48,7 +52,9 @@ async def pull_model(
 
 
 @router.delete("/models/{name}", response_model=None, tags=["models"])
+@limiter.limit(f"{settings.RATE_LIMIT_MUTATIONS_PER_MINUTE}/minute")
 async def delete_model_endpoint(
+    request: Request,
     name: str,
     client: httpx.AsyncClient = Depends(get_http_client),
 ):

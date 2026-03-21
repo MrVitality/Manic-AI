@@ -1,12 +1,15 @@
 """Collection CRUD routes."""
 
+import asyncio
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from api.config import settings
 from api.dependencies import get_document_repo
+from api.middleware.rate_limit import limiter
 from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.schemas.envelope import ok
 
@@ -23,14 +26,21 @@ class CreateCollectionRequest(BaseModel):
 @router.get("/collections", response_model=None, tags=["collections"])
 async def list_collections(
     user_id: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     repo: SupabaseDocumentRepository = Depends(get_document_repo),
 ):
-    results = await repo.list_collections(user_id)
-    return ok(results)
+    results, total = await asyncio.gather(
+        repo.list_collections(user_id, limit, offset),
+        repo.count_collections(user_id),
+    )
+    return ok(results, meta={"total": total, "limit": limit, "offset": offset})
 
 
 @router.post("/collections", response_model=None, tags=["collections"])
+@limiter.limit(f"{settings.RATE_LIMIT_MUTATIONS_PER_MINUTE}/minute")
 async def create_collection(
+    request: Request,
     body: CreateCollectionRequest,
     repo: SupabaseDocumentRepository = Depends(get_document_repo),
 ):
@@ -40,7 +50,9 @@ async def create_collection(
 
 
 @router.delete("/collections/{collection_id}", response_model=None, tags=["collections"])
+@limiter.limit(f"{settings.RATE_LIMIT_MUTATIONS_PER_MINUTE}/minute")
 async def delete_collection(
+    request: Request,
     collection_id: str,
     repo: SupabaseDocumentRepository = Depends(get_document_repo),
 ):

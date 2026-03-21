@@ -31,6 +31,7 @@ async def health_check(
     return ok({
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "auth_enabled": bool(settings.API_SECRET_KEY),
         "services": {
             "database": "connected" if db else "disconnected",
             "ollama": ollama["status"],

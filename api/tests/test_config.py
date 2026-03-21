@@ -12,9 +12,9 @@ class TestSettingsDefaults:
     def test_default_values(self):
         s = Settings()
         assert s.OLLAMA_URL == "http://ollama:11434"
-        assert s.EMBEDDING_MODEL == "nomic-embed-text"
+        assert s.EMBEDDING_MODEL == "bge-m3"
         assert s.CHAT_MODEL == "llama3.2:3b"
-        assert s.VECTOR_DIMENSION == 768
+        assert s.VECTOR_DIMENSION == 1024
         assert s.RAG_TOP_K == 5
         assert 0.0 <= s.RAG_THRESHOLD <= 1.0
         assert 0.0 <= s.RAG_KEYWORD_WEIGHT <= 1.0

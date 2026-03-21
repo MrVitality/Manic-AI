@@ -6,13 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.auth import require_api_key
 from api.config import settings
+from api.exception_handlers import register_exception_handlers
 from api.middleware.guardrails import GuardrailsMiddleware
 from api.middleware.metrics import MetricsMiddleware
 from api.middleware.rate_limit import limiter
 from api.middleware.request_id import RequestIdMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 
 from api.database import init_pool, close_pool
 from api.http_client import init_client, close_client
@@ -48,11 +47,31 @@ async def lifespan(app: FastAPI):
 
 
 
+_TAGS_METADATA = [
+    {"name": "health", "description": "Health checks and service status (unauthenticated)"},
+    {"name": "chat", "description": "Chat completion and streaming inference"},
+    {"name": "search", "description": "Hybrid vector + BM25 search (POST bodies used for complex query parameters)"},
+    {"name": "ingest", "description": "Document ingestion and embedding generation"},
+    {"name": "documents", "description": "Document CRUD and chunk inspection"},
+    {"name": "collections", "description": "Collection management for organizing documents"},
+    {"name": "qdrant", "description": "Direct Qdrant vector database operations"},
+    {"name": "analytics", "description": "Usage, model, RAG, and service analytics"},
+    {"name": "system", "description": "System info, cache management, and RAG stats"},
+    {"name": "models", "description": "Ollama model management (list, pull, delete)"},
+    {"name": "agent", "description": "Generator-Critic reasoning agent with streaming support"},
+]
+
+
 def create_app() -> FastAPI:
     _app = FastAPI(
         title="Manic AI API",
+        description=(
+            "Full-stack AI platform API with RAG capabilities, hybrid search, "
+            "document ingestion, and multi-model inference."
+        ),
         version="2.0.0",
         lifespan=lifespan,
+        openapi_tags=_TAGS_METADATA,
     )
 
     # --- CORS configuration (secure defaults) ---
@@ -74,7 +93,9 @@ def create_app() -> FastAPI:
 
     # --- Rate limiting ---
     _app.state.limiter = limiter
-    _app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # --- Global exception handlers (envelope-consistent errors) ---
+    register_exception_handlers(_app)
 
     # --- Observability & security middleware ---
     # Order matters: outermost runs first.

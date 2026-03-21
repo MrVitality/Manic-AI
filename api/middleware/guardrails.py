@@ -139,8 +139,13 @@ class GuardrailsMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=400,
                 content={
-                    "error": "Request blocked by security guardrails",
-                    "code": "INJECTION_DETECTED",
+                    "success": False,
+                    "data": None,
+                    "error": {
+                        "code": "injection_detected",
+                        "message": "Request blocked by security guardrails",
+                    },
+                    "meta": None,
                 },
             )
 

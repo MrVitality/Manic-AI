@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 import httpx
 
+from api.config import settings
 from api.dependencies import get_http_client, get_qdrant_repo
 from api.repositories.qdrant_vector import QdrantVectorRepository
 from api.schemas.envelope import ok
@@ -24,7 +25,7 @@ async def list_qdrant_collections(
 @router.post("/qdrant/collections/{collection_name}", response_model=None, tags=["qdrant"])
 async def create_qdrant_collection(
     collection_name: str,
-    vector_size: int = 768,
+    vector_size: int = settings.VECTOR_DIMENSION,
     qdrant: QdrantVectorRepository = Depends(get_qdrant_repo),
 ):
     try:
@@ -57,7 +58,14 @@ async def delete_qdrant_collection(
         raise HTTPException(status_code=502, detail=f"Qdrant error: {e}")
 
 
-@router.post("/qdrant/search/{collection_name}", response_model=None, tags=["qdrant"])
+@router.post(
+    "/qdrant/search/{collection_name}",
+    response_model=None,
+    tags=["qdrant"],
+    summary="Vector search in a Qdrant collection",
+    description="Perform vector similarity search within a named Qdrant collection. "
+    "Uses POST to support embedding generation from the query text.",
+)
 async def search_qdrant_collection(
     collection_name: str,
     query: str,

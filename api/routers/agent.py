@@ -3,13 +3,15 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 import asyncpg
 import httpx
 
+from api.config import settings
 from api.dependencies import get_db_optional, get_http_client
+from api.middleware.rate_limit import limiter
 from api.schemas.envelope import ok
 from api.services.agent_graph import get_run_status, run_agent, stream_agent_steps
 
@@ -26,7 +28,9 @@ class AgentRunRequest(BaseModel):
 
 
 @router.post("/agent/run", response_model=None, tags=["agent"])
+@limiter.limit(f"{settings.RATE_LIMIT_AGENT_PER_MINUTE}/minute")
 async def agent_run(
+    http_request: Request,
     request: AgentRunRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
@@ -58,7 +62,9 @@ async def agent_status(run_id: str):
 
 
 @router.post("/agent/stream", tags=["agent"])
+@limiter.limit(f"{settings.RATE_LIMIT_AGENT_PER_MINUTE}/minute")
 async def agent_stream(
+    http_request: Request,
     request: AgentRunRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),

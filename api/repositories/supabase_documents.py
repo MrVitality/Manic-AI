@@ -36,6 +36,7 @@ class SupabaseDocumentRepository:
         collection_id: Optional[str] = None,
         status: Optional[str] = None,
         limit: int = 50,
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
         async with self._pool.acquire() as conn:
             results = await conn.fetch(
@@ -57,9 +58,9 @@ class SupabaseDocumentRepository:
                     AND ($2::uuid IS NULL OR dc.collection_id = $2::uuid)
                     AND ($3::text IS NULL OR d.status = $3)
                 ORDER BY d.created_at DESC
-                LIMIT $4
+                LIMIT $4 OFFSET $5
                 """,
-                user_id, collection_id, status, limit,
+                user_id, collection_id, status, limit, offset,
             )
         return [
             {
@@ -214,6 +215,8 @@ class SupabaseDocumentRepository:
     async def list_collections(
         self,
         user_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
     ) -> List[Dict[str, Any]]:
         async with self._pool.acquire() as conn:
             results = await conn.fetch(
@@ -232,8 +235,9 @@ class SupabaseDocumentRepository:
                 WHERE ($1::uuid IS NULL OR c.user_id = $1::uuid OR c.is_public = TRUE)
                 GROUP BY c.id
                 ORDER BY c.created_at DESC
+                LIMIT $2 OFFSET $3
                 """,
-                user_id,
+                user_id, limit, offset,
             )
         return [
             {
@@ -248,6 +252,39 @@ class SupabaseDocumentRepository:
             }
             for r in results
         ]
+
+    async def count_documents(
+        self,
+        user_id: Optional[str] = None,
+        collection_id: Optional[str] = None,
+        status: Optional[str] = None,
+    ) -> int:
+        """Count documents matching the given filters."""
+        async with self._pool.acquire() as conn:
+            return await conn.fetchval(
+                """
+                SELECT COUNT(DISTINCT d.id)
+                FROM rag.documents d
+                LEFT JOIN rag.document_collections dc ON d.id = dc.document_id
+                WHERE
+                    ($1::uuid IS NULL OR d.user_id = $1::uuid)
+                    AND ($2::uuid IS NULL OR dc.collection_id = $2::uuid)
+                    AND ($3::text IS NULL OR d.status = $3)
+                """,
+                user_id, collection_id, status,
+            )
+
+    async def count_collections(self, user_id: Optional[str] = None) -> int:
+        """Count collections matching the given filters."""
+        async with self._pool.acquire() as conn:
+            return await conn.fetchval(
+                """
+                SELECT COUNT(*)
+                FROM rag.collections c
+                WHERE ($1::uuid IS NULL OR c.user_id = $1::uuid OR c.is_public = TRUE)
+                """,
+                user_id,
+            )
 
     async def create_collection(
         self,

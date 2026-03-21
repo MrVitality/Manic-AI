@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     # --- Rate limiting ---
     RATE_LIMIT_PER_MINUTE: int = 60
     RATE_LIMIT_INGEST_PER_MINUTE: int = 10
+    RATE_LIMIT_MUTATIONS_PER_MINUTE: int = 30
+    RATE_LIMIT_AGENT_PER_MINUTE: int = 20
 
     # --- Security guardrails ---
     GUARDRAILS_ENABLED: bool = True

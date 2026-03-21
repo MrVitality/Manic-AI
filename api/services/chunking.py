@@ -16,9 +16,10 @@ from typing import Dict, List, Literal
 
 def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[Dict]:
     """Original simple chunker -- character-based with sentence-boundary snapping."""
-    # Guard against infinite loop: overlap must be strictly less than chunk_size
-    if overlap >= chunk_size:
-        overlap = chunk_size - 1
+    # Guard against infinite loop: overlap must be less than half of chunk_size
+    # to ensure forward progress on every iteration.
+    if overlap >= chunk_size // 2:
+        overlap = max(0, chunk_size // 2 - 1)
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = " ".join(text.split())
     if len(text) <= chunk_size:

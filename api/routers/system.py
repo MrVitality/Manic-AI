@@ -6,10 +6,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import asyncpg
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
 from api.config import settings
 from api.dependencies import get_db, get_db_optional, get_redis
+from api.middleware.rate_limit import limiter
 from api.repositories.redis_cache import RedisCacheRepository
 from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.schemas.envelope import ok
@@ -42,7 +43,9 @@ async def system_info(
 
 
 @router.post("/system/cache/clear", response_model=None, tags=["system"])
+@limiter.limit(f"{settings.RATE_LIMIT_MUTATIONS_PER_MINUTE}/minute")
 async def clear_cache(
+    request: Request,
     redis: Optional[RedisCacheRepository] = Depends(get_redis),
 ) -> Dict[str, Any]:
     if not redis:
@@ -82,4 +85,5 @@ async def get_document_chunks(
 ) -> Dict[str, Any]:
     doc_repo = SupabaseDocumentRepository(db)
     data = await doc_repo.get_document_chunks(document_id, limit, offset)
-    return ok(data)
+    total = data.get("total", 0)
+    return ok(data, meta={"total": total, "limit": limit, "offset": offset})
