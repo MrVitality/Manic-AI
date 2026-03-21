@@ -30,18 +30,18 @@ class AgentRunRequest(BaseModel):
 @router.post("/agent/run", response_model=None, tags=["agent"])
 @limiter.limit(f"{settings.RATE_LIMIT_AGENT_PER_MINUTE}/minute")
 async def agent_run(
-    http_request: Request,
-    request: AgentRunRequest,
+    request: Request,
+    body: AgentRunRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
 ):
     """Execute the agent Generator-Critic loop and return the structured result."""
     try:
         result = await run_agent(
-            query=request.query,
+            query=body.query,
             http_client=client,
             db_pool=db,
-            model=request.model,
+            model=body.model,
         )
         return ok(result)
     except httpx.HTTPError:
@@ -64,18 +64,18 @@ async def agent_status(run_id: str):
 @router.post("/agent/stream", tags=["agent"])
 @limiter.limit(f"{settings.RATE_LIMIT_AGENT_PER_MINUTE}/minute")
 async def agent_stream(
-    http_request: Request,
-    request: AgentRunRequest,
+    request: Request,
+    body: AgentRunRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
 ):
     """Stream agent steps in real-time via SSE."""
     return StreamingResponse(
         stream_agent_steps(
-            query=request.query,
+            query=body.query,
             http_client=client,
             db_pool=db,
-            model=request.model,
+            model=body.model,
         ),
         media_type="text/event-stream",
     )

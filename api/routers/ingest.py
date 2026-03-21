@@ -38,12 +38,12 @@ router = APIRouter()
 
 @router.post("/embed", response_model=None, tags=["ingest"])
 async def create_embedding(
-    request: EmbedRequest,
+    body: EmbedRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
 ):
     try:
-        model = request.model or settings.EMBEDDING_MODEL
-        embedding = await generate_embedding(request.text, model, client=client)
+        model = body.model or settings.EMBEDDING_MODEL
+        embedding = await generate_embedding(body.text, model, client=client)
         return ok(EmbedResponse(embedding=embedding, model=model, dimensions=len(embedding)).model_dump())
     except httpx.HTTPError:
         logger.exception("Embedding generation failed via Ollama")
@@ -53,8 +53,8 @@ async def create_embedding(
 @router.post("/ingest", response_model=None, tags=["ingest"])
 @limiter.limit(f"{settings.RATE_LIMIT_INGEST_PER_MINUTE}/minute")
 async def ingest_document_endpoint(
-    http_request: Request,
-    request: IngestRequest,
+    request: Request,
+    body: IngestRequest,
     background_tasks: BackgroundTasks,
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
     client: httpx.AsyncClient = Depends(get_http_client),
@@ -69,11 +69,11 @@ async def ingest_document_endpoint(
     to images and described via a vision LLM before embedding.
     """
     # Route to multimodal pipeline if requested
-    if request.multimodal and request.content_type == "application/pdf":
+    if body.multimodal and body.content_type == "application/pdf":
         import base64
 
         try:
-            pdf_bytes = base64.b64decode(request.content)
+            pdf_bytes = base64.b64decode(body.content)
         except Exception:
             raise HTTPException(
                 status_code=400,
@@ -81,9 +81,9 @@ async def ingest_document_endpoint(
             )
 
         document_id = str(uuid4())
-        _update_job(document_id, status="pending", filename=request.filename)
+        _update_job(document_id, status="pending", filename=body.filename)
         if db:
-            await create_ingest_job(db, document_id, request.filename)
+            await create_ingest_job(db, document_id, body.filename)
 
         async def _run_multimodal(doc_id: str):
             from api.services.ingestion import _update_job as _uj, _db_set_status
@@ -93,12 +93,12 @@ async def ingest_document_endpoint(
             try:
                 result = await ingest_pdf_as_images(
                     pdf_bytes,
-                    request.filename,
+                    body.filename,
                     db,
                     client,
-                    collection_id=request.collection_id,
-                    user_id=request.user_id,
-                    metadata=request.metadata,
+                    collection_id=body.collection_id,
+                    user_id=body.user_id,
+                    metadata=body.metadata,
                 )
                 _uj(doc_id, status=result["status"], chunks_created=result.get("pages_processed", 0))
                 if db:
@@ -115,14 +115,14 @@ async def ingest_document_endpoint(
     document_id = str(uuid4())
 
     # Seed in-memory tracker
-    _update_job(document_id, status="pending", filename=request.filename)
+    _update_job(document_id, status="pending", filename=body.filename)
 
     # Seed database row (best-effort)
     if db:
-        await create_ingest_job(db, document_id, request.filename)
+        await create_ingest_job(db, document_id, body.filename)
 
     # Schedule actual work in background
-    background_tasks.add_task(run_ingest_background, document_id, request, db, client)
+    background_tasks.add_task(run_ingest_background, document_id, body, db, client)
 
     return ok(IngestAccepted(document_id=document_id, status="processing").model_dump())
 

@@ -1,5 +1,7 @@
 """Tests for analytics endpoints."""
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 
@@ -23,7 +25,13 @@ async def test_model_analytics(client):
 
 
 @pytest.mark.asyncio
-async def test_rag_analytics(client):
+async def test_rag_analytics(client, app):
+    conn = app.state.db_pool._mock_conn
+    # rag_analytics calls fetchrow twice (chunk stats + collection stats)
+    conn.fetchrow = AsyncMock(side_effect=[
+        {"total": 0, "avg_tokens": 0, "total_tokens": 0},
+        {"total": 0, "avg_docs": 0},
+    ])
     resp = await client.get("/v1/analytics/rag")
     assert resp.status_code == 200
 

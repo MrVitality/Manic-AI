@@ -50,7 +50,7 @@ async def test_rerank_returns_top_n(sample_chunks):
     with patch("api.services.reranker.settings") as mock_settings:
         mock_settings.CHAT_MODEL = "test-model"
         mock_settings.OLLAMA_URL = "http://mock-ollama:11434"
-        result = await rerank_chunks("test query", sample_chunks, client, top_n=2)
+        result = await rerank_chunks("test query", sample_chunks, client, top_n=2, reranker_mode="individual")
 
     assert len(result) == 2
     # First result should have the highest rerank_score

@@ -23,14 +23,14 @@ router = APIRouter()
 @router.post("/chat", response_model=None, tags=["chat"])
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def chat(
-    http_request: Request,
-    request: ChatRequest,
+    request: Request,
+    body: ChatRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
     langfuse=Depends(get_langfuse),
 ):
     try:
-        result = await complete_chat(request, client, db, langfuse)
+        result = await complete_chat(body, client, db, langfuse)
         return ok(result.model_dump())
     except httpx.HTTPError:
         raise HTTPException(status_code=502, detail="Chat service unavailable")
@@ -42,12 +42,12 @@ async def chat(
 @router.post("/chat/stream", tags=["chat"])
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def chat_stream_endpoint(
-    http_request: Request,
-    request: ChatRequest,
+    request: Request,
+    body: ChatRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
 ):
     return StreamingResponse(
-        stream_chat(request, client, db),
+        stream_chat(body, client, db),
         media_type="text/event-stream",
     )

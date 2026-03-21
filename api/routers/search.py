@@ -31,29 +31,29 @@ router = APIRouter()
 )
 @limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def search_documents(
-    http_request: Request,
-    request: SearchRequest,
+    request: Request,
+    body: SearchRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
 ):
     try:
-        query_embedding = await generate_embedding(request.query, client=client)
+        query_embedding = await generate_embedding(body.query, client=client)
         results = await unified_search(
-            query_text=request.query,
+            query_text=body.query,
             query_embedding=query_embedding,
-            backend=request.backend or "supabase",
-            top_k=request.top_k or 5,
-            threshold=request.threshold or 0.7,
-            use_hybrid=request.use_hybrid if request.use_hybrid is not None else True,
-            collection_id=request.collection_id,
-            user_id=request.user_id,
+            backend=body.backend or "supabase",
+            top_k=body.top_k or 5,
+            threshold=body.threshold or 0.7,
+            use_hybrid=body.use_hybrid if body.use_hybrid is not None else True,
+            collection_id=body.collection_id,
+            user_id=body.user_id,
             db=db,
             client=client,
-            rerank=request.rerank or False,
+            rerank=body.rerank or False,
         )
         return ok([SearchResult(**r).model_dump() for r in results])
     except Exception:
-        logger.exception("Search failed for query: %s", request.query[:100])
+        logger.exception("Search failed for query: %s", body.query[:100])
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -66,20 +66,20 @@ async def search_documents(
     "Uses POST to support the same complex query body as /search.",
 )
 async def search_explain(
-    request: SearchExplainRequest,
+    body: SearchExplainRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
 ):
-    query_embedding = await generate_embedding(request.query, client=client)
+    query_embedding = await generate_embedding(body.query, client=client)
     result = await search_with_explain(
-        query_text=request.query,
+        query_text=body.query,
         query_embedding=query_embedding,
-        backend=request.backend or "supabase",
-        top_k=request.top_k or 5,
-        threshold=request.threshold or 0.5,
-        use_hybrid=request.use_hybrid if request.use_hybrid is not None else True,
-        collection_id=request.collection_id,
-        include_vectors=request.include_vectors or False,
+        backend=body.backend or "supabase",
+        top_k=body.top_k or 5,
+        threshold=body.threshold or 0.5,
+        use_hybrid=body.use_hybrid if body.use_hybrid is not None else True,
+        collection_id=body.collection_id,
+        include_vectors=body.include_vectors or False,
         db=db,
         client=client,
     )

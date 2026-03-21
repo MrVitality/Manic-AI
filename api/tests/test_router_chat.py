@@ -5,17 +5,21 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
+from api.schemas.chat import ChatMessage, ChatResponse
+
 
 @pytest.mark.asyncio
 async def test_chat_200(client):
-    with patch("api.services.chat.routed_chat_completion", new_callable=AsyncMock) as mock_cc:
-        mock_cc.return_value = {
-            "content": "hi there",
-            "prompt_tokens": 5,
-            "completion_tokens": 3,
-            "model": "test-model",
-            "raw": {},
-        }
+    mock_response = ChatResponse(
+        id="test-id",
+        model="test-model",
+        message=ChatMessage(role="assistant", content="hi there"),
+        sources=[],
+        citations=[],
+        usage={"prompt_tokens": 5, "completion_tokens": 3},
+    )
+    with patch("api.routers.chat.complete_chat", new_callable=AsyncMock) as mock_cc:
+        mock_cc.return_value = mock_response
         resp = await client.post(
             "/v1/chat",
             json={"messages": [{"role": "user", "content": "hello"}]},
@@ -26,13 +30,14 @@ async def test_chat_200(client):
 
 @pytest.mark.asyncio
 async def test_chat_502_on_http_error(client):
-    with patch("api.services.chat.routed_chat_completion", new_callable=AsyncMock) as mock_cc:
+    with patch("api.routers.chat.complete_chat", new_callable=AsyncMock) as mock_cc:
         mock_cc.side_effect = httpx.HTTPError("connection refused")
         resp = await client.post(
             "/v1/chat",
             json={"messages": [{"role": "user", "content": "hello"}]},
         )
     assert resp.status_code == 502
+    assert resp.json()["error"]["code"] == "bad_gateway"
 
 
 @pytest.mark.asyncio

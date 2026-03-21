@@ -1,16 +1,17 @@
 """Tests for ingest endpoints."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 
 @pytest.mark.asyncio
 async def test_ingest_returns_accepted(client):
-    resp = await client.post(
-        "/v1/ingest",
-        json={"content": "hello world", "filename": "test.txt"},
-    )
+    with patch("api.routers.ingest.run_ingest_background", new_callable=AsyncMock):
+        resp = await client.post(
+            "/v1/ingest",
+            json={"content": "hello world", "filename": "test.txt"},
+        )
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["status"] == "processing"
