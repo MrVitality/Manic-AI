@@ -1,6 +1,6 @@
 """Tests for the ApiResponse envelope helpers in api.schemas.envelope."""
 
-from api.schemas.envelope import ApiResponse, ok, fail
+from api.schemas.envelope import ApiError, ApiResponse, ok, fail
 
 
 class TestOkHelper:
@@ -30,17 +30,22 @@ class TestOkHelper:
 
 class TestFailHelper:
     def test_basic_fail(self):
-        result = fail("Something went wrong")
+        result = fail("bad_request", "Something went wrong")
         assert result["success"] is False
         assert result["data"] is None
-        assert result["error"] == "Something went wrong"
+        assert result["error"]["code"] == "bad_request"
+        assert result["error"]["message"] == "Something went wrong"
         assert result["meta"] is None
 
     def test_fail_with_meta(self):
-        result = fail("bad request", meta={"code": 400})
+        result = fail("bad_request", "bad request", meta={"status": 400})
         assert result["success"] is False
-        assert result["error"] == "bad request"
-        assert result["meta"]["code"] == 400
+        assert result["error"]["code"] == "bad_request"
+        assert result["meta"]["status"] == 400
+
+    def test_fail_with_details(self):
+        result = fail("validation_error", "Invalid", details=[{"field": "name", "message": "required", "code": "missing"}])
+        assert result["error"]["details"][0]["field"] == "name"
 
 
 class TestApiResponseModel:
@@ -51,10 +56,10 @@ class TestApiResponseModel:
         assert resp.error is None
 
     def test_error_model(self):
-        resp = ApiResponse(success=False, error="not found")
+        resp = ApiResponse(success=False, error=ApiError(code="not_found", message="not found"))
         assert resp.success is False
         assert resp.data is None
-        assert resp.error == "not found"
+        assert resp.error.code == "not_found"
 
     def test_serialization_roundtrip(self):
         resp = ApiResponse(success=True, data="hello", meta={"v": 1})

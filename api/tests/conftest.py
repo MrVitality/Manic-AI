@@ -26,16 +26,28 @@ def mock_db_pool():
     connection with ``fetch``, ``fetchval``, ``fetchrow``, and ``execute``
     methods that return empty defaults.
     """
-    pool = AsyncMock()
     conn = AsyncMock()
     conn.fetch = AsyncMock(return_value=[])
-    conn.fetchval = AsyncMock(return_value=None)
+    conn.fetchval = AsyncMock(return_value=0)
     conn.fetchrow = AsyncMock(return_value=None)
     conn.execute = AsyncMock(return_value="OK")
 
-    # pool.acquire() is an async context manager
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=False)
+    # Build pool as MagicMock so sync methods (get_size, get_idle_size) work
+    pool = MagicMock()
+    pool.get_size = MagicMock(return_value=5)
+    pool.get_idle_size = MagicMock(return_value=3)
+
+    # pool.acquire() must return a fresh async context manager each call
+    # to avoid reentrancy issues with asyncio.gather
+    class _AcquireCM:
+        async def __aenter__(self):
+            return conn
+        async def __aexit__(self, *args):
+            return False
+
+    pool.acquire = MagicMock(side_effect=lambda: _AcquireCM())
+    # Attach conn for test access
+    pool._mock_conn = conn
     return pool
 
 
@@ -96,3 +108,51 @@ async def client(app: FastAPI) -> AsyncClient:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
+
+
+@pytest.fixture()
+def make_http_response():
+    """Factory for building mock httpx.Response objects with custom status/json."""
+
+    def _make(status_code=200, json_body=None):
+        resp = MagicMock(spec=httpx.Response)
+        resp.status_code = status_code
+        resp.json.return_value = json_body or {}
+        resp.raise_for_status = MagicMock()
+        if status_code >= 400:
+            resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+                "error", request=MagicMock(), response=resp
+            )
+        return resp
+
+    return _make
+
+
+@pytest.fixture()
+def app_with_auth(mock_db_pool, mock_http_client, mock_redis) -> FastAPI:
+    """App with API_SECRET_KEY='test-secret' for auth enforcement tests."""
+    from api.app import create_app
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def _noop(app: FastAPI):
+        yield
+
+    with patch("api.app.lifespan", _noop):
+        test_app = create_app()
+
+    test_app.state.db_pool = mock_db_pool
+    test_app.state.http_client = mock_http_client
+    test_app.state.redis_cache = mock_redis
+    test_app.state.langfuse = None
+    return test_app
+
+
+@pytest_asyncio.fixture()
+async def auth_client(app_with_auth: FastAPI) -> AsyncClient:
+    """Async HTTP test client with auth enforcement enabled."""
+    transport = ASGITransport(app=app_with_auth)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        # Patch _secret_key for the duration of the test
+        with patch("api.auth._secret_key", "test-secret"):
+            yield ac
