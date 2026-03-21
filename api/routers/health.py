@@ -10,7 +10,8 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 import asyncpg
 import httpx
 
@@ -108,3 +109,9 @@ async def services_status_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
+
+
+@router.get("/metrics", tags=["health"], include_in_schema=False)
+async def prometheus_metrics():
+    """Prometheus metrics endpoint for monitoring stack."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

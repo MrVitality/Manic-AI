@@ -11,9 +11,18 @@ import os
 
 # Configuration
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", "")
 # Reads from the same env var used by the API service.
 # Default matches bge-m3 (1024 dims). Override via VECTOR_DIMENSION env var.
 VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", "1024"))
+
+
+def _auth_headers() -> dict:
+    """Build request headers, including API key if configured."""
+    headers = {"Content-Type": "application/json"}
+    if QDRANT_API_KEY:
+        headers["api-key"] = QDRANT_API_KEY
+    return headers
 
 # Collection configurations
 COLLECTIONS = [
@@ -55,7 +64,7 @@ COLLECTIONS = [
 def check_qdrant_health():
     """Check if Qdrant is accessible"""
     try:
-        response = requests.get(f"{QDRANT_URL}/health", timeout=5)
+        response = requests.get(f"{QDRANT_URL}/health", headers=_auth_headers(), timeout=5)
         if response.status_code == 200:
             print("✓ Qdrant is healthy")
             return True
@@ -67,7 +76,7 @@ def check_qdrant_health():
 def list_collections():
     """List existing collections"""
     try:
-        response = requests.get(f"{QDRANT_URL}/collections")
+        response = requests.get(f"{QDRANT_URL}/collections", headers=_auth_headers())
         if response.status_code == 200:
             collections = response.json().get("result", {}).get("collections", [])
             return [c["name"] for c in collections]
@@ -92,7 +101,7 @@ def create_collection(name: str, vectors_config: dict, description: str = ""):
     try:
         response = requests.put(
             f"{QDRANT_URL}/collections/{name}",
-            headers={"Content-Type": "application/json"},
+            headers=_auth_headers(),
             json=payload
         )
 
@@ -122,7 +131,7 @@ def create_payload_index(collection_name: str, field_name: str, field_type: str)
     try:
         response = requests.put(
             f"{QDRANT_URL}/collections/{collection_name}/index",
-            headers={"Content-Type": "application/json"},
+            headers=_auth_headers(),
             json=payload
         )
 
@@ -200,7 +209,7 @@ def show_collection_info():
 
     for name in collections:
         try:
-            response = requests.get(f"{QDRANT_URL}/collections/{name}")
+            response = requests.get(f"{QDRANT_URL}/collections/{name}", headers=_auth_headers())
             if response.status_code == 200:
                 info = response.json().get("result", {})
                 vectors_count = info.get("vectors_count", 0)

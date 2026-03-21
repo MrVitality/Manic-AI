@@ -9,6 +9,7 @@ from api.config import settings
 from api.exception_handlers import register_exception_handlers
 from api.middleware.guardrails import GuardrailsMiddleware
 from api.middleware.metrics import MetricsMiddleware
+from api.middleware.prometheus import PrometheusMiddleware
 from api.middleware.rate_limit import limiter
 from api.middleware.request_id import RequestIdMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
@@ -99,8 +100,9 @@ def create_app() -> FastAPI:
 
     # --- Observability & security middleware ---
     # Order matters: outermost runs first.
-    # RequestId -> SecurityHeaders -> Guardrails -> Metrics
+    # RequestId -> SecurityHeaders -> Guardrails -> Prometheus -> Metrics
     _app.add_middleware(MetricsMiddleware)
+    _app.add_middleware(PrometheusMiddleware)
     _app.add_middleware(GuardrailsMiddleware)
     _app.add_middleware(SecurityHeadersMiddleware)
     _app.add_middleware(RequestIdMiddleware)

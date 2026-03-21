@@ -5,7 +5,7 @@ services:
   # Core AI Services
   # ===========================================================================
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.6.2
     container_name: ollama
     restart: unless-stopped
     ports:
@@ -36,7 +36,7 @@ services:
         max-file: "3"
 
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.13.2
     container_name: qdrant
     restart: unless-stopped
     ports:
@@ -148,6 +148,10 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     networks:
       - db-network
       - app-network
@@ -172,6 +176,10 @@ services:
         condition: service_healthy
     env_file:
       - .env
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     networks:
       - db-network
       - app-network
@@ -197,6 +205,10 @@ services:
     environment:
       PG_META_PORT: "8080"
       PG_META_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/postgres
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     networks:
       - db-network
       - app-network
@@ -223,6 +235,10 @@ services:
       - .env
     volumes:
       - supabase-storage-data:/var/lib/storage
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks:
       - db-network
       - app-network
@@ -247,8 +263,19 @@ services:
       - "${BIND_IP}:8444:8443"
     env_file:
       - .env
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        envsubst < /var/lib/kong/kong.yml.template > /tmp/kong.yml
+        export KONG_DECLARATIVE_CONFIG=/tmp/kong.yml
+        /docker-entrypoint.sh kong docker-start
     volumes:
-      - ./supabase/kong.yml:/var/lib/kong/kong.yml:ro
+      - ./supabase/kong.yml.template:/var/lib/kong/kong.yml.template:ro
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks:
       - db-network
       - app-network
@@ -269,9 +296,14 @@ services:
     container_name: ai-supabase-studio
     restart: unless-stopped
     depends_on:
-      - supabase-meta
+      supabase-meta:
+        condition: service_healthy
     env_file:
       - .env
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     networks:
       - app-network
     healthcheck:
@@ -296,7 +328,8 @@ services:
       - ./supabase/studio-nginx.conf:/etc/nginx/nginx.conf:ro
       - ./supabase/.htpasswd:/etc/nginx/.htpasswd:ro
     depends_on:
-      - supabase-studio
+      supabase-studio:
+        condition: service_healthy
     networks:
       - app-network
     healthcheck:
@@ -315,7 +348,7 @@ services:
   # Workflow & Automation
   # ===========================================================================
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:1.81.4
     container_name: ai-n8n
     restart: unless-stopped
     ports:
@@ -389,11 +422,13 @@ services:
         max-file: "3"
 
   searxng:
-    image: searxng/searxng:latest
+    image: searxng/searxng:2024.11.17-b20ed819e
     container_name: ai-searxng
     restart: unless-stopped
     ports:
       - "${BIND_IP}:8889:8080"
+    environment:
+      - SEARXNG_SECRET_KEY=${SEARXNG_SECRET_KEY}
     volumes:
       - ./searxng:/etc/searxng
     deploy:
@@ -480,7 +515,7 @@ services:
         max-file: "3"
 
   flowise:
-    image: flowiseai/flowise:latest
+    image: flowiseai/flowise:2.2.7
     container_name: ai-flowise
     restart: unless-stopped
     ports:
@@ -488,7 +523,7 @@ services:
     volumes:
       - flowise-data:/root/.flowise
     environment:
-      - FLOWISE_USERNAME=admin
+      - FLOWISE_USERNAME=${FLOWISE_USERNAME:-admin}
       - FLOWISE_PASSWORD=${FLOWISE_PASSWORD}
     deploy:
       resources:
@@ -525,7 +560,7 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
       VECTOR_DIMENSION: ${VECTOR_DIMENSION:-768}
       SUPABASE_DB_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB}
-      REDIS_URL: redis://ai-redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@ai-redis:6379
       QDRANT_URL: http://qdrant:6333
       SEARXNG_URL: http://ai-searxng:8080
       RAG_TOP_K: ${RAG_TOP_K:-5}
@@ -577,7 +612,7 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
       VECTOR_DIMENSION: ${VECTOR_DIMENSION:-768}
       SUPABASE_DB_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB}
-      REDIS_URL: redis://ai-redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@ai-redis:6379
       QDRANT_URL: http://qdrant:6333
       SEARXNG_URL: http://ai-searxng:8080
       RAG_TOP_K: ${RAG_TOP_K:-5}
@@ -588,6 +623,12 @@ services:
         condition: service_healthy
       ollama:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'api.mcp_main' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -619,8 +660,10 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=http://${BIND_IP}:8001
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY}
     depends_on:
-      - api
-      - ollama
+      api:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -722,7 +765,7 @@ services:
   # vLLM Production Inference (optional -- enable with: docker compose --profile vllm up)
   # ===========================================================================
   vllm:
-    image: vllm/vllm-openai:latest
+    image: vllm/vllm-openai:v0.7.3
     container_name: ai-vllm
     profiles: ["vllm"]
     restart: unless-stopped
@@ -751,12 +794,137 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ===========================================================================
+  # Monitoring Stack (opt-in: docker compose --profile monitoring up -d)
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: ai-prometheus
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts:/etc/prometheus/alerts:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - monitoring-network
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9090/-/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: ai-grafana
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:3009:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - monitoring-network
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: ai-cadvisor
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - monitoring-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: ai-node-exporter
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    networks:
+      - monitoring-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   db-network:
     driver: bridge
   app-network:
     driver: bridge
   tools-network:
+    driver: bridge
+  monitoring-network:
     driver: bridge
 
 volumes:
@@ -769,3 +937,5 @@ volumes:
   open-webui-data:
   langfuse-db-data:
   flowise-data:
+  prometheus-data:
+  grafana-data:
