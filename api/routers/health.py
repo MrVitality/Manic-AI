@@ -7,9 +7,9 @@ and uptime monitors can reach them without authentication.
 import asyncio
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response, StreamingResponse
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 import asyncpg
@@ -21,6 +21,31 @@ from api.schemas.envelope import ok
 from api.services.rag import check_service
 
 router = APIRouter()
+
+
+class ConnectionManager:
+    """Manages active WebSocket connections for broadcasting status updates."""
+
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, data: dict):
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(data)
+            except Exception:
+                pass
+
+
+manager = ConnectionManager()
 
 
 @router.get("/health", tags=["health"])
@@ -109,6 +134,34 @@ async def services_status_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
+
+
+@router.websocket("/ws/status")
+async def websocket_status(
+    websocket: WebSocket,
+    client: httpx.AsyncClient = Depends(get_http_client),
+    db: Optional[asyncpg.Pool] = Depends(get_db_optional),
+):
+    """WebSocket endpoint for real-time service status updates.
+
+    Sends a full status snapshot every 10 seconds. Responds to ``ping``
+    messages from the client with a ``{"type": "pong"}`` reply.
+    """
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await _get_all_services(client, db)
+            await websocket.send_json(data)
+            try:
+                msg = await asyncio.wait_for(websocket.receive_text(), timeout=10.0)
+                if msg == "ping":
+                    await websocket.send_json({"type": "pong"})
+            except asyncio.TimeoutError:
+                pass  # Normal — just proceed to next status update
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception:
+        manager.disconnect(websocket)
 
 
 @router.get("/metrics", tags=["health"], include_in_schema=False)
