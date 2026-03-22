@@ -471,6 +471,27 @@ export async function fetchSearchHistory(limit = 50, offset = 0): Promise<Search
 }
 
 // =============================================================================
+// Feedback
+// =============================================================================
+
+export async function submitFeedback(feedback: {
+  rating: number
+  comment?: string
+  conversation_id?: string
+  message_id?: string
+  query_text?: string
+  response_text?: string
+  had_rag?: boolean
+}): Promise<{ id: string; rating: number }> {
+  const response = await fetch(`${getApiV1()}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(feedback),
+  })
+  return unwrap<{ id: string; rating: number }>(response)
+}
+
+// =============================================================================
 // System
 // =============================================================================
 
@@ -486,4 +507,34 @@ export async function clearCache(): Promise<{ cleared: boolean; keys_removed: nu
 
 export function streamServiceStatus(): EventSource {
   return new EventSource(`${getApiUrl()}/services/status/stream`)
+}
+
+export function connectStatusWebSocket(
+  onMessage: (data: ServicesStatusResponse) => void,
+  onError?: (error: Event) => void,
+): WebSocket {
+  const wsUrl = getApiUrl().replace(/^http/, 'ws') + '/ws/status'
+  const ws = new WebSocket(wsUrl)
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      if (data.type !== 'pong') {
+        onMessage(data)
+      }
+    } catch { /* skip malformed frames */ }
+  }
+
+  ws.onerror = (event) => onError?.(event)
+
+  // Ping every 30s to keep the connection alive
+  const pingInterval = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send('ping')
+    }
+  }, 30000)
+
+  ws.onclose = () => clearInterval(pingInterval)
+
+  return ws
 }

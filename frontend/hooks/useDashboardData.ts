@@ -10,6 +10,7 @@ import {
   fetchRagAnalytics,
   fetchSystemInfo,
   streamServiceStatus,
+  connectStatusWebSocket,
 } from '@/lib/api'
 
 export function useDashboardData() {
@@ -28,20 +29,28 @@ export function useDashboardData() {
   const setIsStreaming = useDashboardStore((s) => s.setIsStreaming)
   const setError = useDashboardStore((s) => s.setError)
 
+  const applyServiceData = useCallback((data: { timestamp?: string; services?: Record<string, any> }) => {
+    if (!data.services) return
+    const snapshot = {
+      timestamp: data.timestamp || new Date().toISOString(),
+      services: {} as Record<string, { status: any; latency_ms: any }>,
+    }
+    for (const [key, svc] of Object.entries(data.services)) {
+      snapshot.services[key] = { status: (svc as any).status, latency_ms: (svc as any).latency_ms }
+    }
+    addServiceSnapshot(snapshot)
+    uiStoreApi.getState().setServiceStatuses(data.services)
+  }, [addServiceSnapshot])
+
   const refreshServices = useCallback(async () => {
     try {
       const data = await fetchServicesStatus()
-      const snapshot = { timestamp: data.timestamp, services: {} as Record<string, { status: any; latency_ms: any }> }
-      for (const [key, svc] of Object.entries(data.services)) {
-        snapshot.services[key] = { status: svc.status, latency_ms: svc.latency_ms }
-      }
-      addServiceSnapshot(snapshot)
-      uiStoreApi.getState().setServiceStatuses(data.services)
+      applyServiceData(data)
     } catch (e) {
       console.error('Failed to refresh services:', e)
       setError('Failed to refresh services')
     }
-  }, [addServiceSnapshot, setError])
+  }, [applyServiceData, setError])
 
   const refreshAnalytics = useCallback(async () => {
     setIsLoadingAnalytics(true)
@@ -69,48 +78,89 @@ export function useDashboardData() {
     await Promise.all([refreshServices(), refreshAnalytics()])
   }, [refreshServices, refreshAnalytics])
 
-  // SSE connection for live service status
+  // WebSocket connection for live service status (with SSE fallback)
   useEffect(() => {
-    try {
-      const sse = streamServiceStatus()
-      sseRef.current = sse
+    let ws: WebSocket | null = null
+    let reconnectTimeout: ReturnType<typeof setTimeout>
+    let usingSse = false
 
-      sse.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          if (data.services) {
-            const snapshot = { timestamp: data.timestamp || new Date().toISOString(), services: {} as Record<string, { status: any; latency_ms: any }> }
-            for (const [key, svc] of Object.entries(data.services) as any) {
-              snapshot.services[key] = { status: svc.status, latency_ms: svc.latency_ms }
-            }
-            addServiceSnapshot(snapshot)
-            uiStoreApi.getState().setServiceStatuses(data.services)
+    const connectWs = () => {
+      try {
+        ws = connectStatusWebSocket(
+          (data) => {
+            applyServiceData(data as any)
             setIsStreaming(true)
-          }
-        } catch {}
-      }
+          },
+          () => {
+            // WebSocket error — reconnect after 5s
+            setIsStreaming(false)
+            reconnectTimeout = setTimeout(connectWs, 5000)
+          },
+        )
 
-      sse.onerror = () => {
-        setIsStreaming(false)
+        // Override the onclose set inside connectStatusWebSocket so we can also
+        // clear the ping interval (handled inside) AND schedule a reconnect.
+        const originalOnClose = ws.onclose
+        ws.onclose = (event) => {
+          originalOnClose?.call(ws!, event)
+          setIsStreaming(false)
+          // Only reconnect on unexpected closes (not a clean teardown from cleanup)
+          if (!event.wasClean) {
+            reconnectTimeout = setTimeout(connectWs, 5000)
+          }
+        }
+      } catch {
+        // WebSocket constructor unavailable — fall back to SSE
+        if (!usingSse) {
+          usingSse = true
+          connectSse()
+        }
       }
-    } catch {
-      // SSE not available, fall back to polling
     }
 
+    const connectSse = () => {
+      try {
+        const sse = streamServiceStatus()
+        sseRef.current = sse
+
+        sse.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            applyServiceData(data)
+            setIsStreaming(true)
+          } catch {}
+        }
+
+        sse.onerror = () => {
+          setIsStreaming(false)
+        }
+      } catch {
+        // SSE also unavailable — polling fallback will handle it
+      }
+    }
+
+    connectWs()
+
     return () => {
+      clearTimeout(reconnectTimeout)
+      if (ws) {
+        // Signal a clean close so onclose does not schedule a reconnect
+        const prev = ws.onclose
+        ws.onclose = null
+        ws.close()
+        ws.onclose = prev
+      }
       if (sseRef.current) {
         sseRef.current.close()
         sseRef.current = null
       }
     }
-  }, [addServiceSnapshot, setIsStreaming])
+  }, [applyServiceData, setIsStreaming])
 
-  // Polling fallback — only poll services when SSE is not streaming
+  // Analytics fetch on mount + polling fallback for service status when not streaming
   useEffect(() => {
-    // Always fetch analytics on mount (SSE only covers service status)
     refreshAnalytics()
 
-    // Only poll services if SSE is not actively streaming
     if (!store.isStreaming) {
       refreshServices()
       const interval = setInterval(refreshServices, settings.dashboardRefreshRate)

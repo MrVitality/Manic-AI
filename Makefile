@@ -1,7 +1,7 @@
 # =============================================================================
 # Manic-AI — Development Commands
 # =============================================================================
-.PHONY: help dev up down test lint build clean logs status setup monitoring
+.PHONY: help dev up down test lint build clean logs status setup setup-deps setup-hooks verify monitoring
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -73,16 +73,28 @@ build-frontend: ## Build frontend Docker image
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
-setup: ## Initial setup — install deps, create .env, setup Qdrant
-	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example — fill in required values")
-	cd api && pip install -r requirements.txt
-	cd frontend && npm ci --legacy-peer-deps
+setup: setup-deps setup-hooks ## Full project setup
+	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example")
 	@echo ""
 	@echo "Setup complete. Next steps:"
 	@echo "  1. Edit .env with your secrets"
 	@echo "  2. Run: make up"
 	@echo "  3. Run: python scripts/setup_qdrant.py"
 
+setup-deps: ## Install Python and Node dependencies
+	@command -v python3 >/dev/null 2>&1 || { echo "Python 3 is required but not installed."; exit 1; }
+	@command -v node >/dev/null 2>&1 || { echo "Node.js is required but not installed."; exit 1; }
+	@command -v docker >/dev/null 2>&1 || { echo "Docker is required but not installed."; exit 1; }
+	cd api && pip install -r requirements.txt
+	cd frontend && npm ci --legacy-peer-deps
+
 setup-hooks: ## Install pre-commit hooks
-	pip install pre-commit
+	@command -v pre-commit >/dev/null 2>&1 || pip install pre-commit
 	pre-commit install
+	@echo "Pre-commit hooks installed"
+
+verify: ## Verify development environment setup
+	python scripts/verify_setup.py
+
+sdk: ## Generate TypeScript SDK from OpenAPI spec
+	python scripts/generate_sdk.py

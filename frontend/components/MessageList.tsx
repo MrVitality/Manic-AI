@@ -9,6 +9,7 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import ToolCallCard from './ToolCallCard'
 import type { ToolCallData } from './ToolCallCard'
 import type { Message, RagSource, ToolCallInfo } from '@/types'
+import FeedbackButtons from './FeedbackButtons'
 
 interface MessageListProps {
   messages: Message[]
@@ -272,6 +273,11 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
                   Regenerate
                 </button>
               )}
+              <FeedbackButtons
+                messageId={message.id}
+                responseText={message.content}
+                hadRag={(message.sources?.length ?? 0) > 0}
+              />
             </div>
           )}
         </div>
