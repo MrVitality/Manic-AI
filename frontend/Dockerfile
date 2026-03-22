@@ -8,14 +8,15 @@ WORKDIR /app
 # Copy package files first for layer caching
 COPY package.json package-lock.json* ./
 
-# Install dependencies (with legacy-peer-deps for compatibility)
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+# Install dependencies (lockfile-based for reproducible builds)
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .
 
 # Build the application
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # Production stage
