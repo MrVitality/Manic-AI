@@ -42,26 +42,26 @@ export default function RagCenter() {
   const { ragAnalytics } = useDashboardData()
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Error Banner */}
         {error && (
-          <div className="mx-4 mb-3 px-3 py-2 rounded-lg text-sm flex items-center justify-between"
+          <div className="mb-3 px-3 py-2 rounded-lg text-sm flex items-center justify-between"
             style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--status-error)', border: '1px solid rgba(239,68,68,0.2)' }}>
             <span>{error}</span>
-            <button onClick={() => setError(null)} className="text-xs opacity-70 hover:opacity-100">Dismiss</button>
+            <button onClick={() => setError(null)} className="text-xs opacity-70 hover:opacity-100 min-w-[44px] min-h-[44px] flex items-center justify-end">Dismiss</button>
           </div>
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
           <div>
-            <h2 className="text-2xl font-bold gradient-text">RAG Center</h2>
+            <h2 className="text-xl md:text-2xl font-bold gradient-text">RAG Center</h2>
             <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
               Manage your knowledge base and search pipeline
             </p>
           </div>
-          <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <div className="flex items-center gap-2 text-xs flex-wrap" style={{ color: 'var(--text-muted)' }}>
             {isLoadingStats && !ragStats ? (
               <>
                 <span style={{ ...SKELETON_BAR_STYLE, width: '48px' }} />
@@ -75,20 +75,22 @@ export default function RagCenter() {
                 <span>{ragStats.total_documents} docs</span>
                 <span className="opacity-30">|</span>
                 <span>{ragStats.total_chunks} chunks</span>
-                <span className="opacity-30">|</span>
-                <span>{ragStats.embedding_model}</span>
+                <span className="opacity-30 hidden sm:inline">|</span>
+                <span className="hidden sm:inline">{ragStats.embedding_model}</span>
               </>
             ) : null}
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="mb-6">
-          <TabGroup
-            tabs={TABS}
-            activeTab={ragTab}
-            onChange={(tab) => setRagTab(tab as RagCenterTab)}
-          />
+        {/* Tab Navigation — horizontally scrollable on mobile */}
+        <div className="mb-6 overflow-x-auto pb-1">
+          <div className="min-w-max">
+            <TabGroup
+              tabs={TABS}
+              activeTab={ragTab}
+              onChange={(tab) => setRagTab(tab as RagCenterTab)}
+            />
+          </div>
         </div>
 
         {/* Tab Content */}

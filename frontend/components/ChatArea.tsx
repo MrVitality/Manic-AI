@@ -21,11 +21,8 @@ export default function ChatArea() {
 
   return (
     <div
-      className="flex-1 flex min-h-0 transition-all duration-300"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: isArtifactPanelOpen ? '60fr 40fr' : '1fr',
-      }}
+      className={`flex-1 min-h-0 transition-all duration-300 ${isArtifactPanelOpen ? 'flex flex-col md:grid' : 'flex flex-col'}`}
+      style={isArtifactPanelOpen ? { gridTemplateColumns: '60fr 40fr' } : undefined}
     >
       {/* Chat Column */}
       <div className="flex flex-col min-h-0 min-w-0">
@@ -83,8 +80,12 @@ export default function ChatArea() {
         </div>
       </div>
 
-      {/* Artifact Panel (right pane) */}
-      {isArtifactPanelOpen && <ArtifactPanel />}
+      {/* Artifact Panel (right pane, full-width below chat on mobile, side pane on md+) */}
+      {isArtifactPanelOpen && (
+        <div className="min-h-[300px] md:min-h-0">
+          <ArtifactPanel />
+        </div>
+      )}
     </div>
   )
 }

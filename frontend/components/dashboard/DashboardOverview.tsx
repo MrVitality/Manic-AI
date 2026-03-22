@@ -137,16 +137,16 @@ export default function DashboardOverview({
           <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>Recent Activity</h3>
           <div className="space-y-2">
             {usageAnalytics.data.slice(-8).reverse().map((point, i) => (
-              <div key={i} className="flex items-center justify-between py-1.5" style={{ borderBottom: i < 7 ? '1px solid var(--border-color)' : 'none' }}>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+              <div key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5" style={{ borderBottom: i < 7 ? '1px solid var(--border-color)' : 'none' }}>
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-xs font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
                     {new Date(point.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
-                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    {point.request_count} requests
+                  <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+                    {point.request_count} req
                   </span>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 flex-shrink-0">
                   <span className="text-xs font-mono" style={{ color: 'var(--accent-cyan)' }}>
                     {point.total_tokens.toLocaleString()} tok
                   </span>

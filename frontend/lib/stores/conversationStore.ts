@@ -16,6 +16,7 @@ interface ConversationState {
   selectConversation: (id: string) => void
   updateConversationTitle: (id: string, title: string) => void
   clearConversations: () => void
+  importConversation: (data: Record<string, unknown>) => void
   addMessage: (conversationId: string, message: Message) => void
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void
   deleteMessage: (conversationId: string, messageId: string) => void
@@ -77,6 +78,21 @@ export const useConversationStore = create<ConversationState>()(
 
       clearConversations: () => {
         set({ conversations: [], currentConversationId: null })
+      },
+
+      importConversation: (data: Record<string, unknown>) => {
+        const conversation: Conversation = {
+          id: typeof data.id === 'string' ? data.id : generateId(),
+          title: typeof data.title === 'string' && data.title.trim() ? data.title.trim() : 'Imported Conversation',
+          messages: Array.isArray(data.messages) ? data.messages as Message[] : [],
+          model: typeof data.model === 'string' ? data.model : '',
+          createdAt: data.createdAt ? new Date(data.createdAt as string) : new Date(),
+          updatedAt: new Date(),
+        }
+        set((state) => ({
+          conversations: [conversation, ...state.conversations],
+          currentConversationId: conversation.id,
+        }))
       },
 
       addMessage: (conversationId: string, message: Message) => {

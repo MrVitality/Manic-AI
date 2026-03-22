@@ -48,23 +48,23 @@ export default function Dashboard() {
   }, [systemInfo?.uptime_seconds])
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         {/* Error Banner */}
         {error && (
-          <div className="mx-4 mb-3 px-3 py-2 rounded-lg text-sm flex items-center justify-between"
+          <div className="mb-3 px-3 py-2 rounded-lg text-sm flex items-center justify-between"
             style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--status-error)', border: '1px solid rgba(239,68,68,0.2)' }}>
             <span>{error}</span>
-            <button onClick={() => setError(null)} className="text-xs opacity-70 hover:opacity-100">Dismiss</button>
+            <button onClick={() => setError(null)} className="text-xs opacity-70 hover:opacity-100 min-w-[44px] min-h-[44px] flex items-center justify-end">Dismiss</button>
           </div>
         )}
 
         {/* Dashboard Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div className="flex items-center gap-4">
             <div>
-              <h2 className="text-2xl font-bold gradient-text">Command Center</h2>
-              <div className="flex items-center gap-3 mt-1">
+              <h2 className="text-xl md:text-2xl font-bold gradient-text">Command Center</h2>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1">
                 <div className="flex items-center gap-1.5">
                   <PulseIndicator
                     status={healthyCount === totalCount && totalCount > 0 ? 'healthy' : totalCount === 0 ? 'unknown' : 'degraded'}
@@ -81,20 +81,20 @@ export default function Dashboard() {
                 )}
                 {lastRefresh && (
                   <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    Updated {lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
             {isLoadingAnalytics && (
               <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--border-color)', borderTopColor: 'var(--accent-blue)' }} />
             )}
             <button
               onClick={refreshAll}
-              className="px-3 py-1.5 text-xs glass-card hover:bg-white/[0.05] transition-all rounded-lg flex items-center gap-2"
+              className="px-3 py-2 text-xs glass-card hover:bg-white/[0.05] transition-all rounded-lg flex items-center gap-2 min-h-[44px]"
               style={{ color: 'var(--text-secondary)' }}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,13 +105,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="mb-6">
-          <TabGroup
-            tabs={TABS}
-            activeTab={dashboardTab}
-            onChange={(tab) => setDashboardTab(tab as DashboardTab)}
-          />
+        {/* Tab Navigation — horizontally scrollable on mobile */}
+        <div className="mb-6 overflow-x-auto pb-1">
+          <div className="min-w-max">
+            <TabGroup
+              tabs={TABS}
+              activeTab={dashboardTab}
+              onChange={(tab) => setDashboardTab(tab as DashboardTab)}
+            />
+          </div>
         </div>
 
         {/* Tab Content */}

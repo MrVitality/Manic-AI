@@ -1,7 +1,7 @@
 # =============================================================================
 # Manic-AI — Development Commands
 # =============================================================================
-.PHONY: help dev up down test lint build clean logs status setup setup-deps setup-hooks verify monitoring
+.PHONY: help dev up down test lint build clean logs status setup setup-deps setup-hooks verify monitoring backup
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -98,3 +98,6 @@ verify: ## Verify development environment setup
 
 sdk: ## Generate TypeScript SDK from OpenAPI spec
 	python scripts/generate_sdk.py
+
+backup: ## Backup database (pg_dump → backups/)
+	python scripts/backup_db.py

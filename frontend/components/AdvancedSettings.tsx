@@ -29,10 +29,25 @@ export default function AdvancedSettings() {
   }, [])
 
   return (
-    <div className="flex-1 overflow-hidden flex">
-      {/* Settings Sidebar */}
+    <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+      {/* Mobile section picker */}
+      <div className="md:hidden p-3" style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
+        <h2 className="text-base font-bold gradient-text mb-2">Settings</h2>
+        <select
+          value={activeSection}
+          onChange={(e) => setActiveSection(e.target.value as SettingsSection)}
+          className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+          style={{ background: 'var(--glass-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+        >
+          {SECTIONS.map((section) => (
+            <option key={section.id} value={section.id}>{section.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Desktop Settings Sidebar */}
       <nav
-        className="w-48 flex-shrink-0 overflow-y-auto p-3 space-y-1"
+        className="hidden md:flex w-48 flex-shrink-0 flex-col overflow-y-auto p-3 space-y-1"
         style={{ borderRight: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}
       >
         <div className="px-3 py-2 mb-2">
@@ -55,7 +70,7 @@ export default function AdvancedSettings() {
       </nav>
 
       {/* Settings Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="max-w-2xl mx-auto animate-tab-enter" key={activeSection}>
           {activeSection === 'general' && <GeneralSettings />}
           {activeSection === 'inference' && <InferenceSettings />}

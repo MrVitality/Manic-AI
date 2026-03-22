@@ -36,7 +36,15 @@ const viewTitleMap: Record<string, string> = {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  // Start open on desktop, closed on mobile. SSR defaults to true (desktop-first).
+  // A useEffect immediately corrects to false on mobile before first paint is committed.
   const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false)
+    }
+  }, [])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const pathname = usePathname()
   const settings = useUiStore((s) => s.settings)
@@ -77,11 +85,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onNavClick={() => setSidebarOpen(false)}
       />
 
       <main className="flex-1 flex flex-col min-w-0">
-        <div className="lg:hidden flex items-center gap-3 p-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 rounded-lg" style={{ background: 'var(--glass-bg)' }}>
+        <div className="md:hidden flex items-center gap-3 p-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center"
+            style={{ background: 'var(--glass-bg)' }}
+            aria-label="Open navigation menu"
+          >
             <MenuIcon className="w-6 h-6" />
           </button>
           <h1 className="font-semibold truncate">{title}</h1>
@@ -93,7 +107,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <CommandPalette />
 
       {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-20" onClick={() => setSidebarOpen(false)} />
+        <div className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-20" onClick={() => setSidebarOpen(false)} />
       )}
     </div>
   )

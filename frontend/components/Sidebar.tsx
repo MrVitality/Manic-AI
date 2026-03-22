@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatStore } from '@/lib/store'
+import { useConversationStore } from '@/lib/stores/conversationStore'
 import { useModels } from '@/hooks/useModels'
 import { useTheme } from '@/hooks/useTheme'
 import type { Conversation } from '@/types'
@@ -19,12 +20,14 @@ import {
   MoonIcon,
   RagIcon,
   DownloadIcon,
+  UploadIcon,
 } from '@/components/ui/Icons'
 
 interface SidebarProps {
   isOpen: boolean
   onToggle: () => void
   onOpenSettings: () => void
+  onNavClick?: () => void
 }
 
 interface NavItem {
@@ -64,7 +67,7 @@ function groupConversationsByDate(convos: Conversation[]): Record<string, Conver
   return groups
 }
 
-export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarProps) {
+export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const {
@@ -72,10 +75,13 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
     createConversation, selectConversation, deleteConversation,
     clearConversations,
   } = useChatStore()
+  const { importConversation } = useConversationStore()
   const { models, selectedModel, setSelectedModel, isLoadingModels } = useModels()
   const { theme, toggleTheme } = useTheme()
   const [showClearConfirm, setShowClearConfirm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [importError, setImportError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const filteredConversations = useMemo(
     () =>
@@ -120,8 +126,44 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
     URL.revokeObjectURL(url)
   }
 
+  const handleImportClick = () => {
+    setImportError(null)
+    fileInputRef.current?.click()
+  }
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.name.endsWith('.json')) {
+      setImportError('Only .json files are supported')
+      e.target.value = ''
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const raw = ev.target?.result
+        if (typeof raw !== 'string') throw new Error('Could not read file')
+        const data = JSON.parse(raw) as Record<string, unknown>
+        if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+          throw new Error('Invalid conversation format')
+        }
+        importConversation(data)
+        router.push('/chat')
+      } catch (err) {
+        setImportError(err instanceof Error ? err.message : 'Failed to import conversation')
+      }
+    }
+    reader.onerror = () => setImportError('Failed to read file')
+    reader.readAsText(file)
+    e.target.value = '' // reset so the same file can be re-imported
+  }
+
   const navigateTo = (path: string) => {
     router.push(path)
+    onNavClick?.()
   }
 
   const navItems: NavItem[] = [
@@ -142,7 +184,7 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
       <aside
         role="navigation"
         aria-label="Main navigation"
-        className={`fixed lg:relative inset-y-0 left-0 z-30 w-72 flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-0 lg:border-0 lg:overflow-hidden'}`}
+        className={`fixed md:relative inset-y-0 left-0 z-30 w-72 flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:w-0 md:border-0 md:overflow-hidden'}`}
         style={{ background: 'var(--bg-secondary)', borderRight: '1px solid var(--border-color)' }}
       >
         {/* Header */}
@@ -155,14 +197,35 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
               <button onClick={toggleTheme} className="p-1.5 rounded-md transition-colors hover:bg-white/5 text-zinc-400 hover:text-zinc-200" title={`Switch mode`} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
                 {theme === 'dark' ? <SunIcon className="w-4 h-4" /> : <MoonIcon className="w-4 h-4" />}
               </button>
-              <button onClick={onToggle} className="lg:hidden p-1.5 rounded-md text-zinc-400 hover:bg-white/5 hover:text-zinc-200" aria-label="Close sidebar">
+              <button onClick={onToggle} className="md:hidden p-1.5 rounded-md text-zinc-400 hover:bg-white/5 hover:text-zinc-200 min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="Close sidebar">
                 <CloseIcon className="w-4 h-4" />
               </button>
             </div>
           </div>
-          <button onClick={handleNewChat} className="w-full btn-primary flex items-center justify-center gap-2 py-2.5">
-            <PlusIcon className="w-4 h-4" /> New Chat
-          </button>
+          <div className="flex gap-2">
+            <button onClick={handleNewChat} className="flex-1 btn-primary flex items-center justify-center gap-2 py-2.5">
+              <PlusIcon className="w-4 h-4" /> New Chat
+            </button>
+            <button
+              onClick={handleImportClick}
+              className="btn-secondary flex items-center justify-center px-3 py-2.5"
+              title="Import conversation from JSON"
+              aria-label="Import conversation"
+            >
+              <UploadIcon className="w-4 h-4" />
+            </button>
+          </div>
+          {importError && (
+            <p className="mt-2 text-xs text-red-400" role="alert">{importError}</p>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            aria-hidden="true"
+            onChange={handleImportFile}
+          />
         </div>
 
         {/* Navigation */}

@@ -48,14 +48,14 @@ export default function ModelManager() {
     : null
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Models</h2>
+            <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Models</h2>
             <p className="text-sm text-gray-400 mt-1">Manage your Ollama models</p>
           </div>
-          <button onClick={refreshModels} disabled={isLoadingModels} className="px-3 py-1.5 text-sm glass-card hover:bg-white/10 transition-colors rounded-lg flex items-center gap-2">
+          <button onClick={refreshModels} disabled={isLoadingModels} className="px-3 py-2 text-sm glass-card hover:bg-white/10 transition-colors rounded-lg flex items-center gap-2 self-start sm:self-auto min-h-[44px]">
             <svg className={`w-4 h-4 ${isLoadingModels ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             Refresh
           </button>
@@ -64,7 +64,7 @@ export default function ModelManager() {
         {/* Pull Model */}
         <div className="glass-card p-4 rounded-xl mb-6">
           <h3 className="text-sm font-medium text-gray-300 mb-3">Pull a New Model</h3>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input
               type="text"
               value={pullName}
@@ -74,7 +74,7 @@ export default function ModelManager() {
               disabled={isPulling}
               className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent placeholder-gray-500 disabled:opacity-50"
             />
-            <button onClick={handlePull} disabled={isPulling || !pullName.trim()} className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={handlePull} disabled={isPulling || !pullName.trim()} className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]">
               {isPulling ? 'Pulling...' : 'Pull'}
             </button>
           </div>

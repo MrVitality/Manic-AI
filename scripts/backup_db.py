@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""Automated database backup using pg_dump.
+
+Usage:
+    python scripts/backup_db.py                    # Backup to backups/ directory
+    python scripts/backup_db.py --output /path/    # Custom output directory
+    python scripts/backup_db.py --retain 7         # Keep last 7 backups (default)
+    python scripts/backup_db.py --schemas rag      # Backup only specific schemas
+"""
+import argparse
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime
+from pathlib import Path
+
+ROOT = Path(__file__).parent.parent
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Backup Manic AI database")
+    parser.add_argument("--output", default=str(ROOT / "backups"), help="Backup directory")
+    parser.add_argument("--retain", type=int, default=7, help="Number of backups to keep")
+    parser.add_argument(
+        "--schemas",
+        nargs="*",
+        default=["public", "rag"],
+        help="Schemas to backup",
+    )
+    args = parser.parse_args()
+
+    output_dir = Path(args.output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Read DB connection from environment or .env file
+    db_url = os.getenv("SUPABASE_DB_URL", "")
+    if not db_url:
+        env_file = ROOT / ".env"
+        if env_file.exists():
+            for line in env_file.read_text().splitlines():
+                if line.startswith("POSTGRES_PASSWORD="):
+                    pw = line.split("=", 1)[1].strip()
+                    db_url = f"postgresql://postgres:{pw}@localhost:5433/postgres"
+                    break
+
+    if not db_url:
+        print(
+            "Error: No database URL found. "
+            "Set SUPABASE_DB_URL or POSTGRES_PASSWORD in .env"
+        )
+        sys.exit(1)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = output_dir / f"manic_ai_backup_{timestamp}.sql.gz"
+
+    # Build schema filter args
+    schema_args: list[str] = []
+    for schema in args.schemas:
+        schema_args.extend(["-n", schema])
+
+    cmd = [
+        "pg_dump",
+        db_url,
+        "--no-owner",
+        "--no-privileges",
+        *schema_args,
+    ]
+
+    print(f"Backing up to {backup_file}...")
+    start = time.time()
+
+    try:
+        with open(backup_file, "wb") as f:
+            dump = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            gzip_proc = subprocess.Popen(["gzip"], stdin=dump.stdout, stdout=f)
+            dump.stdout.close()  # type: ignore[union-attr]
+            gzip_proc.communicate()
+
+            if dump.wait() != 0:
+                stderr = dump.stderr.read().decode()  # type: ignore[union-attr]
+                print(f"Error: pg_dump failed: {stderr}")
+                backup_file.unlink(missing_ok=True)
+                sys.exit(1)
+
+    except FileNotFoundError:
+        # pg_dump not available locally — fall back to Docker
+        print("pg_dump not found locally, trying via Docker...")
+        docker_cmd = [
+            "docker",
+            "exec",
+            "ai-supabase-db",
+            "pg_dump",
+            "-U",
+            "postgres",
+            "--no-owner",
+            "--no-privileges",
+            *schema_args,
+            "postgres",
+        ]
+        result = subprocess.run(docker_cmd, capture_output=True)
+        if result.returncode != 0:
+            print(f"Error: {result.stderr.decode()}")
+            sys.exit(1)
+
+        import gzip as gz
+
+        with gz.open(backup_file, "wb") as f:
+            f.write(result.stdout)
+
+    elapsed = time.time() - start
+    size_mb = backup_file.stat().st_size / (1024 * 1024)
+    print(f"Backup complete: {backup_file} ({size_mb:.1f} MB, {elapsed:.1f}s)")
+
+    # Prune old backups beyond retention limit
+    backups = sorted(output_dir.glob("manic_ai_backup_*.sql.gz"))
+    if len(backups) > args.retain:
+        for old in backups[: -args.retain]:
+            old.unlink()
+            print(f"Removed old backup: {old.name}")
+
+    retained = min(len(backups), args.retain)
+    print(f"Backups retained: {retained}")
+
+
+if __name__ == "__main__":
+    main()

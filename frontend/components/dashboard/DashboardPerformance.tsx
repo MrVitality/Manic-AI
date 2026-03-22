@@ -89,13 +89,17 @@ export default function DashboardPerformance({
           Latency Heatmap (24h)
         </h3>
         {heatmapData.cells.length > 0 ? (
-          <Heatmap
-            cells={heatmapData.cells}
-            columns={24}
-            rows={heatmapData.names.length}
-            rowLabels={heatmapData.names}
-            colLabels={colLabels}
-          />
+          <div className="overflow-x-auto">
+            <div className="min-w-[600px]">
+              <Heatmap
+                cells={heatmapData.cells}
+                columns={24}
+                rows={heatmapData.names.length}
+                rowLabels={heatmapData.names}
+                colLabels={colLabels}
+              />
+            </div>
+          </div>
         ) : (
           <div className="text-xs text-center py-8" style={{ color: 'var(--text-muted)' }}>
             Collecting service data...
@@ -109,13 +113,17 @@ export default function DashboardPerformance({
           Request Throughput
         </h3>
         {rpmData.length > 2 ? (
-          <AreaChart
-            data={rpmData}
-            width={700}
-            height={150}
-            color="var(--accent-purple)"
-            showGrid
-          />
+          <div className="overflow-x-auto">
+            <div className="min-w-[320px]">
+              <AreaChart
+                data={rpmData}
+                width={700}
+                height={150}
+                color="var(--accent-purple)"
+                showGrid
+              />
+            </div>
+          </div>
         ) : (
           <div className="text-xs text-center py-8" style={{ color: 'var(--text-muted)' }}>
             No throughput data yet
