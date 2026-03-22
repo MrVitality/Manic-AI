@@ -369,26 +369,38 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const handleToggleActive = async (id: string, value: boolean) => {
-    await apiFetch(`/v1/admin/users/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ is_active: value }),
-    })
-    await fetchData()
-  }
+  const handleToggleActive = useCallback(async (id: string, value: boolean) => {
+    try {
+      await apiFetch(`/v1/admin/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: value }),
+      })
+      await fetchData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update user')
+    }
+  }, [fetchData])
 
-  const handleToggleAdmin = async (id: string, value: boolean) => {
-    await apiFetch(`/v1/admin/users/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ is_admin: value }),
-    })
-    await fetchData()
-  }
+  const handleToggleAdmin = useCallback(async (id: string, value: boolean) => {
+    try {
+      await apiFetch(`/v1/admin/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_admin: value }),
+      })
+      await fetchData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update user')
+    }
+  }, [fetchData])
 
-  const handleDeactivate = async (id: string) => {
-    await apiFetch(`/v1/admin/users/${id}`, { method: 'DELETE' })
-    await fetchData()
-  }
+  const handleDeactivate = useCallback(async (id: string) => {
+    try {
+      await apiFetch(`/v1/admin/users/${id}`, { method: 'DELETE' })
+      await fetchData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete user')
+    }
+  }, [fetchData])
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 

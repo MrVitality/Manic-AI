@@ -100,7 +100,7 @@ export const useConversationStore = create<ConversationState>()(
               }))
           : []
         const conversation: Conversation = {
-          id: typeof data.id === 'string' ? data.id : generateId(),
+          id: generateId(),
           title: typeof data.title === 'string' && data.title.trim() ? data.title.trim() : 'Imported Conversation',
           messages: validatedMessages,
           model: typeof data.model === 'string' ? data.model : '',

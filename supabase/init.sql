@@ -45,7 +45,13 @@ BEGIN
         CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
     END IF;
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN
-        CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD '@@AUTHENTICATOR_PASSWORD@@';
+        -- SECURITY: Password is read from current_setting('app.authenticator_password') if set,
+        -- otherwise falls back to the literal below. After init you MUST run:
+        --   ALTER ROLE authenticator PASSWORD '<strong-random-secret>';
+        -- or set the GUC before running this script.
+        CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD
+            COALESCE(current_setting('app.authenticator_password', true),
+                     'change-me-immediately-' || gen_random_uuid()::text);
     END IF;
 END
 $$;
@@ -577,34 +583,9 @@ BEGIN
 END;
 $$;
 
--- Admin: Execute custom SQL (restricted to SELECT only)
-CREATE OR REPLACE FUNCTION public.execute_custom_sql(sql_query TEXT)
-RETURNS JSONB
-LANGUAGE plpgsql SECURITY DEFINER
-AS $$
-DECLARE
-    result JSONB;
-BEGIN
-    IF NOT (UPPER(TRIM(sql_query)) LIKE 'SELECT%') THEN
-        RETURN jsonb_build_object(
-            'error', 'Only SELECT queries are allowed',
-            'detail', 'PERMISSION_DENIED'
-        );
-    END IF;
-
-    EXECUTE 'SELECT COALESCE(jsonb_agg(t), ''[]''::jsonb) FROM (' || sql_query || ') t' INTO result;
-    RETURN result;
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN jsonb_build_object(
-            'error', SQLERRM,
-            'detail', SQLSTATE
-        );
-END;
-$$;
-
-REVOKE EXECUTE ON FUNCTION public.execute_custom_sql(text) FROM PUBLIC, authenticated, anon;
-GRANT EXECUTE ON FUNCTION public.execute_custom_sql(text) TO service_role;
+-- execute_custom_sql was removed: dynamic EXECUTE with string concatenation is
+-- architecturally unsound and cannot be made safe regardless of input checks.
+-- Callers should use parameterised queries or dedicated typed functions instead.
 
 -- Get conversation with all messages
 CREATE OR REPLACE FUNCTION get_conversation_with_messages(conv_id UUID)
@@ -981,25 +962,33 @@ CREATE POLICY "Service role full access to agent_messages" ON public.agent_messa
 CREATE POLICY "Deny delete for agent_messages" ON public.agent_messages
     FOR DELETE USING (false);
 
--- Conversations (simple)
+-- Conversations: authenticated users and service_role only
 DROP POLICY IF EXISTS "conversations_all_access" ON public.conversations;
 CREATE POLICY "conversations_all_access" ON public.conversations
-    FOR ALL USING (true) WITH CHECK (true);
+    FOR ALL
+    USING  (auth.role() = 'authenticated' OR auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'service_role');
 
--- Messages (simple)
+-- Messages: authenticated users and service_role only
 DROP POLICY IF EXISTS "messages_all_access" ON public.messages;
 CREATE POLICY "messages_all_access" ON public.messages
-    FOR ALL USING (true) WITH CHECK (true);
+    FOR ALL
+    USING  (auth.role() = 'authenticated' OR auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'service_role');
 
--- Prompts
+-- Prompts: authenticated users and service_role only
 DROP POLICY IF EXISTS "prompts_all_access" ON public.prompts;
 CREATE POLICY "prompts_all_access" ON public.prompts
-    FOR ALL USING (true) WITH CHECK (true);
+    FOR ALL
+    USING  (auth.role() = 'authenticated' OR auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'service_role');
 
--- Usage logs
+-- Usage logs: service_role only (contains billing/cost data)
 DROP POLICY IF EXISTS "usage_logs_all_access" ON public.usage_logs;
 CREATE POLICY "usage_logs_all_access" ON public.usage_logs
-    FOR ALL USING (true) WITH CHECK (true);
+    FOR ALL
+    USING  (auth.role() = 'service_role')
+    WITH CHECK (auth.role() = 'service_role');
 
 -- Document tables (backend-only, service role access)
 DROP POLICY IF EXISTS "Service role access to document_metadata" ON public.document_metadata;
@@ -1146,7 +1135,7 @@ GRANT SELECT, INSERT, UPDATE ON public.user_profiles TO authenticated;
 GRANT SELECT, INSERT ON public.requests TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON public.agent_conversations TO authenticated;
 GRANT SELECT, INSERT ON public.agent_messages TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO anon;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO anon;
 

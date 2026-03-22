@@ -5,6 +5,7 @@ and uptime monitors can reach them without authentication.
 """
 
 import asyncio
+import hmac
 import json
 import time
 from datetime import datetime, timezone
@@ -12,13 +13,13 @@ from typing import Any, Dict, List, Optional
 
 import logging
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response, StreamingResponse
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 import asyncpg
 import httpx
 
-from api.auth import require_api_key
+from api.auth import _secret_key, require_api_key
 from api.config import settings
 from api.dependencies import get_db_optional, get_http_client
 from api.schemas.envelope import ok
@@ -62,28 +63,14 @@ manager = ConnectionManager()
 
 
 @router.get("/health", tags=["health"])
-async def health_check(
-    client: httpx.AsyncClient = Depends(get_http_client),
-    db: Optional[asyncpg.Pool] = Depends(get_db_optional),
-) -> Dict[str, Any]:
+async def health_check() -> Dict[str, Any]:
     now = time.monotonic()
     if _health_cache["data"] is not None and now < _health_cache["expires"]:
         return _health_cache["data"]
 
-    ollama = await check_service(f"{settings.OLLAMA_URL}/api/tags", client)
     result = ok({
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "auth_enabled": bool(settings.API_SECRET_KEY),
-        "services": {
-            "database": "connected" if db else "disconnected",
-            "ollama": ollama["status"],
-        },
-        "config": {
-            "chat_model": settings.CHAT_MODEL,
-            "embedding_model": settings.EMBEDDING_MODEL,
-            "vector_dimension": settings.VECTOR_DIMENSION,
-        },
     })
     _health_cache["data"] = result
     _health_cache["expires"] = now + _HEALTH_CACHE_TTL
@@ -160,6 +147,7 @@ async def services_status_stream(
 @router.websocket("/ws/status")
 async def websocket_status(
     websocket: WebSocket,
+    token: Optional[str] = Query(default=None),
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
 ):
@@ -167,7 +155,15 @@ async def websocket_status(
 
     Sends a full status snapshot every 10 seconds. Responds to ``ping``
     messages from the client with a ``{"type": "pong"}`` reply.
+
+    When API_SECRET_KEY is configured, callers must supply a matching
+    ``token`` query parameter or the connection is rejected with code 1008.
     """
+    if _secret_key:
+        if not token or not hmac.compare_digest(token, _secret_key):
+            await websocket.close(code=1008)
+            return
+
     await manager.connect(websocket)
     try:
         while True:

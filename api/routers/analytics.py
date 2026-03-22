@@ -7,6 +7,7 @@ import asyncpg
 import httpx
 from fastapi import APIRouter, Depends, Query
 
+from api.auth import require_api_key
 from api.dependencies import get_db_optional, get_http_client, get_redis
 from api.repositories.redis_cache import RedisCacheRepository
 from api.schemas.envelope import ok
@@ -18,7 +19,7 @@ from api.services.analytics import (
 )
 from api.services.cache import get_cached, set_cached
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_api_key)])
 
 _PERIOD_INTERVALS = {
     "hour": "1 hour",
@@ -87,7 +88,7 @@ async def analytics_rag_endpoint(
 
 @router.get("/analytics/services/history", response_model=None, tags=["analytics"])
 async def analytics_services_history_endpoint(
-    service: Optional[str] = None,
+    service: Optional[str] = Query(None, max_length=100, pattern=r"^[a-zA-Z0-9_\-]+$"),
     hours: int = Query(24, ge=1, le=168),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
     redis: Optional[RedisCacheRepository] = Depends(get_redis),

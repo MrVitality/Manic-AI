@@ -12,6 +12,7 @@ import {
   streamServiceStatus,
   connectStatusWebSocket,
 } from '@/lib/api'
+import type { ServicesStatusResponse, ServiceStatus } from '@/types'
 
 export function useDashboardData() {
   const store = useDashboardStore()
@@ -29,14 +30,14 @@ export function useDashboardData() {
   const setIsStreaming = useDashboardStore((s) => s.setIsStreaming)
   const setError = useDashboardStore((s) => s.setError)
 
-  const applyServiceData = useCallback((data: { timestamp?: string; services?: Record<string, any> }) => {
+  const applyServiceData = useCallback((data: Partial<ServicesStatusResponse>) => {
     if (!data.services) return
     const snapshot = {
       timestamp: data.timestamp || new Date().toISOString(),
-      services: {} as Record<string, { status: any; latency_ms: any }>,
+      services: {} as Record<string, { status: ServiceStatus['status']; latency_ms: ServiceStatus['latency_ms'] }>,
     }
     for (const [key, svc] of Object.entries(data.services)) {
-      snapshot.services[key] = { status: (svc as any).status, latency_ms: (svc as any).latency_ms }
+      snapshot.services[key] = { status: svc.status, latency_ms: svc.latency_ms }
     }
     addServiceSnapshot(snapshot)
     uiStoreApi.getState().setServiceStatuses(data.services)
@@ -88,7 +89,7 @@ export function useDashboardData() {
       try {
         ws = connectStatusWebSocket(
           (data) => {
-            applyServiceData(data as any)
+            applyServiceData(data)
             setIsStreaming(true)
           },
           () => {
@@ -160,16 +161,23 @@ export function useDashboardData() {
   // Subscribe to isStreaming directly to avoid stale closure
   const isStreaming = useDashboardStore((s) => s.isStreaming)
 
-  // Analytics fetch on mount + polling fallback for service status when not streaming
+  // One-time analytics fetch on mount
+  const analyticsInitialized = useRef(false)
   useEffect(() => {
-    refreshAnalytics()
+    if (!analyticsInitialized.current) {
+      analyticsInitialized.current = true
+      refreshAnalytics()
+    }
+  }, [refreshAnalytics])
 
+  // Polling fallback for service status when not streaming (separate from analytics)
+  useEffect(() => {
     if (!isStreaming) {
       refreshServices()
       const interval = setInterval(refreshServices, settings.dashboardRefreshRate)
       return () => clearInterval(interval)
     }
-  }, [refreshServices, refreshAnalytics, isStreaming, settings.dashboardRefreshRate])
+  }, [refreshServices, isStreaming, settings.dashboardRefreshRate])
 
   return {
     ...store,

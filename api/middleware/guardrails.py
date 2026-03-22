@@ -57,10 +57,11 @@ def _decode_base64_fragments(text: str) -> str:
 
 def _decode_unicode_escapes(text: str) -> str:
     """Decode common unicode escape sequences (\\uXXXX, \\xXX)."""
-    try:
-        return text.encode("utf-8").decode("unicode_escape", errors="ignore")
-    except Exception:
-        return text
+    return re.sub(
+        r"\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})",
+        lambda m: chr(int(m.group(1) or m.group(2), 16)),
+        text,
+    )
 
 
 def score_injection(text: str) -> Tuple[float, str]:
@@ -129,14 +130,12 @@ class GuardrailsMiddleware(BaseHTTPMiddleware):
         scan_ms = (time.perf_counter() - start) * 1000.0
 
         if injection_score > 0.7:
-            truncated_input = body_text[:200].replace("\n", " ")
             logger.warning(
-                "Blocked prompt injection: score=%.2f label=%s path=%s scan_ms=%.2f input=%r",
+                "Blocked prompt injection: score=%.2f label=%s path=%s scan_ms=%.2f",
                 injection_score,
                 matched_label,
                 request.url.path,
                 scan_ms,
-                truncated_input,
             )
             return JSONResponse(
                 status_code=400,

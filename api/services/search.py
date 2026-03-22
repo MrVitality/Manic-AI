@@ -1,6 +1,7 @@
 """Search business logic -- unified search across Supabase + Qdrant."""
 
 import asyncio
+import hashlib
 import logging
 import time
 from typing import Any, Dict, List, Optional
@@ -80,7 +81,7 @@ async def unified_search(
         seen: set = set()
         unique: List[Dict[str, Any]] = []
         for r in sorted(results, key=lambda x: x["score"], reverse=True):
-            h = hash(r["content"][:100])
+            h = hashlib.sha256(r["content"][:500].encode()).hexdigest()
             if h not in seen:
                 seen.add(h)
                 unique.append(r)

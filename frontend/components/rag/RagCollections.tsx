@@ -101,9 +101,9 @@ export default function RagCollections({ collections, onRefresh }: RagCollection
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div role="dialog" aria-modal="true" aria-labelledby="create-collection-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="rounded-xl p-6 max-w-md w-full mx-4 animate-palette-enter" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-color)' }}>
-            <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>New Collection</h3>
+            <h3 id="create-collection-title" className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>New Collection</h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Name</label>

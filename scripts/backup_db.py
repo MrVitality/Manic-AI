@@ -9,8 +9,10 @@ Usage:
 """
 import argparse
 import os
+import stat
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -80,11 +82,32 @@ def main():
         *schema_args,
     ]
 
-    # Pass password via env var, not CLI arg (visible in ps/proc)
-    dump_env = {**os.environ, "PGPASSWORD": pg_password} if pg_password else None
-
     print(f"Backing up to {backup_file}...")
     start = time.time()
+
+    # Pass password via a temporary .pgpass file (mode 0o600) instead of the
+    # PGPASSWORD environment variable, which is visible to all processes on the
+    # host via /proc/<pid>/environ.
+    pgpass_file = None
+    dump_env = None
+    if pg_password:
+        parsed_for_pgpass = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(
+            os.getenv("SUPABASE_DB_URL", db_url)
+        )
+        host = parsed_for_pgpass.hostname or "localhost"
+        port = parsed_for_pgpass.port or 5432
+        user = parsed_for_pgpass.username or "postgres"
+        dbname = (parsed_for_pgpass.path or "/postgres").lstrip("/") or "postgres"
+        pgpass_fd, pgpass_path = tempfile.mkstemp(prefix="pgpass_", suffix=".conf")
+        try:
+            os.write(pgpass_fd, f"{host}:{port}:{dbname}:{user}:{pg_password}\n".encode())
+        finally:
+            os.close(pgpass_fd)
+        os.chmod(pgpass_path, stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+        pgpass_file = pgpass_path
+        dump_env = {**os.environ, "PGPASSFILE": pgpass_path}
+        # Ensure PGPASSWORD is not inadvertently inherited
+        dump_env.pop("PGPASSWORD", None)
 
     try:
         with open(backup_file, "wb") as f:
@@ -123,6 +146,11 @@ def main():
 
         with gz.open(backup_file, "wb") as f:
             f.write(result.stdout)
+
+    finally:
+        # Always remove the temporary .pgpass file so the password is not left on disk
+        if pgpass_file and os.path.exists(pgpass_file):
+            os.unlink(pgpass_file)
 
     elapsed = time.time() - start
     size_mb = backup_file.stat().st_size / (1024 * 1024)

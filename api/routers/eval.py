@@ -1,4 +1,5 @@
 """RAG evaluation endpoints."""
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -7,13 +8,14 @@ import httpx
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
+from api.auth import require_api_key
 from api.dependencies import get_db, get_db_optional, get_http_client
 from api.schemas.envelope import ok
 from api.services.rag_eval import compute_eval_metrics, score_distribution
 from api.services.search_logger import get_search_history
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_api_key)])
 
 
 class EvalRequest(BaseModel):
@@ -79,9 +81,7 @@ async def run_eval_batch(
     from api.services.embedding import generate_embedding
     from api.services.search import unified_search
 
-    all_metrics: List[Dict[str, Any]] = []
-
-    for case in body.test_cases:
+    async def _run_case(case: EvalRequest) -> Dict[str, Any]:
         query_embedding = await generate_embedding(case.query, client=client)
         results = await unified_search(
             query_text=case.query,
@@ -96,11 +96,14 @@ async def run_eval_batch(
             client=client,
             rerank=case.rerank,
         )
-
         retrieved_ids = [r.get("id", "") for r in results]
-        metrics: Dict[str, Any] = compute_eval_metrics(retrieved_ids, case.relevant_chunk_ids)
-        metrics["query"] = case.query
-        all_metrics.append(metrics)
+        m: Dict[str, Any] = compute_eval_metrics(retrieved_ids, case.relevant_chunk_ids)
+        m["query"] = case.query
+        return m
+
+    all_metrics: List[Dict[str, Any]] = await asyncio.gather(
+        *[_run_case(case) for case in body.test_cases]
+    )
 
     # Aggregate numeric metrics across all test cases
     n = len(all_metrics)

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 import httpx
 
+from api.auth import require_api_key
 from api.config import settings
 from api.dependencies import get_http_client
 from api.middleware.rate_limit import limiter
@@ -15,7 +16,7 @@ from api.services.ollama import delete_model, list_models, stream_pull_model
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_api_key)])
 
 
 @router.get("/models", response_model=None, tags=["models"])

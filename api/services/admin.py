@@ -111,6 +111,10 @@ async def update_user(
     Returns:
         Updated user mapping or None.
     """
+    # SECURITY: field names below are hardcoded constants — they MUST NOT come
+    # from user input. The allowlist below documents and enforces this invariant.
+    ALLOWED_FIELDS = {"is_active", "is_admin", "display_name"}
+
     set_clauses: List[str] = []
     values: List[Any] = []
     idx = 1
@@ -138,6 +142,14 @@ async def update_user(
     if not set_clauses:
         # Nothing to update — fetch and return current state
         return await get_user(db, user_id)
+
+    # Verify every clause references only an allowlisted field name.
+    # This is a defence-in-depth check; field names are hardcoded above and
+    # never derived from user input.
+    for clause in set_clauses:
+        field = clause.split("=")[0].strip()
+        if field not in ALLOWED_FIELDS and field not in {"rate_limit_override", "username"}:
+            raise ValueError(f"Unexpected field in update clause: {field!r}")
 
     set_clauses.append("updated_at = NOW()")
     values.append(user_id)

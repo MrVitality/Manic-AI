@@ -1,3 +1,4 @@
+import hmac
 import logging
 
 from fastapi import HTTPException, Security, status
@@ -16,6 +17,12 @@ if not _secret_key:
         "API_SECRET_KEY is not set -- all endpoints are UNAUTHENTICATED. "
         "Set this environment variable before deploying to production."
     )
+    logger.error(
+        "AUTH_MODE is '%s' but API_SECRET_KEY is not set -- "
+        "the API is running without authentication in a configuration that expects it. "
+        "Set API_SECRET_KEY immediately.",
+        settings.AUTH_MODE,
+    )
 
 
 async def require_api_key(key: str | None = Security(_API_KEY_HEADER)) -> None:
@@ -29,7 +36,7 @@ async def require_api_key(key: str | None = Security(_API_KEY_HEADER)) -> None:
         # Auth disabled -- local-dev mode, warning already logged at import.
         return
 
-    if not key or key != _secret_key:
+    if not key or not hmac.compare_digest(key, _secret_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing API key.",

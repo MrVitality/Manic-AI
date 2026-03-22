@@ -6,6 +6,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 import httpx
 
+from api.auth import require_api_key
 from api.config import settings
 from api.dependencies import get_http_client, get_qdrant_repo
 from api.repositories.qdrant_vector import QdrantVectorRepository
@@ -13,7 +14,7 @@ from api.schemas.envelope import ok
 from api.services.embedding import generate_embedding
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_api_key)])
 
 _COLLECTION_NAME_RE = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
 

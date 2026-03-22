@@ -6,7 +6,7 @@ import type {
   Model, ModelsResponse, DocumentInfo, PullProgress, ServicesStatusResponse,
   UsageAnalyticsData, ModelAnalyticsData, RagAnalyticsData, ServiceHealthSnapshot,
   ChunkInfo, SearchExplainResult, SearchExplainResponse, RagStatsData, SystemInfo,
-  CollectionInfo,
+  CollectionInfo, RagSource,
 } from '@/types'
 
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
@@ -47,7 +47,16 @@ function isValidApiUrl(url: string): boolean {
   }
 }
 
+let _cachedApiUrl: string | null = null
+
+/** Invalidate the cached API URL (call when settings change). */
+export function invalidateApiUrlCache(): void {
+  _cachedApiUrl = null
+}
+
 const getApiUrl = (): string => {
+  if (_cachedApiUrl !== null) return _cachedApiUrl
+
   // Check localStorage for user-configured API URL (from settings)
   if (typeof window !== 'undefined') {
     try {
@@ -57,6 +66,7 @@ const getApiUrl = (): string => {
         const candidate = parsed?.state?.settings?.apiUrl
         if (candidate) {
           if (isValidApiUrl(candidate)) {
+            _cachedApiUrl = candidate
             return candidate
           }
           console.warn(
@@ -70,7 +80,8 @@ const getApiUrl = (): string => {
     }
   }
   // Fallback to env var or default
-  return DEFAULT_API_URL
+  _cachedApiUrl = DEFAULT_API_URL
+  return _cachedApiUrl
 }
 
 /** Return the versioned API base, e.g. ``http://localhost:8081/v1``. */
@@ -193,7 +204,7 @@ export interface ChatOptions {
 export interface StreamEvent {
   type: 'content' | 'sources' | 'done' | 'error' | 'tool_start' | 'tool_end'
   content?: string
-  sources?: any[]
+  sources?: RagSource[]
   error?: string
   tool_name?: string
   tool_call_id?: string
@@ -257,7 +268,7 @@ export async function* streamChat(
   }
 }
 
-export async function chat(options: ChatOptions): Promise<{ content: string; sources: any[] }> {
+export async function chat(options: ChatOptions): Promise<{ content: string; sources: RagSource[] }> {
   const { model, messages, temperature = 0.7, systemPrompt, useRag = false } = options
 
   const allMessages = systemPrompt
@@ -276,7 +287,7 @@ export async function chat(options: ChatOptions): Promise<{ content: string; sou
     }),
   })
 
-  const data = await unwrap<any>(response)
+  const data = await unwrap<{ message?: { content?: string }; sources?: RagSource[] }>(response)
   return {
     content: data.message?.content || '',
     sources: data.sources || [],

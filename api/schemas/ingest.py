@@ -19,7 +19,7 @@ class EmbedResponse(BaseModel):
 
 class IngestRequest(BaseModel):
     content: str = Field(..., max_length=10_000_000)
-    filename: str
+    filename: str = Field(..., max_length=255, pattern=r"^[^\x00/\\]+$")
     content_type: Optional[str] = Field(
         default="text/plain",
         pattern=r"^[a-zA-Z0-9!#$&\-^_]+/[a-zA-Z0-9!#$&\-^_.+]+$",

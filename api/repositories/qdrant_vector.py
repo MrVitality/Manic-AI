@@ -136,6 +136,7 @@ class QdrantVectorRepository:
         response = await self._client.put(
             f"{self._base_url}/collections/{collection_name}",
             json={"vectors": {"size": vector_size, "distance": "Cosine"}},
+            timeout=30.0,
         )
         if response.status_code in [200, 201]:
             return {"status": "created", "collection": collection_name}
@@ -150,6 +151,7 @@ class QdrantVectorRepository:
     async def delete_collection(self, collection_name: str) -> Dict[str, str]:
         response = await self._client.delete(
             f"{self._base_url}/collections/{collection_name}",
+            timeout=30.0,
         )
         if response.status_code in [200, 204]:
             return {"status": "deleted", "collection": collection_name}

@@ -8,11 +8,14 @@ Usage:
     Default AUTH_MODE=single (current behavior, shared API key).
 """
 
+import re
 import secrets
 from typing import Any, Dict, Optional
 
 import asyncpg
 import bcrypt
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def hash_password(password: str) -> str:
@@ -45,6 +48,9 @@ async def create_user(
     Raises:
         asyncpg.UniqueViolationError: if email or username already exists.
     """
+    if not _EMAIL_RE.match(email):
+        raise ValueError(f"Invalid email address: {email!r}")
+
     password_hash = hash_password(password)
     api_key = f"manic_{secrets.token_urlsafe(32)}"
 

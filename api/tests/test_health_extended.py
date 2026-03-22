@@ -33,21 +33,25 @@ def _err_http_response() -> MagicMock:
 
 
 # ---------------------------------------------------------------------------
-# GET /health
+# GET /health (minimal — must NOT leak config)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_health_returns_auth_enabled_field(client, mock_http_client):
-    """GET /health response includes auth_enabled boolean."""
+async def test_health_returns_minimal_response(client, mock_http_client):
+    """GET /health returns only status and timestamp — no auth_enabled, no services."""
     mock_http_client.get = AsyncMock(return_value=_ok_http_response())
 
     resp = await client.get("/health")
 
     assert resp.status_code == 200
     body = resp.json()
-    assert "auth_enabled" in body["data"]
-    assert isinstance(body["data"]["auth_enabled"], bool)
+    assert body["data"]["status"] == "healthy"
+    assert "timestamp" in body["data"]
+    # Security: these must NOT be in the public health check
+    assert "auth_enabled" not in body["data"]
+    assert "services" not in body["data"]
+    assert "config" not in body["data"]
 
 
 @pytest.mark.asyncio
@@ -72,12 +76,12 @@ async def test_health_ollama_down_still_returns_200(client, mock_http_client):
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["data"]["services"]["ollama"] in ("offline", "healthy", "error", "unknown")
+    assert body["data"]["status"] == "healthy"
 
 
 @pytest.mark.asyncio
 async def test_health_with_db_disconnected(app, mock_http_client):
-    """GET /health reports database as disconnected when pool is None."""
+    """GET /health returns 200 even when DB pool is None."""
     from httpx import ASGITransport, AsyncClient
 
     mock_http_client.get = AsyncMock(return_value=_ok_http_response())
@@ -94,11 +98,11 @@ async def test_health_with_db_disconnected(app, mock_http_client):
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["data"]["services"]["database"] == "disconnected"
+    assert body["data"]["status"] == "healthy"
 
 
 # ---------------------------------------------------------------------------
-# GET /services/status
+# GET /services/status (authenticated — detailed service info)
 # ---------------------------------------------------------------------------
 
 
@@ -159,5 +163,4 @@ async def test_metrics_content_type_is_correct(client):
 
     assert resp.status_code == 200
     content_type = resp.headers.get("content-type", "")
-    # Prometheus content type starts with text/plain
-    assert "text/plain" in content_type or "text/plain" in content_type
+    assert "text/plain" in content_type
