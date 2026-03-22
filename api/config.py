@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     GUARDRAILS_ENABLED: bool = True
     PII_REDACTION_ENABLED: bool = False
 
+    # --- OpenTelemetry distributed tracing ---
+    OTEL_ENABLED: bool = False
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = ""  # e.g., "http://jaeger:4317"
+
     # --- CORS ---
     CORS_ORIGINS: str = ""
 

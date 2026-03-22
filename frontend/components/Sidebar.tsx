@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatStore } from '@/lib/store'
 import { useConversationStore } from '@/lib/stores/conversationStore'
@@ -21,6 +21,7 @@ import {
   RagIcon,
   DownloadIcon,
   UploadIcon,
+  AdminIcon,
 } from '@/components/ui/Icons'
 
 interface SidebarProps {
@@ -82,6 +83,17 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
   const [searchQuery, setSearchQuery] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Read admin flag from localStorage — set externally by the API key auth flow.
+  // Using useState + useEffect to avoid SSR mismatch.
+  const [isAdmin, setIsAdmin] = useState(false)
+  useEffect(() => {
+    try {
+      setIsAdmin(localStorage.getItem('manic-is-admin') === 'true')
+    } catch {
+      // localStorage unavailable (SSR or sandboxed context)
+    }
+  }, [])
 
   const filteredConversations = useMemo(
     () =>
@@ -173,6 +185,9 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
     { path: '/dashboard', label: 'Health', icon: <DashboardIcon className="w-5 h-5" />, hint: 'Ctrl+H' },
     { path: '/rag', label: 'RAG', icon: <RagIcon className="w-5 h-5" />, hint: 'Ctrl+R' },
     { path: '/settings', label: 'Config', icon: <SettingsIcon className="w-5 h-5" />, hint: 'Ctrl+,' },
+    ...(isAdmin
+      ? [{ path: '/admin', label: 'Admin', icon: <AdminIcon className="w-5 h-5" /> }]
+      : []),
   ]
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')

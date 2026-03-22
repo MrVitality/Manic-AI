@@ -22,9 +22,10 @@ from api.http_client import init_client, close_client
 from api.services.embedding import init_redis
 from api.services.langfuse import init_langfuse
 from api.services.health_logger import health_log_loop
+from api.plugins import load_plugins
 
 # Import all routers
-from api.routers import health, chat, ingest, documents, collections, qdrant, search, analytics, system, models, agent, eval as eval_router, feedback as feedback_router
+from api.routers import health, chat, ingest, documents, collections, qdrant, search, analytics, system, models, agent, eval as eval_router, feedback as feedback_router, plugins as plugins_router, admin as admin_router
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     await init_client(app=app)
     await init_redis(app=app)
     init_langfuse(app=app)
+    load_plugins()
     health_task = asyncio.create_task(health_log_loop())
 
     yield  # app runs
@@ -65,6 +67,8 @@ _TAGS_METADATA = [
     {"name": "agent", "description": "Generator-Critic reasoning agent with streaming support"},
     {"name": "eval", "description": "RAG evaluation metrics, batch testing, and search history analytics"},
     {"name": "feedback", "description": "User feedback on chat responses for RAG quality tracking"},
+    {"name": "plugins", "description": "Plugin management — list installed plugins and execute plugin tools"},
+    {"name": "admin", "description": "Admin-only: user management, account control, and system statistics"},
 ]
 
 
@@ -135,8 +139,15 @@ def create_app() -> FastAPI:
     v1_router.include_router(agent.router, dependencies=auth_dep, tags=["agent"])
     v1_router.include_router(eval_router.router, dependencies=auth_dep, tags=["eval"])
     v1_router.include_router(feedback_router.router, dependencies=auth_dep, tags=["feedback"])
+    v1_router.include_router(plugins_router.router, dependencies=auth_dep, tags=["plugins"])
+    # Admin router: base auth_dep runs first, then require_admin enforces admin-level access per endpoint
+    v1_router.include_router(admin_router.router, dependencies=auth_dep, tags=["admin"])
 
     _app.include_router(v1_router)
+
+    # --- Distributed tracing (opt-in via OTEL_ENABLED=true) ---
+    from api.tracing import setup_tracing
+    setup_tracing(_app)
 
     return _app
 
