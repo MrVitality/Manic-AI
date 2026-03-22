@@ -10,16 +10,21 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+import logging
+
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response, StreamingResponse
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 import asyncpg
 import httpx
 
+from api.auth import require_api_key
 from api.config import settings
 from api.dependencies import get_db_optional, get_http_client
 from api.schemas.envelope import ok
 from api.services.rag import check_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -118,7 +123,7 @@ async def _get_all_services(
     }
 
 
-@router.get("/services/status", tags=["health"])
+@router.get("/services/status", tags=["health"], dependencies=[Depends(require_api_key)])
 async def services_status(
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
@@ -127,7 +132,7 @@ async def services_status(
     return ok(data)
 
 
-@router.get("/services/status/stream", tags=["health"])
+@router.get("/services/status/stream", tags=["health"], dependencies=[Depends(require_api_key)])
 async def services_status_stream(
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
@@ -138,8 +143,9 @@ async def services_status_stream(
                 try:
                     data = await _get_all_services(client, db)
                     yield f"data: {json.dumps(data)}\n\n"
-                except Exception as e:
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                except Exception:
+                    logger.exception("Service status poll failed")
+                    yield f"data: {json.dumps({'error': 'Status check failed'})}\n\n"
                 await asyncio.sleep(10)
         except asyncio.CancelledError:
             return

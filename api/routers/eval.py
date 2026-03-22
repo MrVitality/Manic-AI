@@ -30,7 +30,7 @@ class EvalRequest(BaseModel):
 class EvalBatchRequest(BaseModel):
     """Run batch evaluation over multiple queries."""
 
-    test_cases: List[EvalRequest]
+    test_cases: List[EvalRequest] = Field(..., max_length=50)
 
 
 @router.post("/eval/run", response_model=None, tags=["eval"])

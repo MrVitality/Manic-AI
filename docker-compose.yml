@@ -43,7 +43,7 @@ services:
       - "${BIND_IP}:6333:6333"
       - "${BIND_IP}:6334:6334"
     environment:
-      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:-}
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:?QDRANT_API_KEY must be set}
     volumes:
       - qdrant-data:/qdrant/storage
     deploy:
@@ -85,7 +85,7 @@ services:
     networks:
       - db-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli ${REDIS_PASSWORD:+-a $REDIS_PASSWORD} ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -358,7 +358,7 @@ services:
     environment:
       - N8N_PORT=5678
       - N8N_RUNNERS_DISABLED=true
-      - N8N_SECURE_COOKIE=false
+      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-true}
       - GENERIC_TIMEZONE=UTC
       - N8N_HOST=${BIND_IP}
       - WEBHOOK_URL=http://${BIND_IP}:5679/
@@ -839,7 +839,7 @@ services:
     ports:
       - "${BIND_IP}:3009:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_ANALYTICS_REPORTING_ENABLED=false
     volumes:
@@ -872,7 +872,13 @@ services:
     container_name: ai-cadvisor
     profiles: ["monitoring"]
     restart: unless-stopped
-    privileged: true
+    # privileged: true  # Replaced with explicit capabilities
+    cap_add:
+      - SYS_PTRACE
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro

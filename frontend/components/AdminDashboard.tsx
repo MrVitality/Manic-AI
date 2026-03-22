@@ -49,8 +49,9 @@ interface CreateUserForm {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8081'
 
 function getApiKey(): string {
+  // sessionStorage: not accessible after tab close, reduces XSS exfiltration window
   if (typeof window === 'undefined') return ''
-  return localStorage.getItem('manic-api-key') ?? ''
+  return sessionStorage.getItem('manic-admin-api-key') ?? ''
 }
 
 async function apiFetch<T>(

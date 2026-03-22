@@ -183,69 +183,68 @@ async def deactivate_user(db: asyncpg.Pool, user_id: str) -> bool:
             user_id,
         )
     # asyncpg returns e.g. "UPDATE 1" or "UPDATE 0"
-    return result.endswith("1")
+    return result == "UPDATE 1"
 
 
 async def get_system_stats(db: asyncpg.Pool) -> Dict[str, Any]:
-    """Aggregate system-wide statistics across all major tables.
+    """Aggregate system-wide statistics in a single DB round trip.
 
     Args:
         db: Database connection pool.
 
     Returns:
-        Mapping with total_users, active_users, total_chats,
-        total_searches, total_feedback.
+        Mapping with total_users, active_users, admin_users,
+        total_chats, total_searches, total_feedback.
     """
     async with db.acquire() as conn:
-        total_users = await conn.fetchval(
-            "SELECT COUNT(*) FROM public.users"
-        )
-        active_users = await conn.fetchval(
-            "SELECT COUNT(*) FROM public.users WHERE is_active = TRUE"
-        )
-        admin_users = await conn.fetchval(
-            "SELECT COUNT(*) FROM public.users WHERE is_admin = TRUE"
-        )
-
-        # These tables may not exist yet — use coalescing fallbacks
-        total_chats = await conn.fetchval(
-            "SELECT COUNT(*) FROM information_schema.tables "
-            "WHERE table_schema = 'public' AND table_name = 'chat_messages'"
-        )
-        if total_chats:
-            total_chats = await conn.fetchval(
-                "SELECT COUNT(*) FROM public.chat_messages"
+        row = await conn.fetchrow(
+            """
+            WITH user_counts AS (
+                SELECT
+                    COUNT(*)                           AS total_users,
+                    COUNT(*) FILTER (WHERE is_active)  AS active_users,
+                    COUNT(*) FILTER (WHERE is_admin)   AS admin_users
+                FROM public.users
+            ),
+            existing_tables AS (
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name IN ('chat_messages', 'search_logs', 'feedback')
+            ),
+            chat_count AS (
+                SELECT CASE
+                    WHEN EXISTS (SELECT 1 FROM existing_tables WHERE table_name = 'chat_messages')
+                    THEN (SELECT COUNT(*) FROM public.chat_messages)
+                    ELSE 0
+                END AS total_chats
+            ),
+            search_count AS (
+                SELECT CASE
+                    WHEN EXISTS (SELECT 1 FROM existing_tables WHERE table_name = 'search_logs')
+                    THEN (SELECT COUNT(*) FROM public.search_logs)
+                    ELSE 0
+                END AS total_searches
+            ),
+            feedback_count AS (
+                SELECT CASE
+                    WHEN EXISTS (SELECT 1 FROM existing_tables WHERE table_name = 'feedback')
+                    THEN (SELECT COUNT(*) FROM public.feedback)
+                    ELSE 0
+                END AS total_feedback
             )
-        else:
-            total_chats = 0
-
-        total_searches = await conn.fetchval(
-            "SELECT COUNT(*) FROM information_schema.tables "
-            "WHERE table_schema = 'public' AND table_name = 'search_logs'"
+            SELECT
+                u.total_users, u.active_users, u.admin_users,
+                c.total_chats, s.total_searches, f.total_feedback
+            FROM user_counts u, chat_count c, search_count s, feedback_count f
+            """
         )
-        if total_searches:
-            total_searches = await conn.fetchval(
-                "SELECT COUNT(*) FROM public.search_logs"
-            )
-        else:
-            total_searches = 0
-
-        total_feedback = await conn.fetchval(
-            "SELECT COUNT(*) FROM information_schema.tables "
-            "WHERE table_schema = 'public' AND table_name = 'feedback'"
-        )
-        if total_feedback:
-            total_feedback = await conn.fetchval(
-                "SELECT COUNT(*) FROM public.feedback"
-            )
-        else:
-            total_feedback = 0
 
     return {
-        "total_users": total_users,
-        "active_users": active_users,
-        "admin_users": admin_users,
-        "total_chats": total_chats,
-        "total_searches": total_searches,
-        "total_feedback": total_feedback,
+        "total_users": row["total_users"],
+        "active_users": row["active_users"],
+        "admin_users": row["admin_users"],
+        "total_chats": row["total_chats"],
+        "total_searches": row["total_searches"],
+        "total_feedback": row["total_feedback"],
     }

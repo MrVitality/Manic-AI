@@ -99,7 +99,7 @@ async def unified_search(
 
     # Log search event (best-effort, does not block response)
     latency_ms = round((time.time() - start) * 1000, 1)
-    asyncio.ensure_future(log_search(
+    task = asyncio.create_task(log_search(
         db=db,
         query=query_text,
         backend=backend,
@@ -113,6 +113,10 @@ async def unified_search(
         collection_id=collection_id,
         user_id=user_id,
     ))
+    task.add_done_callback(
+        lambda t: logger.warning("Search log failed: %s", t.exception())
+        if not t.cancelled() and t.exception() else None
+    )
 
     return results
 
@@ -188,7 +192,7 @@ async def search_with_explain(
     embedding_preview = query_embedding[:10] if include_vectors else []
 
     # Log search event (best-effort, does not block response)
-    asyncio.ensure_future(log_search(
+    task = asyncio.create_task(log_search(
         db=db,
         query=query_text,
         backend=backend,
@@ -202,6 +206,10 @@ async def search_with_explain(
         collection_id=collection_id,
         user_id=None,
     ))
+    task.add_done_callback(
+        lambda t: logger.warning("Search log failed: %s", t.exception())
+        if not t.cancelled() and t.exception() else None
+    )
 
     return {
         "results": results,

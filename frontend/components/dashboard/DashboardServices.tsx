@@ -109,7 +109,7 @@ export default function DashboardServices({ serviceStatuses, serviceHistory }: D
                         const color = !s ? '#374151' : s.status === 'healthy' ? '#10b981' : s.status === 'degraded' ? '#f59e0b' : '#ef4444'
                         return (
                           <div
-                            key={i}
+                            key={snap.timestamp}
                             className="flex-1 transition-colors"
                             style={{ background: color, minWidth: 2 }}
                             title={`${new Date(snap.timestamp).toLocaleTimeString()} — ${s?.status || 'no data'}`}

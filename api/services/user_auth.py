@@ -8,11 +8,21 @@ Usage:
     Default AUTH_MODE=single (current behavior, shared API key).
 """
 
-import hashlib
 import secrets
 from typing import Any, Dict, Optional
 
 import asyncpg
+import bcrypt
+
+
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt (constant-time, salted)."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("ascii")
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    """Verify a plaintext password against a bcrypt hash."""
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("ascii"))
 
 
 async def create_user(
@@ -21,12 +31,12 @@ async def create_user(
     password: str,
     username: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Create a new user with hashed password and generated API key.
+    """Create a new user with bcrypt-hashed password and generated API key.
 
     Args:
         db: Database connection pool.
         email: User's email address (must be unique).
-        password: Plaintext password — stored as SHA-256 hash.
+        password: Plaintext password — stored as bcrypt hash.
         username: Optional display name (must be unique if provided).
 
     Returns:
@@ -35,7 +45,7 @@ async def create_user(
     Raises:
         asyncpg.UniqueViolationError: if email or username already exists.
     """
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    password_hash = hash_password(password)
     api_key = f"manic_{secrets.token_urlsafe(32)}"
 
     async with db.acquire() as conn:
@@ -84,7 +94,7 @@ async def authenticate_by_email(
     email: str,
     password: str,
 ) -> Optional[Dict[str, Any]]:
-    """Authenticate by email + password.
+    """Authenticate by email + password using bcrypt comparison.
 
     Args:
         db: Database connection pool.
@@ -95,15 +105,19 @@ async def authenticate_by_email(
         Mapping with id, email, username, api_key, is_admin,
         or None if credentials are invalid or the account is inactive.
     """
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
     async with db.acquire() as conn:
         row = await conn.fetchrow(
             """
-            SELECT id::text, email, username, api_key, is_admin
+            SELECT id::text, email, username, api_key, is_admin, password_hash
             FROM public.users
-            WHERE email = $1 AND password_hash = $2 AND is_active = TRUE
+            WHERE email = $1 AND is_active = TRUE
             """,
             email,
-            password_hash,
         )
-    return dict(row) if row else None
+    if not row:
+        return None
+    if not verify_password(password, row["password_hash"]):
+        return None
+    result = dict(row)
+    result.pop("password_hash", None)
+    return result

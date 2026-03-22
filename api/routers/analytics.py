@@ -39,7 +39,7 @@ def _params_hash(*parts: Any) -> str:
 @router.get("/analytics/usage", response_model=None, tags=["analytics"])
 async def analytics_usage_endpoint(
     period: str = Query("day", pattern="^(hour|day|week|month)$"),
-    model: Optional[str] = None,
+    model: Optional[str] = Query(None, max_length=200),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
     redis: Optional[RedisCacheRepository] = Depends(get_redis),
 ) -> Dict[str, Any]:

@@ -21,10 +21,11 @@ export default function DashboardPerformance({
   serviceHistory,
   isLoading,
 }: DashboardPerformanceProps) {
+  const [sortKey, setSortKey] = useState<'requests' | 'latency' | 'tokens'>('requests')
+
   if (isLoading && !usageAnalytics && !modelAnalytics) {
     return <LoadingSkeleton rows={5} title="Loading performance data..." />
   }
-  const [sortKey, setSortKey] = useState<'requests' | 'latency' | 'tokens'>('requests')
 
   // Heatmap data: 24 columns (hours) x N rows (services)
   const heatmapData = useMemo(() => {

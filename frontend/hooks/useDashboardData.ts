@@ -157,16 +157,19 @@ export function useDashboardData() {
     }
   }, [applyServiceData, setIsStreaming])
 
+  // Subscribe to isStreaming directly to avoid stale closure
+  const isStreaming = useDashboardStore((s) => s.isStreaming)
+
   // Analytics fetch on mount + polling fallback for service status when not streaming
   useEffect(() => {
     refreshAnalytics()
 
-    if (!store.isStreaming) {
+    if (!isStreaming) {
       refreshServices()
       const interval = setInterval(refreshServices, settings.dashboardRefreshRate)
       return () => clearInterval(interval)
     }
-  }, [refreshServices, refreshAnalytics, store.isStreaming, settings.dashboardRefreshRate])
+  }, [refreshServices, refreshAnalytics, isStreaming, settings.dashboardRefreshRate])
 
   return {
     ...store,

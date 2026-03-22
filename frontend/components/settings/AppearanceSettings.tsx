@@ -1,5 +1,6 @@
 'use client'
 
+import type { Settings } from '@/types'
 import { useChatStore } from '@/lib/store'
 import { useTheme } from '@/hooks/useTheme'
 import GlassPanel from '@/components/ui/GlassPanel'
@@ -63,7 +64,7 @@ export default function AppearanceSettings() {
             {ACCENT_COLORS.map((accent) => (
               <button
                 key={accent.id}
-                onClick={() => updateSettings({ accentColor: accent.id as any })}
+                onClick={() => updateSettings({ accentColor: accent.id as Settings['accentColor'] })}
                 className="flex flex-col items-center gap-1.5 p-2 rounded-lg transition-all"
                 style={{
                   background: settings.accentColor === accent.id ? 'rgba(255,255,255,0.05)' : 'transparent',
@@ -87,7 +88,7 @@ export default function AppearanceSettings() {
             {FONT_SIZES.map((size) => (
               <button
                 key={size.id}
-                onClick={() => updateSettings({ fontSize: size.id as any })}
+                onClick={() => updateSettings({ fontSize: size.id as Settings['fontSize'] })}
                 className="flex-1 py-2 rounded-lg text-center transition-all"
                 style={{
                   background: settings.fontSize === size.id ? 'rgba(129,140,248,0.1)' : 'var(--glass-bg)',

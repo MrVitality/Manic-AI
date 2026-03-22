@@ -35,6 +35,8 @@ _INJECTION_PATTERNS: List[Tuple[re.Pattern, float, str]] = [
 _GUARDED_ENDPOINTS = {
     ("POST", "/v1/chat"),
     ("POST", "/v1/search"),
+    ("POST", "/v1/agent/run"),
+    ("POST", "/v1/agent/stream"),
 }
 
 # Maximum body size to scan (64 KB) -- avoid scanning huge file uploads

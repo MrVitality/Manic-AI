@@ -116,13 +116,16 @@ class QdrantVectorRepository:
             return False
 
     async def list_collections(self) -> Any:
-        response = await self._client.get(f"{self._base_url}/collections")
+        response = await self._client.get(
+            f"{self._base_url}/collections", timeout=10.0,
+        )
         response.raise_for_status()
         return response.json()
 
     async def get_collection(self, collection_name: str) -> Any:
         response = await self._client.get(
             f"{self._base_url}/collections/{collection_name}",
+            timeout=10.0,
         )
         response.raise_for_status()
         return response.json()

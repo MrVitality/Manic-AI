@@ -47,4 +47,20 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
                         "meta": None,
                     },
                 )
+        else:
+            # No Content-Length — chunked transfer: read and measure directly
+            body = await request.body()
+            if len(body) > MAX_BODY_SIZE:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "success": False,
+                        "data": None,
+                        "error": {
+                            "code": "payload_too_large",
+                            "message": f"Request body exceeds {_MAX_MB}MB limit",
+                        },
+                        "meta": None,
+                    },
+                )
         return await call_next(request)

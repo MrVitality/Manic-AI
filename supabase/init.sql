@@ -45,7 +45,7 @@ BEGIN
         CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
     END IF;
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN
-        CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'postgres';
+        CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD '@@AUTHENTICATOR_PASSWORD@@';
     END IF;
 END
 $$;

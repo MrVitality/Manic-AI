@@ -21,7 +21,7 @@ class Citation(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    messages: List[ChatMessage]
+    messages: List[ChatMessage] = Field(..., max_length=200)
     model: Optional[str] = None
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = 2048

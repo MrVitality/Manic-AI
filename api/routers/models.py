@@ -61,8 +61,8 @@ async def delete_model_endpoint(
     try:
         result = await delete_model(name, client)
         return ok(result)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid model name")
     except httpx.HTTPError:
         logger.exception("Failed to delete Ollama model %s", name)
         raise HTTPException(status_code=502, detail="Failed to delete model")

@@ -81,10 +81,28 @@ export const useConversationStore = create<ConversationState>()(
       },
 
       importConversation: (data: Record<string, unknown>) => {
+        const validRoles = new Set(['user', 'assistant', 'system'])
+        const validatedMessages: Message[] = Array.isArray(data.messages)
+          ? (data.messages as Record<string, unknown>[])
+              .filter(
+                (m) =>
+                  m &&
+                  typeof m === 'object' &&
+                  typeof m.role === 'string' &&
+                  validRoles.has(m.role) &&
+                  typeof m.content === 'string'
+              )
+              .map((m) => ({
+                id: typeof m.id === 'string' ? m.id : generateId(),
+                role: m.role as 'user' | 'assistant' | 'system',
+                content: m.content as string,
+                timestamp: typeof m.timestamp === 'string' ? new Date(m.timestamp) : new Date(),
+              }))
+          : []
         const conversation: Conversation = {
           id: typeof data.id === 'string' ? data.id : generateId(),
           title: typeof data.title === 'string' && data.title.trim() ? data.title.trim() : 'Imported Conversation',
-          messages: Array.isArray(data.messages) ? data.messages as Message[] : [],
+          messages: validatedMessages,
           model: typeof data.model === 'string' ? data.model : '',
           createdAt: data.createdAt ? new Date(data.createdAt as string) : new Date(),
           updatedAt: new Date(),

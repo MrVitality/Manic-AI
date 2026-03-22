@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class EmbedRequest(BaseModel):
-    text: str
+    text: str = Field(..., max_length=50_000)
     model: Optional[str] = None
 
 
@@ -18,9 +18,12 @@ class EmbedResponse(BaseModel):
 
 
 class IngestRequest(BaseModel):
-    content: str
+    content: str = Field(..., max_length=10_000_000)
     filename: str
-    content_type: Optional[str] = "text/plain"
+    content_type: Optional[str] = Field(
+        default="text/plain",
+        pattern=r"^[a-zA-Z0-9!#$&\-^_]+/[a-zA-Z0-9!#$&\-^_.+]+$",
+    )
     user_id: Optional[str] = None
     collection_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None

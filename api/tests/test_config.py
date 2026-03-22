@@ -20,11 +20,10 @@ class TestSettingsDefaults:
         assert 0.0 <= s.RAG_KEYWORD_WEIGHT <= 1.0
         assert s.RAG_CONTEXT_WINDOW == 4096
 
-    def test_cors_origins_empty_falls_back_to_localhost(self):
+    def test_cors_origins_empty_falls_back_to_empty_list(self):
         s = Settings(CORS_ORIGINS="")
         origins = s.parse_cors_origins()
-        assert "http://localhost:3000" in origins
-        assert "http://localhost:3006" in origins
+        assert origins == []
 
     def test_cors_origins_parsed(self):
         s = Settings(CORS_ORIGINS="http://a.com, http://b.com")

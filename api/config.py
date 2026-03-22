@@ -123,7 +123,7 @@ class Settings(BaseSettings):
             "CORS_ORIGINS is not set -- defaulting to localhost origins. "
             "Set this environment variable in production."
         )
-        return ["http://localhost:3000", "http://localhost:3006"]
+        return []
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 

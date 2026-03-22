@@ -35,13 +35,14 @@ def main():
 
     # Read DB connection from environment or .env file
     db_url = os.getenv("SUPABASE_DB_URL", "")
+    pg_password = ""
     if not db_url:
         env_file = ROOT / ".env"
         if env_file.exists():
             for line in env_file.read_text().splitlines():
                 if line.startswith("POSTGRES_PASSWORD="):
-                    pw = line.split("=", 1)[1].strip()
-                    db_url = f"postgresql://postgres:{pw}@localhost:5433/postgres"
+                    pg_password = line.split("=", 1)[1].strip()
+                    db_url = f"postgresql://postgres@localhost:5433/postgres"
                     break
 
     if not db_url:
@@ -50,6 +51,18 @@ def main():
             "Set SUPABASE_DB_URL or POSTGRES_PASSWORD in .env"
         )
         sys.exit(1)
+
+    # Extract password from URL so it's not visible in process listings
+    from urllib.parse import urlparse, urlunparse
+    parsed = urlparse(db_url)
+    if parsed.password:
+        pg_password = parsed.password
+        netloc = parsed.hostname or ""
+        if parsed.port:
+            netloc = f"{netloc}:{parsed.port}"
+        if parsed.username:
+            netloc = f"{parsed.username}@{netloc}"
+        db_url = urlunparse(parsed._replace(netloc=netloc))
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = output_dir / f"manic_ai_backup_{timestamp}.sql.gz"
@@ -67,12 +80,15 @@ def main():
         *schema_args,
     ]
 
+    # Pass password via env var, not CLI arg (visible in ps/proc)
+    dump_env = {**os.environ, "PGPASSWORD": pg_password} if pg_password else None
+
     print(f"Backing up to {backup_file}...")
     start = time.time()
 
     try:
         with open(backup_file, "wb") as f:
-            dump = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            dump = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=dump_env)
             gzip_proc = subprocess.Popen(["gzip"], stdin=dump.stdout, stdout=f)
             dump.stdout.close()  # type: ignore[union-attr]
             gzip_proc.communicate()

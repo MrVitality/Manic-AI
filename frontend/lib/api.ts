@@ -20,6 +20,14 @@ const ALLOWED_HOSTNAMES: string[] = [
   '::1',
 ]
 
+// Allow private/LAN IPs for non-localhost deployments (Tailscale, LAN, etc.)
+const PRIVATE_IP_PATTERNS = [
+  /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,           // 10.0.0.0/8
+  /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/,  // 172.16.0.0/12
+  /^192\.168\.\d{1,3}\.\d{1,3}$/,               // 192.168.0.0/16
+  /^100\.(6[4-9]|[7-9]\d|1[0-2]\d|127)\.\d{1,3}\.\d{1,3}$/,  // Tailscale CGNAT 100.64.0.0/10
+]
+
 function isValidApiUrl(url: string): boolean {
   try {
     const parsed = new URL(url)
@@ -27,6 +35,10 @@ function isValidApiUrl(url: string): boolean {
       return false
     }
     if (ALLOWED_HOSTNAMES.includes(parsed.hostname)) {
+      return true
+    }
+    // Allow private/LAN IPs for self-hosted deployments
+    if (PRIVATE_IP_PATTERNS.some((re) => re.test(parsed.hostname))) {
       return true
     }
     return false
@@ -444,6 +456,18 @@ export async function fetchRagStats(): Promise<RagStatsData> {
 export async function fetchCollections(): Promise<CollectionInfo[]> {
   const response = await fetch(`${getApiV1()}/collections`)
   return unwrap<CollectionInfo[]>(response)
+}
+
+export async function createCollection(
+  name: string,
+  description?: string,
+): Promise<unknown> {
+  const response = await fetch(`${getApiV1()}/collections`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description: description || undefined }),
+  })
+  return unwrap<unknown>(response)
 }
 
 // =============================================================================

@@ -23,35 +23,14 @@ export default function RagCollections({ collections, onRefresh }: RagCollection
     setIsCreating(true)
     setCreateError(null)
     try {
-      const { fetchCollections: _fc, ...api } = await import('@/lib/api')
-      // Use the same getApiV1 pattern as all other API calls
-      const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
-      let apiUrl = DEFAULT_API_URL
-      if (typeof window !== 'undefined') {
-        try {
-          const stored = localStorage.getItem('manic-ai-ui')
-          if (stored) {
-            const p = JSON.parse(stored)
-            if (p?.state?.settings?.apiUrl) apiUrl = p.state.settings.apiUrl
-          }
-        } catch {}
-      }
-      const response = await fetch(`${apiUrl}/v1/collections`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), description: newDesc.trim() || undefined }),
-      })
-      if (response.ok) {
-        setNewName('')
-        setNewDesc('')
-        setShowCreateModal(false)
-        onRefresh()
-      } else {
-        const body = await response.json().catch(() => null)
-        setCreateError(body?.error?.message || `Failed (${response.status})`)
-      }
-    } catch (e) {
-      setCreateError('Network error — check API connection')
+      const { createCollection } = await import('@/lib/api')
+      await createCollection(newName.trim(), newDesc.trim() || undefined)
+      setNewName('')
+      setNewDesc('')
+      setShowCreateModal(false)
+      onRefresh()
+    } catch {
+      setCreateError('Failed to create collection — check API connection')
     } finally {
       setIsCreating(false)
     }

@@ -30,8 +30,8 @@ async def vector_search(
     db: asyncpg.Pool,
     top_k: int = 5,
     threshold: float = 0.7,
-    collection_id: str = None,
-    user_id: str = None,
+    collection_id: Optional[str] = None,
+    user_id: Optional[str] = None,
 ) -> List[Dict]:
     repo = SupabaseVectorRepository(db)
     return await repo.vector_search(query_embedding, top_k, threshold, collection_id, user_id)
@@ -43,8 +43,8 @@ async def hybrid_search(
     db: asyncpg.Pool,
     top_k: int = 5,
     keyword_weight: float = 0.3,
-    collection_id: str = None,
-    user_id: str = None,
+    collection_id: Optional[str] = None,
+    user_id: Optional[str] = None,
 ) -> List[Dict]:
     repo = SupabaseVectorRepository(db)
     return await repo.hybrid_search(query_text, query_embedding, top_k, keyword_weight, collection_id, user_id)
@@ -61,7 +61,7 @@ async def qdrant_search(
     collection_name: str = "documents",
     top_k: int = 5,
     threshold: float = 0.7,
-    filters: Dict[str, Any] = None,
+    filters: Optional[Dict[str, Any]] = None,
 ) -> List[Dict]:
     repo = QdrantVectorRepository(settings.QDRANT_URL, client)
     return await repo.search(query_embedding, collection_name, top_k, threshold, filters)
