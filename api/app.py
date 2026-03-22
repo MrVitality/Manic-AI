@@ -21,7 +21,7 @@ from api.services.langfuse import init_langfuse
 from api.services.health_logger import health_log_loop
 
 # Import all routers
-from api.routers import health, chat, ingest, documents, collections, qdrant, search, analytics, system, models, agent
+from api.routers import health, chat, ingest, documents, collections, qdrant, search, analytics, system, models, agent, eval as eval_router
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ _TAGS_METADATA = [
     {"name": "system", "description": "System info, cache management, and RAG stats"},
     {"name": "models", "description": "Ollama model management (list, pull, delete)"},
     {"name": "agent", "description": "Generator-Critic reasoning agent with streaming support"},
+    {"name": "eval", "description": "RAG evaluation metrics, batch testing, and search history analytics"},
 ]
 
 
@@ -126,6 +127,7 @@ def create_app() -> FastAPI:
     v1_router.include_router(system.router, dependencies=auth_dep, tags=["system"])
     v1_router.include_router(models.router, dependencies=auth_dep, tags=["models"])
     v1_router.include_router(agent.router, dependencies=auth_dep, tags=["agent"])
+    v1_router.include_router(eval_router.router, dependencies=auth_dep, tags=["eval"])
 
     _app.include_router(v1_router)
 
