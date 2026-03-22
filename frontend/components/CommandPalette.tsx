@@ -16,6 +16,7 @@ export default function CommandPalette() {
     createConversation, updateSettings, settings,
     useRag, setUseRag,
   } = useChatStore()
+  const { clearConversations } = useConversationStore()
   const router = useRouter()
 
   const inputRef = useRef<HTMLInputElement>(null)
@@ -40,6 +41,7 @@ export default function CommandPalette() {
       { id: 'action-toggle-theme', label: 'Toggle Theme', description: `Switch to ${settings.theme === 'dark' ? 'light' : 'dark'} mode`, category: 'action', action: () => updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' }) },
       { id: 'action-toggle-rag', label: 'Toggle RAG', description: `${useRag ? 'Disable' : 'Enable'} RAG for chat`, category: 'action', action: () => setUseRag(!useRag) },
       { id: 'action-refresh', label: 'Refresh View', description: 'Reload current view data', category: 'action', shortcut: 'Ctrl+.', action: () => window.dispatchEvent(new CustomEvent('manic-refresh')) },
+      { id: 'clear-conversations', label: 'Clear All Conversations', description: 'Permanently delete all chat history', category: 'action', action: () => { if (window.confirm('Delete all conversations? This cannot be undone.')) { clearConversations() } } },
     ]
 
     // Dynamic: conversations
@@ -82,7 +84,7 @@ export default function CommandPalette() {
     })
 
     return cmds
-  }, [conversations, documents, models, settings.theme, useRag, createConversation, navigateTo, updateSettings, setUseRag])
+  }, [conversations, documents, models, settings.theme, useRag, createConversation, navigateTo, updateSettings, setUseRag, clearConversations])
 
   // Fuzzy filter
   const filtered = useMemo(() => {

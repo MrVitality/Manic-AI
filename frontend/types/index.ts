@@ -73,6 +73,9 @@ export interface Settings {
   defaultModel: string
   temperature: number
   maxTokens: number
+  topP: number
+  repeatPenalty: number
+  seed: number | null
   systemPrompt: string
   streamResponses: boolean
   apiUrl: string

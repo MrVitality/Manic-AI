@@ -148,6 +148,7 @@ class SupabaseDocumentRepository:
         chunks: List[Dict[str, Any]],
         chunk_embeddings: List[List[float]],
         raw_content: Optional[str] = None,
+        processing_time_ms: Optional[int] = None,
     ) -> None:
         """Transactionally insert a document and all its chunks."""
         async with self._pool.acquire() as conn:
@@ -190,15 +191,29 @@ class SupabaseDocumentRepository:
                         json.dumps(chunk_meta),
                     )
                 await conn.execute(
-                    "UPDATE rag.documents SET status = 'completed' WHERE id = $1",
-                    document_id,
+                    """
+                    UPDATE rag.documents
+                    SET status = 'completed',
+                        processing_time_ms = COALESCE($2, processing_time_ms)
+                    WHERE id = $1
+                    """,
+                    document_id, processing_time_ms,
                 )
 
-    async def mark_document_completed(self, document_id: str) -> None:
+    async def mark_document_completed(
+        self,
+        document_id: str,
+        processing_time_ms: Optional[int] = None,
+    ) -> None:
         async with self._pool.acquire() as conn:
             await conn.execute(
-                "UPDATE rag.documents SET status = 'completed' WHERE id = $1",
-                document_id,
+                """
+                UPDATE rag.documents
+                SET status = 'completed',
+                    processing_time_ms = COALESCE($2, processing_time_ms)
+                WHERE id = $1
+                """,
+                document_id, processing_time_ms,
             )
 
     async def mark_document_failed(self, document_id: str, error: str) -> None:

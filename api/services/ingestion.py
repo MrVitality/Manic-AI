@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -126,6 +127,7 @@ async def ingest_document(
     backend = request.backend or "both"
     qdrant_success = False
     supabase_success = False
+    start_time = time.perf_counter()
 
     try:
         # Preprocess content based on content_type
@@ -164,6 +166,9 @@ async def ingest_document(
         if failed:
             raise RuntimeError(f"Embedding generation failed for {len(failed)} chunk(s): {failed[0]}")
 
+        # Compute processing time before writing to DB so it covers the full pipeline
+        processing_time_ms = round((time.perf_counter() - start_time) * 1000)
+
         # Ingest to Supabase
         if backend in ["supabase", "both"] and db:
             doc_repo = SupabaseDocumentRepository(db)
@@ -179,6 +184,7 @@ async def ingest_document(
                 chunks=chunks,
                 chunk_embeddings=chunk_embeddings,
                 raw_content=request.content,
+                processing_time_ms=processing_time_ms,
             )
             supabase_success = True
 

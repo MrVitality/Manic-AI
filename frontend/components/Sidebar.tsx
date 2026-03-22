@@ -18,6 +18,7 @@ import {
   SunIcon,
   MoonIcon,
   RagIcon,
+  DownloadIcon,
 } from '@/components/ui/Icons'
 
 interface SidebarProps {
@@ -99,6 +100,24 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
   const handleClearAll = () => {
     clearConversations()
     setShowClearConfirm(false)
+  }
+
+  const handleExport = (conversation: Conversation) => {
+    const data = {
+      id: conversation.id,
+      title: conversation.title,
+      messages: conversation.messages,
+      model: conversation.model,
+      createdAt: conversation.createdAt,
+      exportedAt: new Date().toISOString(),
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${conversation.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const navigateTo = (path: string) => {
@@ -246,6 +265,7 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
                               isActive={conv.id === currentConversationId}
                               onSelect={() => selectConversation(conv.id)}
                               onDelete={() => deleteConversation(conv.id)}
+                              onExport={() => handleExport(conv)}
                             />
                           ))}
                         </div>
@@ -287,7 +307,7 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
   )
 }
 
-function ConversationItem({ conversation, isActive, onSelect, onDelete }: { conversation: { id: string; title: string; messages: Array<{ role: string }> }; isActive: boolean; onSelect: () => void; onDelete: () => void }) {
+function ConversationItem({ conversation, isActive, onSelect, onDelete, onExport }: { conversation: { id: string; title: string; messages: Array<{ role: string }> }; isActive: boolean; onSelect: () => void; onDelete: () => void; onExport: () => void }) {
   return (
     <div className="group relative flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors focus-within:opacity-100"
       style={{
@@ -302,6 +322,14 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete }: { conv
         <p className="text-sm truncate">{conversation.title}</p>
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{conversation.messages.length} messages</p>
       </div>
+      <button
+        tabIndex={0}
+        onClick={(e) => { e.stopPropagation(); onExport() }}
+        aria-label={`Export conversation: ${conversation.title}`}
+        className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-blue-500/20 focus:bg-blue-500/20 text-blue-400"
+      >
+        <DownloadIcon className="w-3.5 h-3.5" />
+      </button>
       <button
         tabIndex={0}
         onClick={(e) => { e.stopPropagation(); onDelete() }}
