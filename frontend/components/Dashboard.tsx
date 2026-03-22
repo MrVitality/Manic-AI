@@ -18,7 +18,7 @@ const TABS: Array<{ key: string; label: string }> = [
 ]
 
 export default function Dashboard() {
-  const { dashboardTab, setDashboardTab } = useDashboardStore()
+  const { dashboardTab, setDashboardTab, error, setError } = useDashboardStore()
   const {
     serviceHistory,
     usageAnalytics,
@@ -50,6 +50,15 @@ export default function Dashboard() {
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-6xl mx-auto">
+        {/* Error Banner */}
+        {error && (
+          <div className="mx-4 mb-3 px-3 py-2 rounded-lg text-sm flex items-center justify-between"
+            style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--status-error)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-xs opacity-70 hover:opacity-100">Dismiss</button>
+          </div>
+        )}
+
         {/* Dashboard Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
@@ -112,6 +121,7 @@ export default function Dashboard() {
             serviceHistory={serviceHistory}
             usageAnalytics={usageAnalytics}
             systemUptime={uptimeSeconds}
+            isLoading={isLoadingAnalytics}
           />
         )}
 
@@ -127,6 +137,7 @@ export default function Dashboard() {
             usageAnalytics={usageAnalytics}
             modelAnalytics={modelAnalytics}
             serviceHistory={serviceHistory}
+            isLoading={isLoadingAnalytics}
           />
         )}
       </div>

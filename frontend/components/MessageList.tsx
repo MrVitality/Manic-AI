@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react'
+import { RefreshIcon } from '@/components/ui/Icons'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
@@ -130,7 +131,10 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
               {isUser ? '> OPERATOR_INPUT' : '> SYSTEM_RESPONSE'}
             </span>
             {message.model && (
-              <span className="text-[10px] px-1.5 py-0.5 border border-gray-700 text-gray-500 bg-gray-900/50">
+              <span
+                className="text-[10px] px-1.5 py-0.5 border"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}
+              >
                 {message.model}
               </span>
             )}
@@ -299,9 +303,10 @@ const SourceCitations = memo(function SourceCitations({ sources }: { sources: Ra
     <div className="mt-4 font-mono">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 text-xs font-bold transition-colors hover:text-cyan-300 text-cyan-500 uppercase tracking-widest"
+        className="flex items-center gap-2 text-xs font-bold transition-opacity hover:opacity-80 uppercase tracking-widest"
+        style={{ color: 'var(--accent-primary)' }}
       >
-        <span className="text-gray-500">[{expanded ? '-' : '+'}]</span>
+        <span style={{ color: 'var(--text-muted)' }}>[{expanded ? '-' : '+'}]</span>
         {sources.length} CONTEXT_SOURCES_INJECTED
       </button>
 
@@ -310,22 +315,34 @@ const SourceCitations = memo(function SourceCitations({ sources }: { sources: Ra
           {sources.map((source, idx) => (
             <div
               key={source.id || idx}
-              className="p-3 rounded-none text-sm border-l-2 border-y border-r border-y-[var(--border-color)] border-r-[var(--border-color)] border-l-cyan-500 bg-[var(--bg-elevated)]"
+              className="p-3 rounded-none text-sm border-l-2 border-y border-r"
+              style={{
+                borderColor: 'var(--border-color)',
+                borderLeftColor: 'var(--accent-primary)',
+                background: 'var(--bg-elevated)',
+              }}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-cyan-400">
+                <span className="text-xs font-bold" style={{ color: 'var(--accent-primary)' }}>
                   SRC_{idx.toString().padStart(2, '0')}
                   {source.document_id && (
-                    <span className="text-gray-500 font-normal"> :: {source.document_id.slice(0, 8)}</span>
+                    <span className="font-normal" style={{ color: 'var(--text-muted)' }}> :: {source.document_id.slice(0, 8)}</span>
                   )}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] px-1 border border-cyan-500/30 text-cyan-500 bg-cyan-500/10">
+                  <span
+                    className="text-[10px] px-1 border"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                      color: 'var(--accent-primary)',
+                      background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
+                    }}
+                  >
                     MATCH: {(source.score * 100).toFixed(0)}%
                   </span>
                 </div>
               </div>
-              <p className="text-xs leading-relaxed line-clamp-3 text-gray-400">
+              <p className="text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text-muted)' }}>
                 {source.content}
               </p>
             </div>
@@ -383,10 +400,3 @@ function CheckIcon({ className }: { className?: string }) {
   )
 }
 
-function RefreshIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-    </svg>
-  )
-}

@@ -4,6 +4,7 @@ import GlassPanel from '@/components/ui/GlassPanel'
 import DonutChart from '@/components/ui/DonutChart'
 import BarChart from '@/components/ui/BarChart'
 import AnimatedCounter from '@/components/ui/AnimatedCounter'
+import LoadingSkeleton from '@/components/LoadingSkeleton'
 import type { RagAnalyticsData, RagStatsData } from '@/types'
 
 interface RagAnalyticsProps {
@@ -12,6 +13,10 @@ interface RagAnalyticsProps {
 }
 
 export default function RagAnalytics({ ragAnalytics, ragStats }: RagAnalyticsProps) {
+  if (!ragAnalytics && !ragStats) {
+    return <LoadingSkeleton rows={5} title="Loading analytics..." />
+  }
+
   const docByStatus = ragAnalytics?.documents.by_status || {}
 
   const statusSegments = [
@@ -150,7 +155,16 @@ export default function RagAnalytics({ ragAnalytics, ragStats }: RagAnalyticsPro
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <span style={{ color: 'var(--text-muted)' }}>{ing.chunks_created} chunks</span>
-                  <span className={`font-medium ${ing.status === 'completed' ? 'text-emerald-400' : ing.status === 'failed' ? 'text-red-400' : 'text-yellow-400'}`}>
+                  <span
+                    className="font-medium"
+                    style={{
+                      color: ing.status === 'completed'
+                        ? 'var(--status-healthy)'
+                        : ing.status === 'failed'
+                          ? 'var(--status-error)'
+                          : 'var(--status-warning)',
+                    }}
+                  >
                     {ing.status}
                   </span>
                 </div>

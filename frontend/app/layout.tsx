@@ -14,18 +14,43 @@ export const metadata: Metadata = {
   },
 }
 
-// Inline script to set theme before first paint, avoiding flash
+// Inline script to set theme, accent color, and font size before first paint, avoiding flash
 const themeInitScript = `
 (function() {
   try {
     var stored = JSON.parse(localStorage.getItem('manic-ai-ui') || '{}');
-    var theme = stored && stored.state && stored.state.settings && stored.state.settings.theme;
+    var settings = stored && stored.state && stored.state.settings;
+
+    // Theme
+    var theme = settings && settings.theme;
     if (theme === 'light' || theme === 'dark') {
       document.documentElement.setAttribute('data-theme', theme);
     } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
       document.documentElement.setAttribute('data-theme', 'light');
     } else {
       document.documentElement.setAttribute('data-theme', 'dark');
+    }
+
+    // Accent color
+    var accentColors = {
+      blue: '#3b82f6',
+      indigo: '#818cf8',
+      violet: '#a78bfa',
+      purple: '#8b5cf6',
+      emerald: '#10b981'
+    };
+    var accent = settings && settings.accentColor;
+    if (accent && accentColors[accent]) {
+      document.documentElement.style.setProperty('--accent-blue', accentColors[accent]);
+      document.documentElement.style.setProperty('--accent-cyan', accentColors[accent]);
+      document.documentElement.style.setProperty('--accent-primary', accentColors[accent]);
+    }
+
+    // Font size
+    var fontSizes = { sm: '14px', base: '16px', lg: '18px' };
+    var fs = settings && settings.fontSize;
+    if (fs && fontSizes[fs]) {
+      document.documentElement.style.fontSize = fontSizes[fs];
     }
   } catch(e) {
     document.documentElement.setAttribute('data-theme', 'dark');

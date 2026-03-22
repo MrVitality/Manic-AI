@@ -12,6 +12,20 @@ import { useModelStore } from '@/lib/stores/modelStore'
 import { useConversationStore } from '@/lib/stores/conversationStore'
 import { useConnectorStore } from '@/lib/stores/connectorStore'
 
+const ACCENT_COLORS: Record<string, string> = {
+  blue: '#3b82f6',
+  indigo: '#818cf8',
+  violet: '#a78bfa',
+  purple: '#8b5cf6',
+  emerald: '#10b981',
+}
+
+const FONT_SIZES: Record<string, string> = {
+  sm: '14px',
+  base: '16px',
+  lg: '18px',
+}
+
 const viewTitleMap: Record<string, string> = {
   '/chat': 'Chat',
   '/documents': 'Documents',
@@ -25,6 +39,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const pathname = usePathname()
+  const settings = useUiStore((s) => s.settings)
 
   useKeyboardShortcuts()
 
@@ -35,6 +50,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     useConversationStore.persist.rehydrate()
     useConnectorStore.persist.rehydrate()
   }, [])
+
+  // Apply accent color at runtime when settings change
+  useEffect(() => {
+    const color = ACCENT_COLORS[settings.accentColor]
+    if (color) {
+      document.documentElement.style.setProperty('--accent-blue', color)
+      document.documentElement.style.setProperty('--accent-cyan', color)
+      document.documentElement.style.setProperty('--accent-primary', color)
+    }
+  }, [settings.accentColor])
+
+  // Apply font size at runtime when settings change
+  useEffect(() => {
+    const size = FONT_SIZES[settings.fontSize]
+    if (size) {
+      document.documentElement.style.fontSize = size
+    }
+  }, [settings.fontSize])
 
   const title = viewTitleMap[pathname] || 'Manic AI'
 

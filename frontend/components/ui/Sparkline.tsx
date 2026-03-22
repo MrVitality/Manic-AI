@@ -1,5 +1,7 @@
 'use client'
 
+import { useId } from 'react'
+
 interface SparklineProps {
   values: number[]
   width?: number
@@ -17,6 +19,9 @@ export default function Sparkline({
   filled = true,
   className = '',
 }: SparklineProps) {
+  const rawId = useId()
+  const gradientId = `spark-${rawId.replace(/:/g, '')}-fill`
+
   if (values.length < 2) return null
 
   const min = Math.min(...values)
@@ -31,17 +36,16 @@ export default function Sparkline({
   }).join(' ')
 
   const fillPoints = `0,${height} ${points} ${width},${height}`
-  const id = `spark-${Math.random().toString(36).slice(2, 8)}`
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className={`w-full ${className}`} style={{ height }}>
       <defs>
-        <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.3" />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      {filled && <polygon points={fillPoints} fill={`url(#${id}-fill)`} />}
+      {filled && <polygon points={fillPoints} fill={`url(#${gradientId})`} />}
       <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )

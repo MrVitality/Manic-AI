@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useEffect } from 'react'
+import { ErrorIcon, CloseIcon } from '@/components/ui/Icons'
 import { useChatStore, uiStoreApi } from '@/lib/store'
 import { useArtifactStore } from '@/lib/stores/artifactStore'
 import { useChat } from '@/hooks/useChat'
@@ -32,8 +33,16 @@ export default function ChatArea() {
         <div className="flex items-center justify-center gap-3 px-4 py-2 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
           <button
             onClick={() => setUseRag(!useRag)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono tracking-wide transition-all uppercase border ${useRag ? 'border-cyan-400 text-cyan-400 bg-cyan-400/10' : 'border-gray-700 text-gray-400 bg-transparent hover:border-gray-500'
-              }`}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono tracking-wide transition-all uppercase border"
+            style={useRag ? {
+              borderColor: 'var(--accent-primary)',
+              color: 'var(--accent-primary)',
+              background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
+            } : {
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-muted)',
+              background: 'transparent',
+            }}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
@@ -41,7 +50,7 @@ export default function ChatArea() {
             [RAG_MODE: {useRag ? 'ON' : 'OFF'}]
           </button>
           {useRag && (
-            <span className="text-xs font-mono text-cyan-500/70">
+            <span className="text-xs font-mono" style={{ color: 'var(--accent-primary)', opacity: 0.7 }}>
               // Context injection active
             </span>
           )}
@@ -83,11 +92,11 @@ export default function ChatArea() {
 function EmptyState() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center font-mono">
-      <div className="text-6xl text-cyan-400 mb-6 font-bold tracking-tighter">
+      <div className="text-6xl mb-6 font-bold tracking-tighter" style={{ color: 'var(--accent-primary)' }}>
         &gt;_
       </div>
-      <h2 className="text-2xl font-bold mb-2 uppercase tracking-widest text-cyan-400">System Ready</h2>
-      <p className="max-w-md mb-8 text-gray-400 text-sm">
+      <h2 className="text-2xl font-bold mb-2 uppercase tracking-widest" style={{ color: 'var(--accent-primary)' }}>System Ready</h2>
+      <p className="max-w-md mb-8 text-sm" style={{ color: 'var(--text-muted)' }}>
         // Initialize sequence. Awaiting operator input parameter.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-lg w-full">
@@ -97,10 +106,24 @@ function EmptyState() {
           { icon: '[T]', title: 'GEN_TEXT', desc: 'Output text stream' },
           { icon: '[#]', title: 'PARSE_DATA', desc: 'Process datasets' },
         ].map((s) => (
-          <div key={s.title} className="p-4 rounded-sm cursor-pointer transition-all border border-gray-800 hover:border-cyan-400 bg-gray-900/50 hover:bg-cyan-400/5 flex flex-col items-start text-left">
-            <span className="text-cyan-400 mb-2 font-bold">{s.icon}</span>
-            <h3 className="font-bold text-sm text-gray-200">{s.title}</h3>
-            <p className="text-xs text-gray-500 mt-1">{s.desc}</p>
+          <div
+            key={s.title}
+            className="p-4 rounded-sm cursor-pointer transition-all flex flex-col items-start text-left"
+            style={{ border: '1px solid var(--border-color)', background: 'var(--glass-bg)' }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget
+              el.style.borderColor = 'var(--accent-primary)'
+              el.style.background = 'color-mix(in srgb, var(--accent-primary) 5%, transparent)'
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget
+              el.style.borderColor = 'var(--border-color)'
+              el.style.background = 'var(--glass-bg)'
+            }}
+          >
+            <span className="mb-2 font-bold" style={{ color: 'var(--accent-primary)' }}>{s.icon}</span>
+            <h3 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{s.title}</h3>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{s.desc}</p>
           </div>
         ))}
       </div>
@@ -108,6 +131,3 @@ function EmptyState() {
   )
 }
 
-function BoltIcon({ className }: { className?: string }) { return (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>) }
-function ErrorIcon({ className }: { className?: string }) { return (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) }
-function CloseIcon({ className }: { className?: string }) { return (<svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>) }

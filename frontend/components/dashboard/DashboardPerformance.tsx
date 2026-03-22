@@ -5,19 +5,25 @@ import GlassPanel from '@/components/ui/GlassPanel'
 import AreaChart from '@/components/ui/AreaChart'
 import BarChart from '@/components/ui/BarChart'
 import Heatmap from '@/components/ui/Heatmap'
+import LoadingSkeleton from '@/components/LoadingSkeleton'
 import type { UsageAnalyticsData, ModelAnalyticsData, ServiceHealthSnapshot, HeatmapCell } from '@/types'
 
 interface DashboardPerformanceProps {
   usageAnalytics: UsageAnalyticsData | null
   modelAnalytics: ModelAnalyticsData | null
   serviceHistory: ServiceHealthSnapshot[]
+  isLoading?: boolean
 }
 
 export default function DashboardPerformance({
   usageAnalytics,
   modelAnalytics,
   serviceHistory,
+  isLoading,
 }: DashboardPerformanceProps) {
+  if (isLoading && !usageAnalytics && !modelAnalytics) {
+    return <LoadingSkeleton rows={5} title="Loading performance data..." />
+  }
   const [sortKey, setSortKey] = useState<'requests' | 'latency' | 'tokens'>('requests')
 
   // Heatmap data: 24 columns (hours) x N rows (services)
@@ -132,6 +138,7 @@ export default function DashboardPerformance({
                     className="text-right py-2 px-3 font-semibold cursor-pointer hover:opacity-80"
                     style={{ color: sortKey === 'requests' ? 'var(--accent-blue)' : 'var(--text-muted)' }}
                     onClick={() => setSortKey('requests')}
+                    aria-sort={sortKey === 'requests' ? 'descending' : 'none'}
                   >
                     Requests {sortKey === 'requests' && '\u2193'}
                   </th>
@@ -139,6 +146,7 @@ export default function DashboardPerformance({
                     className="text-right py-2 px-3 font-semibold cursor-pointer hover:opacity-80"
                     style={{ color: sortKey === 'latency' ? 'var(--accent-blue)' : 'var(--text-muted)' }}
                     onClick={() => setSortKey('latency')}
+                    aria-sort={sortKey === 'latency' ? 'ascending' : 'none'}
                   >
                     Avg Latency {sortKey === 'latency' && '\u2191'}
                   </th>
@@ -146,6 +154,7 @@ export default function DashboardPerformance({
                     className="text-right py-2 px-3 font-semibold cursor-pointer hover:opacity-80"
                     style={{ color: sortKey === 'tokens' ? 'var(--accent-blue)' : 'var(--text-muted)' }}
                     onClick={() => setSortKey('tokens')}
+                    aria-sort={sortKey === 'tokens' ? 'descending' : 'none'}
                   >
                     Total Tokens {sortKey === 'tokens' && '\u2193'}
                   </th>

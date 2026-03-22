@@ -3,6 +3,7 @@
 interface PulseIndicatorProps {
   status: 'healthy' | 'degraded' | 'offline' | 'unknown'
   size?: 'sm' | 'md' | 'lg'
+  ariaLabel?: string
 }
 
 const colors: Record<string, string> = {
@@ -14,13 +15,13 @@ const colors: Record<string, string> = {
 
 const sizes = { sm: 8, md: 12, lg: 16 }
 
-export default function PulseIndicator({ status, size = 'md' }: PulseIndicatorProps) {
+export default function PulseIndicator({ status, size = 'md', ariaLabel }: PulseIndicatorProps) {
   const color = colors[status]
   const s = sizes[size]
   const isAlive = status === 'healthy' || status === 'degraded'
 
   return (
-    <span className="relative inline-flex" style={{ width: s, height: s }}>
+    <span className="relative inline-flex" role="status" aria-label={ariaLabel ?? status} style={{ width: s, height: s }}>
       {isAlive && (
         <span
           className="absolute inset-0 rounded-full animate-ping"

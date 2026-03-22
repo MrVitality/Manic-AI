@@ -177,26 +177,28 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
 }
 
 function ConversationItem({ conversation, isActive, onSelect, onDelete }: { conversation: { id: string; title: string; messages: Array<{ role: string }> }; isActive: boolean; onSelect: () => void; onDelete: () => void }) {
-  const [showDelete, setShowDelete] = useState(false)
   return (
-    <div className="group relative flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors"
+    <div className="group relative flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors focus-within:opacity-100"
       style={{
         background: isActive ? 'rgba(129, 140, 248, 0.08)' : 'transparent',
         borderLeft: isActive ? '2px solid var(--accent-indigo)' : '2px solid transparent',
         paddingLeft: isActive ? 10 : 12,
         color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}
-      onClick={onSelect} onMouseEnter={() => setShowDelete(true)} onMouseLeave={() => setShowDelete(false)}>
+      onClick={onSelect}>
       <ChatBubbleIcon className="w-4 h-4 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm truncate">{conversation.title}</p>
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{conversation.messages.length} messages</p>
       </div>
-      {showDelete && (
-        <button onClick={(e) => { e.stopPropagation(); onDelete() }} aria-label={`Delete conversation: ${conversation.title}`} className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 text-red-500">
-          <TrashIcon className="w-3.5 h-3.5" />
-        </button>
-      )}
+      <button
+        tabIndex={0}
+        onClick={(e) => { e.stopPropagation(); onDelete() }}
+        aria-label={`Delete conversation: ${conversation.title}`}
+        className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-red-500/20 focus:bg-red-500/20 text-red-500"
+      >
+        <TrashIcon className="w-3.5 h-3.5" />
+      </button>
     </div>
   )
 }

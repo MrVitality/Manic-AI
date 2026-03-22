@@ -75,12 +75,12 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
         {config.icon}
         <span className="flex-1 uppercase tracking-wider truncate">
           {toolCall.toolName}
-          <span className="text-gray-500 normal-case tracking-normal ml-2">
+          <span className="normal-case tracking-normal ml-2" style={{ color: 'var(--text-muted)' }}>
             {config.label}
           </span>
         </span>
         {duration && (
-          <span className="text-[10px] text-gray-600 tabular-nums">{duration}</span>
+          <span className="text-[10px] tabular-nums" style={{ color: 'var(--text-secondary)' }}>{duration}</span>
         )}
         {hasSources && (
           <span
@@ -95,7 +95,7 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
           </span>
         )}
         {isExpandable && (
-          <span className="text-gray-600">[{expanded ? '-' : '+'}]</span>
+          <span style={{ color: 'var(--text-secondary)' }}>[{expanded ? '-' : '+'}]</span>
         )}
       </button>
 
@@ -119,21 +119,26 @@ const ToolCallCard = memo(function ToolCallCard({ toolCall }: ToolCallCardProps)
                   }}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-cyan-400 font-bold">
+                    <span className="font-bold" style={{ color: 'var(--accent-primary)' }}>
                       SRC_{idx.toString().padStart(2, '0')}
                       {source.document_id && (
-                        <span className="text-gray-500 font-normal">
+                        <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
                           {' :: '}{source.document_id.slice(0, 8)}
                         </span>
                       )}
                     </span>
                     <span
-                      className="text-[10px] px-1 border border-cyan-500/30 text-cyan-500 bg-cyan-500/10"
+                      className="text-[10px] px-1 border"
+                      style={{
+                        borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                        color: 'var(--accent-primary)',
+                        background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
+                      }}
                     >
                       MATCH: {(source.score * 100).toFixed(0)}%
                     </span>
                   </div>
-                  <p className="text-gray-400 leading-relaxed line-clamp-2">
+                  <p className="leading-relaxed line-clamp-2" style={{ color: 'var(--text-muted)' }}>
                     {source.content}
                   </p>
                 </div>

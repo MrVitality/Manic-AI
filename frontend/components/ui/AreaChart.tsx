@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useId } from 'react'
 
 interface DataPoint {
   label?: string
@@ -26,6 +26,9 @@ export default function AreaChart({
   showLabels = false,
   className = '',
 }: AreaChartProps) {
+  const rawId = useId()
+  const gradientId = `area-${rawId.replace(/:/g, '')}-fill`
+
   const chart = useMemo(() => {
     if (data.length < 2) return null
 
@@ -65,12 +68,10 @@ export default function AreaChart({
 
   if (!chart) return null
 
-  const id = `area-${Math.random().toString(36).slice(2, 8)}`
-
   return (
     <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className={`w-full ${className}`} style={{ height }}>
       <defs>
-        <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />
           <stop offset="100%" stopColor={color} stopOpacity="0.02" />
         </linearGradient>
@@ -78,7 +79,7 @@ export default function AreaChart({
       {chart.gridLines.map((y, i) => (
         <line key={i} x1={chart.paddingLeft} y1={y} x2={width} y2={y} stroke="var(--border-color)" strokeDasharray="4 4" />
       ))}
-      <path d={chart.areaPath} fill={`url(#${id}-fill)`} />
+      <path d={chart.areaPath} fill={`url(#${gradientId})`} />
       <path d={chart.path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />
     </svg>
   )

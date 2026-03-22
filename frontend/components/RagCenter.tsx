@@ -10,6 +10,14 @@ import RagSearchLab from '@/components/rag/RagSearchLab'
 import RagAnalytics from '@/components/rag/RagAnalytics'
 import type { RagCenterTab } from '@/types'
 
+const SKELETON_BAR_STYLE = {
+  display: 'inline-block',
+  height: '12px',
+  borderRadius: '4px',
+  background: 'var(--bg-elevated)',
+  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+} as const
+
 const TABS: Array<{ key: string; label: string }> = [
   { key: 'pipeline', label: 'Pipeline' },
   { key: 'collections', label: 'Collections' },
@@ -18,7 +26,7 @@ const TABS: Array<{ key: string; label: string }> = [
 ]
 
 export default function RagCenter() {
-  const { ragTab, setRagTab, searchConfig, setSearchConfig } = useRagStore()
+  const { ragTab, setRagTab, searchConfig, setSearchConfig, error, setError, isLoadingStats } = useRagStore()
   const {
     ragStats,
     collections,
@@ -34,6 +42,15 @@ export default function RagCenter() {
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-6xl mx-auto">
+        {/* Error Banner */}
+        {error && (
+          <div className="mx-4 mb-3 px-3 py-2 rounded-lg text-sm flex items-center justify-between"
+            style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--status-error)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="text-xs opacity-70 hover:opacity-100">Dismiss</button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -43,7 +60,15 @@ export default function RagCenter() {
             </p>
           </div>
           <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-            {ragStats && (
+            {isLoadingStats && !ragStats ? (
+              <>
+                <span style={{ ...SKELETON_BAR_STYLE, width: '48px' }} />
+                <span className="opacity-30">|</span>
+                <span style={{ ...SKELETON_BAR_STYLE, width: '56px' }} />
+                <span className="opacity-30">|</span>
+                <span style={{ ...SKELETON_BAR_STYLE, width: '80px' }} />
+              </>
+            ) : ragStats ? (
               <>
                 <span>{ragStats.total_documents} docs</span>
                 <span className="opacity-30">|</span>
@@ -51,7 +76,7 @@ export default function RagCenter() {
                 <span className="opacity-30">|</span>
                 <span>{ragStats.embedding_model}</span>
               </>
-            )}
+            ) : null}
           </div>
         </div>
 

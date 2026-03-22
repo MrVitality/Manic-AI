@@ -6,6 +6,7 @@ import Sparkline from '@/components/ui/Sparkline'
 import AnimatedCounter from '@/components/ui/AnimatedCounter'
 import PulseIndicator from '@/components/ui/PulseIndicator'
 import GlassPanel from '@/components/ui/GlassPanel'
+import LoadingSkeleton from '@/components/LoadingSkeleton'
 import type { ServiceStatus, UsageAnalyticsData, ServiceHealthSnapshot } from '@/types'
 
 interface DashboardOverviewProps {
@@ -13,6 +14,7 @@ interface DashboardOverviewProps {
   serviceHistory: ServiceHealthSnapshot[]
   usageAnalytics: UsageAnalyticsData | null
   systemUptime: number | null
+  isLoading?: boolean
 }
 
 export default function DashboardOverview({
@@ -20,8 +22,13 @@ export default function DashboardOverview({
   serviceHistory,
   usageAnalytics,
   systemUptime,
+  isLoading,
 }: DashboardOverviewProps) {
   const services = Object.entries(serviceStatuses)
+
+  if (isLoading && services.length === 0) {
+    return <LoadingSkeleton rows={6} title="Loading overview..." />
+  }
   const healthyCount = services.filter(([, s]) => s.status === 'healthy').length
   const totalCount = services.length || 1
 

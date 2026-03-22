@@ -7,6 +7,29 @@ import Badge from '@/components/ui/Badge'
 import { fetchDocuments, fetchDocumentChunks } from '@/lib/api'
 import type { DocumentInfo, ChunkInfo, RagStatsData } from '@/types'
 
+function DocumentListSkeleton() {
+  return (
+    <div className="space-y-1">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="p-2 rounded-lg animate-pulse"
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}
+        >
+          <div
+            className="h-3 rounded mb-1.5"
+            style={{ background: 'var(--bg-elevated)', width: `${55 + (i * 13) % 35}%`, animationDelay: `${i * 80}ms` }}
+          />
+          <div
+            className="h-2 rounded"
+            style={{ background: 'var(--bg-elevated)', width: '40%', animationDelay: `${i * 80 + 40}ms` }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 interface RagPipelineProps {
   ragStats: RagStatsData | null
 }
@@ -17,9 +40,14 @@ export default function RagPipeline({ ragStats }: RagPipelineProps) {
   const [chunks, setChunks] = useState<ChunkInfo[]>([])
   const [totalChunks, setTotalChunks] = useState(0)
   const [isLoadingChunks, setIsLoadingChunks] = useState(false)
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true)
 
   useEffect(() => {
-    fetchDocuments().then(setDocuments).catch(() => {})
+    setIsLoadingDocs(true)
+    fetchDocuments()
+      .then(setDocuments)
+      .catch(() => {})
+      .finally(() => setIsLoadingDocs(false))
   }, [])
 
   const handleSelectDoc = async (docId: string) => {
@@ -92,7 +120,9 @@ export default function RagPipeline({ ragStats }: RagPipelineProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Document list */}
           <div className="md:col-span-1 max-h-80 overflow-y-auto space-y-1">
-            {documents.length === 0 ? (
+            {isLoadingDocs ? (
+              <DocumentListSkeleton />
+            ) : documents.length === 0 ? (
               <p className="text-xs py-4 text-center" style={{ color: 'var(--text-muted)' }}>No documents</p>
             ) : (
               documents.map((doc) => (
