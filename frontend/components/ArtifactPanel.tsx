@@ -39,11 +39,12 @@ export default function ArtifactPanel() {
         className="flex items-center gap-2 px-3 py-2 border-b border-[var(--border-color)] bg-[var(--bg-secondary)] font-mono text-xs"
       >
         <ArtifactTypeIcon type={activeArtifact.type} />
-        <span className="flex-1 truncate font-bold uppercase tracking-wider text-gray-200">
+        <span className="flex-1 truncate font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
           {activeArtifact.title}
         </span>
         <span
-          className="text-[10px] px-1.5 py-0.5 border border-gray-700 text-gray-500 uppercase"
+          className="text-[10px] px-1.5 py-0.5 border uppercase"
+          style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
         >
           {activeArtifact.type}
           {activeArtifact.language ? ` :: ${activeArtifact.language}` : ''}
@@ -74,14 +75,18 @@ export default function ArtifactPanel() {
 
         <button
           onClick={() => removeArtifact(activeArtifact.id)}
-          className="p-1 text-gray-500 hover:text-red-400 transition-colors"
+          className="p-1 hover:text-red-400 transition-colors"
+          style={{ color: 'var(--text-muted)' }}
           title="Remove artifact"
         >
           <TrashIcon className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={closePanel}
-          className="p-1 text-gray-500 hover:text-gray-300 transition-colors"
+          className="p-1 transition-colors"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)' }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-muted)' }}
           title="Close panel"
         >
           <CloseIcon className="w-3.5 h-3.5" />
@@ -207,7 +212,7 @@ const ArtifactContent = memo(function ArtifactContent({
   }
 
   return (
-    <pre className="p-4 text-sm text-gray-400 whitespace-pre-wrap font-mono">
+    <pre className="p-4 text-sm whitespace-pre-wrap font-mono" style={{ color: 'var(--text-secondary)' }}>
       {artifact.content}
     </pre>
   )

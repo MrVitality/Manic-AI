@@ -48,6 +48,7 @@ class Settings(BaseSettings):
 
     # --- Auth ---
     API_SECRET_KEY: str = ""
+    AUTH_MODE: str = "single"  # "single" (shared API key) or "multi_user" (per-user)
 
     # --- Agent ---
     AGENT_STATE_TTL_SECONDS: int = 86400  # 24 h (was hardcoded 1 h)

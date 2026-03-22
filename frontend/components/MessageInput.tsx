@@ -9,6 +9,10 @@ interface MessageInputProps {
   onStop: () => void
   isGenerating: boolean
   placeholder?: string
+  /** Controlled input value (optional). When provided, the parent owns the state. */
+  inputText?: string
+  /** Called whenever the textarea value changes (required when inputText is provided). */
+  onInputChange?: (value: string) => void
 }
 
 export default function MessageInput({
@@ -16,8 +20,16 @@ export default function MessageInput({
   onStop,
   isGenerating,
   placeholder = 'Type a message...',
+  inputText,
+  onInputChange,
 }: MessageInputProps) {
-  const [message, setMessage] = useState('')
+  const [internalMessage, setInternalMessage] = useState('')
+  // Use controlled value when the parent provides one, otherwise fall back to local state
+  const message = inputText !== undefined ? inputText : internalMessage
+  const setMessage = (value: string) => {
+    if (onInputChange) onInputChange(value)
+    if (inputText === undefined) setInternalMessage(value)
+  }
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-resize textarea
@@ -88,7 +100,8 @@ export default function MessageInput({
             <button
               onClick={handleSubmit}
               disabled={!message.trim()}
-              className={`px-4 py-2 rounded-sm transition-all border text-xs font-mono font-bold uppercase ${message.trim() ? 'bg-cyan-500 text-black border-cyan-500 hover:bg-transparent hover:text-cyan-400 hover:shadow-[0_0_10px_rgba(0,240,255,0.3)]' : 'bg-transparent text-gray-600 border-gray-800 disabled:opacity-50 disabled:cursor-not-allowed'}`}
+              className={`px-4 py-2 rounded-sm transition-all border text-xs font-mono font-bold uppercase ${message.trim() ? 'bg-cyan-500 text-black border-cyan-500 hover:bg-transparent hover:text-cyan-400 hover:shadow-[0_0_10px_rgba(0,240,255,0.3)]' : 'bg-transparent disabled:opacity-50 disabled:cursor-not-allowed'}`}
+              style={!message.trim() ? { color: 'var(--text-muted)', borderColor: 'var(--border-color)' } : undefined}
               title="Send message (Enter)"
             >
               [EXEC]

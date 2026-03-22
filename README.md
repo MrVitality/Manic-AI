@@ -157,6 +157,17 @@ Makefile            Development commands
 
 ---
 
+## API Versioning
+
+All endpoints use URL path versioning under `/v1/`. Non-breaking changes (new fields, new endpoints) don't require a version bump. Breaking changes follow a 3-phase sunset: announce with `Deprecation` header, warn with `Sunset` header for 2 months, then return `410 Gone` after 3 months. Both v1 and v2 run simultaneously during migration. See `api/app.py` for the full endpoint inventory (41 endpoints across 14 routers).
+
+## Auth Modes
+
+- `AUTH_MODE=single` (default): shared API key via `X-API-Key` header
+- `AUTH_MODE=multi_user`: per-user API keys with email/password registration (requires migration 004)
+
+---
+
 ## License
 
 See [LICENSE](LICENSE).

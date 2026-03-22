@@ -660,5 +660,9 @@
 
 .glass-panel-hover:hover {
   border-color: var(--border-hover);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg-hover, rgba(255, 255, 255, 0.05));
+}
+
+[data-theme="light"] {
+  --glass-bg-hover: rgba(0, 0, 0, 0.04);
 }

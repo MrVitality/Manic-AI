@@ -9,6 +9,7 @@ import DashboardOverview from '@/components/dashboard/DashboardOverview'
 import DashboardServices from '@/components/dashboard/DashboardServices'
 import DashboardPerformance from '@/components/dashboard/DashboardPerformance'
 import PulseIndicator from '@/components/ui/PulseIndicator'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import type { DashboardTab } from '@/types'
 
 const TABS: Array<{ key: string; label: string }> = [
@@ -117,31 +118,33 @@ export default function Dashboard() {
         </div>
 
         {/* Tab Content */}
-        {dashboardTab === 'overview' && (
-          <DashboardOverview
-            serviceStatuses={serviceStatuses}
-            serviceHistory={serviceHistory}
-            usageAnalytics={usageAnalytics}
-            systemUptime={uptimeSeconds}
-            isLoading={isLoadingAnalytics}
-          />
-        )}
+        <ErrorBoundary sectionName="Dashboard">
+          {dashboardTab === 'overview' && (
+            <DashboardOverview
+              serviceStatuses={serviceStatuses}
+              serviceHistory={serviceHistory}
+              usageAnalytics={usageAnalytics}
+              systemUptime={uptimeSeconds}
+              isLoading={isLoadingAnalytics}
+            />
+          )}
 
-        {dashboardTab === 'services' && (
-          <DashboardServices
-            serviceStatuses={serviceStatuses}
-            serviceHistory={serviceHistory}
-          />
-        )}
+          {dashboardTab === 'services' && (
+            <DashboardServices
+              serviceStatuses={serviceStatuses}
+              serviceHistory={serviceHistory}
+            />
+          )}
 
-        {dashboardTab === 'performance' && (
-          <DashboardPerformance
-            usageAnalytics={usageAnalytics}
-            modelAnalytics={modelAnalytics}
-            serviceHistory={serviceHistory}
-            isLoading={isLoadingAnalytics}
-          />
-        )}
+          {dashboardTab === 'performance' && (
+            <DashboardPerformance
+              usageAnalytics={usageAnalytics}
+              modelAnalytics={modelAnalytics}
+              serviceHistory={serviceHistory}
+              isLoading={isLoadingAnalytics}
+            />
+          )}
+        </ErrorBoundary>
       </div>
     </div>
   )

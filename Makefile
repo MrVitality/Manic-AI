@@ -1,7 +1,7 @@
 # =============================================================================
 # Manic-AI — Development Commands
 # =============================================================================
-.PHONY: help dev up down test lint build clean logs status setup setup-deps setup-hooks verify monitoring backup
+.PHONY: help dev up down test lint build clean logs status setup setup-deps setup-hooks verify monitoring backup test-e2e test-e2e-ui
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -43,6 +43,12 @@ test-frontend: ## Run frontend tests (Jest)
 
 test-coverage: ## Run API tests with coverage report
 	cd api && python -m pytest --cov=api --cov-report=term-missing --tb=short
+
+test-e2e: ## Run E2E tests (Playwright)
+	cd frontend && npx playwright test
+
+test-e2e-ui: ## Run E2E tests with UI
+	cd frontend && npx playwright test --ui
 
 # ---------------------------------------------------------------------------
 # Linting

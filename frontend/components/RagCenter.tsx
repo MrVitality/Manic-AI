@@ -9,6 +9,7 @@ import RagCollections from '@/components/rag/RagCollections'
 import RagSearchLab from '@/components/rag/RagSearchLab'
 import RagAnalytics from '@/components/rag/RagAnalytics'
 import RagEval from '@/components/rag/RagEval'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import type { RagCenterTab } from '@/types'
 
 const SKELETON_BAR_STYLE = {
@@ -94,33 +95,35 @@ export default function RagCenter() {
         </div>
 
         {/* Tab Content */}
-        {ragTab === 'pipeline' && (
-          <RagPipeline ragStats={ragStats} />
-        )}
+        <ErrorBoundary sectionName="RAG Center">
+          {ragTab === 'pipeline' && (
+            <RagPipeline ragStats={ragStats} />
+          )}
 
-        {ragTab === 'collections' && (
-          <RagCollections collections={collections} onRefresh={refreshCollections} />
-        )}
+          {ragTab === 'collections' && (
+            <RagCollections collections={collections} onRefresh={refreshCollections} />
+          )}
 
-        {ragTab === 'search-lab' && (
-          <RagSearchLab
-            searchQuery={searchQuery}
-            searchResults={searchResults}
-            searchLatency={searchLatency}
-            isSearching={isSearching}
-            searchConfig={searchConfig}
-            onSearch={performSearch}
-            onConfigChange={(updates) => setSearchConfig({ ...searchConfig, ...updates })}
-          />
-        )}
+          {ragTab === 'search-lab' && (
+            <RagSearchLab
+              searchQuery={searchQuery}
+              searchResults={searchResults}
+              searchLatency={searchLatency}
+              isSearching={isSearching}
+              searchConfig={searchConfig}
+              onSearch={performSearch}
+              onConfigChange={(updates) => setSearchConfig({ ...searchConfig, ...updates })}
+            />
+          )}
 
-        {ragTab === 'analytics' && (
-          <RagAnalytics ragAnalytics={ragAnalytics} ragStats={ragStats} />
-        )}
+          {ragTab === 'analytics' && (
+            <RagAnalytics ragAnalytics={ragAnalytics} ragStats={ragStats} />
+          )}
 
-        {ragTab === 'eval' && (
-          <RagEval />
-        )}
+          {ragTab === 'eval' && (
+            <RagEval />
+          )}
+        </ErrorBoundary>
       </div>
     </div>
   )

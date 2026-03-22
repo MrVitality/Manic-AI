@@ -7,6 +7,7 @@ import RagSettingsPanel from '@/components/settings/RagSettingsPanel'
 import AppearanceSettings from '@/components/settings/AppearanceSettings'
 import DataSettings from '@/components/settings/DataSettings'
 import ConnectorSettings from '@/components/settings/ConnectorSettings'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import { fetchRagStats } from '@/lib/api'
 import type { SettingsSection, RagStatsData } from '@/types'
 
@@ -71,15 +72,17 @@ export default function AdvancedSettings() {
 
       {/* Settings Content */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="max-w-2xl mx-auto animate-tab-enter" key={activeSection}>
-          {activeSection === 'general' && <GeneralSettings />}
-          {activeSection === 'inference' && <InferenceSettings />}
-          {activeSection === 'rag' && <RagSettingsPanel />}
-          {activeSection === 'appearance' && <AppearanceSettings />}
-          {activeSection === 'data' && <DataSettings ragStats={ragStats} />}
-          {activeSection === 'connectors' && <ConnectorSettings />}
-          {activeSection === 'shortcuts' && <ShortcutsReference />}
-        </div>
+        <ErrorBoundary sectionName="Settings">
+          <div className="max-w-2xl mx-auto animate-tab-enter" key={activeSection}>
+            {activeSection === 'general' && <GeneralSettings />}
+            {activeSection === 'inference' && <InferenceSettings />}
+            {activeSection === 'rag' && <RagSettingsPanel />}
+            {activeSection === 'appearance' && <AppearanceSettings />}
+            {activeSection === 'data' && <DataSettings ragStats={ragStats} />}
+            {activeSection === 'connectors' && <ConnectorSettings />}
+            {activeSection === 'shortcuts' && <ShortcutsReference />}
+          </div>
+        </ErrorBoundary>
       </div>
     </div>
   )
