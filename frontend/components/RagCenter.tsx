@@ -8,6 +8,7 @@ import RagPipeline from '@/components/rag/RagPipeline'
 import RagCollections from '@/components/rag/RagCollections'
 import RagSearchLab from '@/components/rag/RagSearchLab'
 import RagAnalytics from '@/components/rag/RagAnalytics'
+import RagEval from '@/components/rag/RagEval'
 import type { RagCenterTab } from '@/types'
 
 const SKELETON_BAR_STYLE = {
@@ -23,6 +24,7 @@ const TABS: Array<{ key: string; label: string }> = [
   { key: 'collections', label: 'Collections' },
   { key: 'search-lab', label: 'Search Lab' },
   { key: 'analytics', label: 'Analytics' },
+  { key: 'eval', label: 'Evaluation' },
 ]
 
 export default function RagCenter() {
@@ -112,6 +114,10 @@ export default function RagCenter() {
 
         {ragTab === 'analytics' && (
           <RagAnalytics ragAnalytics={ragAnalytics} ragStats={ragStats} />
+        )}
+
+        {ragTab === 'eval' && (
+          <RagEval />
         )}
       </div>
     </div>

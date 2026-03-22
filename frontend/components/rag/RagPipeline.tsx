@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import GlassPanel from '@/components/ui/GlassPanel'
 import FlowDiagram from '@/components/ui/FlowDiagram'
 import Badge from '@/components/ui/Badge'
+import EmptyState from '@/components/ui/EmptyState'
 import { fetchDocuments, fetchDocumentChunks } from '@/lib/api'
 import type { DocumentInfo, ChunkInfo, RagStatsData } from '@/types'
 
@@ -123,7 +124,10 @@ export default function RagPipeline({ ragStats }: RagPipelineProps) {
             {isLoadingDocs ? (
               <DocumentListSkeleton />
             ) : documents.length === 0 ? (
-              <p className="text-xs py-4 text-center" style={{ color: 'var(--text-muted)' }}>No documents</p>
+              <EmptyState
+                title="No documents"
+                description="Upload a document to get started with RAG."
+              />
             ) : (
               documents.map((doc) => (
                 <button

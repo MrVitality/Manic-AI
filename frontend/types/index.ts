@@ -137,7 +137,7 @@ export type ActiveView = 'chat' | 'documents' | 'models' | 'dashboard' | 'rag' |
 
 // Dashboard types
 export type DashboardTab = 'overview' | 'services' | 'performance'
-export type RagCenterTab = 'pipeline' | 'collections' | 'search-lab' | 'analytics'
+export type RagCenterTab = 'pipeline' | 'collections' | 'search-lab' | 'analytics' | 'eval'
 export type SettingsSection = 'general' | 'models' | 'rag' | 'inference' | 'appearance' | 'data' | 'connectors' | 'shortcuts'
 
 // Service health snapshot

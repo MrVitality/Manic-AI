@@ -19,6 +19,7 @@ export default function MessageInput({
 }: MessageInputProps) {
   const [message, setMessage] = useState('')
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { useRag } = useChatStore()
@@ -60,7 +61,8 @@ export default function MessageInput({
     if (!file) return
     const result = validateUploadedFile(file)
     if (!result.valid) {
-      alert(result.error)
+      setFileError(result.error ?? 'Invalid file')
+      setTimeout(() => setFileError(null), 3000)
       e.target.value = ''
       return
     }
@@ -103,6 +105,13 @@ export default function MessageInput({
             <CloseIcon className="w-3.5 h-3.5" />
           </button>
         </div>
+      )}
+
+      {/* File validation error */}
+      {fileError && (
+        <span className="block mb-1 text-xs" style={{ color: 'var(--status-error)' }}>
+          {fileError}
+        </span>
       )}
 
       {/* Input Area */}

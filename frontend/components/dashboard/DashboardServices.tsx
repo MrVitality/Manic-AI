@@ -48,6 +48,7 @@ export default function DashboardServices({ serviceStatuses, serviceHistory }: D
             <GlassPanel key={key} className="overflow-hidden">
               <button
                 onClick={() => setExpandedService(isExpanded ? null : key)}
+                aria-expanded={isExpanded}
                 className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-white/[0.02]"
               >
                 <div className="flex items-center gap-3">
@@ -73,8 +74,11 @@ export default function DashboardServices({ serviceStatuses, serviceHistory }: D
                 </div>
               </button>
 
-              {isExpanded && (
-                <div className="px-4 pb-4 animate-tab-enter" style={{ borderTop: '1px solid var(--border-color)' }}>
+              <div
+                className={`overflow-hidden transition-all duration-200 ${isExpanded ? 'max-h-96' : 'max-h-0'}`}
+                style={isExpanded ? { borderTop: '1px solid var(--border-color)' } : undefined}
+              >
+                <div className="px-4 pb-4">
                   <div className="pt-4">
                     <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>
                       Latency History
@@ -115,7 +119,7 @@ export default function DashboardServices({ serviceStatuses, serviceHistory }: D
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
             </GlassPanel>
           )
         })}

@@ -1,5 +1,6 @@
 """Search business logic -- unified search across Supabase + Qdrant."""
 
+import asyncio
 import logging
 import time
 from typing import Any, Dict, List, Optional
@@ -13,6 +14,7 @@ from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.repositories.supabase_vector import SupabaseVectorRepository
 from api.services.embedding import generate_embedding
 from api.services.reranker import rerank_chunks
+from api.services.search_logger import log_search
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ async def unified_search(
     rerank: bool = False,
 ) -> List[Dict[str, Any]]:
     """Run search across the requested backend(s), deduplicate, and optionally rerank."""
+    start = time.time()
     # When reranking, retrieve more candidates for better selection
     retrieval_top_k = 20 if rerank else top_k
     results: List[Dict[str, Any]] = []
@@ -93,6 +96,23 @@ async def unified_search(
         )
     else:
         results = results[:top_k]
+
+    # Log search event (best-effort, does not block response)
+    latency_ms = round((time.time() - start) * 1000, 1)
+    asyncio.ensure_future(log_search(
+        db=db,
+        query=query_text,
+        backend=backend,
+        use_hybrid=use_hybrid,
+        top_k=top_k,
+        threshold=threshold,
+        keyword_weight=settings.RAG_KEYWORD_WEIGHT,
+        reranked=rerank,
+        results=results,
+        latency_ms=latency_ms,
+        collection_id=collection_id,
+        user_id=user_id,
+    ))
 
     return results
 
@@ -166,6 +186,22 @@ async def search_with_explain(
 
     latency_ms = round((time.time() - start) * 1000, 1)
     embedding_preview = query_embedding[:10] if include_vectors else []
+
+    # Log search event (best-effort, does not block response)
+    asyncio.ensure_future(log_search(
+        db=db,
+        query=query_text,
+        backend=backend,
+        use_hybrid=use_hybrid,
+        top_k=top_k,
+        threshold=threshold,
+        keyword_weight=settings.RAG_KEYWORD_WEIGHT,
+        reranked=False,
+        results=results,
+        latency_ms=latency_ms,
+        collection_id=collection_id,
+        user_id=None,
+    ))
 
     return {
         "results": results,

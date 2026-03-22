@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import GlassPanel from '@/components/ui/GlassPanel'
 import ScoreBar from '@/components/ui/ScoreBar'
 import Badge from '@/components/ui/Badge'
+import EmptyState from '@/components/ui/EmptyState'
 import type { SearchConfig, SearchExplainResult } from '@/types'
 
 interface RagSearchLabProps {
@@ -138,8 +139,11 @@ export default function RagSearchLab({
         {/* Results */}
         <div className="lg:col-span-3 space-y-3">
           {searchResults.length === 0 && !isSearching && query.trim() && (
-            <GlassPanel className="p-6 text-center">
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No results found</p>
+            <GlassPanel className="p-2">
+              <EmptyState
+                title="No results found"
+                description="Try adjusting your query or lowering the relevance threshold."
+              />
             </GlassPanel>
           )}
 

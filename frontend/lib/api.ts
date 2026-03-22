@@ -447,6 +447,30 @@ export async function fetchCollections(): Promise<CollectionInfo[]> {
 }
 
 // =============================================================================
+// RAG Evaluation
+// =============================================================================
+
+export interface SearchLogEntry {
+  id: string
+  query: string
+  backend: string
+  use_hybrid: boolean
+  top_k: number
+  reranked: boolean
+  result_count: number
+  avg_score: number
+  max_score: number
+  latency_ms: number
+  created_at: string | null
+}
+
+export async function fetchSearchHistory(limit = 50, offset = 0): Promise<SearchLogEntry[]> {
+  const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() })
+  const response = await fetch(`${getApiV1()}/eval/search-history?${params}`)
+  return unwrap<SearchLogEntry[]>(response)
+}
+
+// =============================================================================
 // System
 // =============================================================================
 

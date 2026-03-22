@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useLayoutEffect, useState } from 'react'
 
 interface Tab {
   key: string
@@ -15,11 +15,13 @@ interface TabGroupProps {
   size?: 'sm' | 'md'
 }
 
+// NOTE: TabGroup renders only the tab buttons. Callers must wrap their content
+// area with: <div role="tabpanel" id={`tabpanel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
 export default function TabGroup({ tabs, activeTab, onChange, size = 'md' }: TabGroupProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [indicator, setIndicator] = useState({ left: 0, width: 0 })
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current
     if (!container) return
     const activeEl = container.querySelector(`[data-tab="${activeTab}"]`) as HTMLElement
