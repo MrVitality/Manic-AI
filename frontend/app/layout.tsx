@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 const themeInitScript = `
 (function() {
   try {
-    var stored = JSON.parse(localStorage.getItem('manic-ai-storage') || '{}');
+    var stored = JSON.parse(localStorage.getItem('manic-ai-ui') || '{}');
     var theme = stored && stored.state && stored.state.settings && stored.state.settings.theme;
     if (theme === 'light' || theme === 'dark') {
       document.documentElement.setAttribute('data-theme', theme);

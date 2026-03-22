@@ -16,30 +16,42 @@ export default function RagCollections({ collections, onRefresh }: RagCollection
   const [newDesc, setNewDesc] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
+  const [createError, setCreateError] = useState<string | null>(null)
+
   const handleCreate = async () => {
     if (!newName.trim()) return
     setIsCreating(true)
+    setCreateError(null)
     try {
-      const { getApiUrl } = await import('@/lib/api').then(() => {
-        // Build the URL inline
-        const stored = typeof window !== 'undefined' ? localStorage.getItem('manic-ai-storage') : null
-        let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
-        if (stored) {
-          try { const p = JSON.parse(stored); if (p?.state?.settings?.apiUrl) apiUrl = p.state.settings.apiUrl } catch {}
-        }
-        return { getApiUrl: () => apiUrl }
+      const { fetchCollections: _fc, ...api } = await import('@/lib/api')
+      // Use the same getApiV1 pattern as all other API calls
+      const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+      let apiUrl = DEFAULT_API_URL
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('manic-ai-ui')
+          if (stored) {
+            const p = JSON.parse(stored)
+            if (p?.state?.settings?.apiUrl) apiUrl = p.state.settings.apiUrl
+          }
+        } catch {}
+      }
+      const response = await fetch(`${apiUrl}/v1/collections`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim(), description: newDesc.trim() || undefined }),
       })
-      const params = new URLSearchParams({ name: newName.trim() })
-      if (newDesc.trim()) params.set('description', newDesc.trim())
-      const response = await fetch(`${getApiUrl()}/collections?${params}`, { method: 'POST' })
       if (response.ok) {
         setNewName('')
         setNewDesc('')
         setShowCreateModal(false)
         onRefresh()
+      } else {
+        const body = await response.json().catch(() => null)
+        setCreateError(body?.error?.message || `Failed (${response.status})`)
       }
     } catch (e) {
-      console.error('Failed to create collection:', e)
+      setCreateError('Network error — check API connection')
     } finally {
       setIsCreating(false)
     }
@@ -80,7 +92,7 @@ export default function RagCollections({ collections, onRefresh }: RagCollection
                 <h4 className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                   {coll.name}
                 </h4>
-                <Badge variant={coll.is_public ? 'healthy' : 'offline'} size="sm">
+                <Badge variant={coll.is_public ? 'healthy' : 'unknown'} size="sm">
                   {coll.is_public ? 'public' : 'private'}
                 </Badge>
               </div>
@@ -136,8 +148,13 @@ export default function RagCollections({ collections, onRefresh }: RagCollection
                 />
               </div>
             </div>
+            {createError && (
+              <p className="text-xs mt-2 px-2 py-1 rounded" style={{ color: 'var(--status-error)', background: 'rgba(239,68,68,0.1)' }}>
+                {createError}
+              </p>
+            )}
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowCreateModal(false)} className="flex-1 btn-secondary">Cancel</button>
+              <button onClick={() => { setShowCreateModal(false); setCreateError(null) }} className="flex-1 btn-secondary">Cancel</button>
               <button onClick={handleCreate} disabled={!newName.trim() || isCreating} className="flex-1 btn-primary">
                 {isCreating ? 'Creating...' : 'Create'}
               </button>

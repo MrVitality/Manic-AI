@@ -5,7 +5,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 const getSupabaseUrl = (): string => {
   if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('manic-ai-storage')
+      const stored = localStorage.getItem('manic-ai-ui')
       if (stored) {
         const parsed = JSON.parse(stored)
         if (parsed?.state?.settings?.supabaseUrl) {

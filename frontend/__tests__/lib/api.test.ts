@@ -97,7 +97,7 @@ describe('API URL construction', () => {
 
   it('should reject invalid API URLs from localStorage', async () => {
     localStorageMock.setItem(
-      'manic-ai-storage',
+      'manic-ai-ui',
       JSON.stringify({ state: { settings: { apiUrl: 'ftp://evil.com' } } })
     )
 

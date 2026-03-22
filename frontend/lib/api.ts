@@ -39,7 +39,7 @@ const getApiUrl = (): string => {
   // Check localStorage for user-configured API URL (from settings)
   if (typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('manic-ai-storage')
+      const stored = localStorage.getItem('manic-ai-ui')
       if (stored) {
         const parsed = JSON.parse(stored)
         const candidate = parsed?.state?.settings?.apiUrl

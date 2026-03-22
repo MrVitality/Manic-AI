@@ -108,7 +108,7 @@ export default function DashboardOverview({
                   <PulseIndicator status={svc.status} />
                   <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{svc.name}</span>
                 </div>
-                <span className="text-xs font-mono" style={{ color: svc.latency_ms ? 'var(--text-muted)' : 'var(--text-muted)' }}>
+                <span className="text-xs font-mono" style={{ color: svc.latency_ms && svc.latency_ms > 500 ? 'var(--status-warning)' : svc.latency_ms && svc.latency_ms > 1000 ? 'var(--status-error)' : 'var(--text-muted)' }}>
                   {svc.latency_ms ? `${svc.latency_ms.toFixed(0)}ms` : '--'}
                 </span>
               </div>
