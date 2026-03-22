@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatStore } from '@/lib/store'
 import { useModels } from '@/hooks/useModels'
 import { useTheme } from '@/hooks/useTheme'
+import type { Conversation } from '@/types'
 import {
   PlusIcon,
   CloseIcon,
@@ -32,6 +33,36 @@ interface NavItem {
   hint?: string
 }
 
+// Groups conversations into time-based buckets for display in the sidebar.
+function groupConversationsByDate(convos: Conversation[]): Record<string, Conversation[]> {
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfYesterday = new Date(startOfToday.getTime() - 86_400_000)
+  const startOfWeek = new Date(startOfToday.getTime() - 7 * 86_400_000)
+
+  const groups: Record<string, Conversation[]> = {
+    Today: [],
+    Yesterday: [],
+    'This Week': [],
+    Older: [],
+  }
+
+  for (const c of convos) {
+    const t = new Date(c.updatedAt).getTime()
+    if (t >= startOfToday.getTime()) {
+      groups['Today'].push(c)
+    } else if (t >= startOfYesterday.getTime()) {
+      groups['Yesterday'].push(c)
+    } else if (t >= startOfWeek.getTime()) {
+      groups['This Week'].push(c)
+    } else {
+      groups['Older'].push(c)
+    }
+  }
+
+  return groups
+}
+
 export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -43,6 +74,22 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
   const { models, selectedModel, setSelectedModel, isLoadingModels } = useModels()
   const { theme, toggleTheme } = useTheme()
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredConversations = useMemo(
+    () =>
+      conversations.filter(
+        (c) => !searchQuery || c.title.toLowerCase().includes(searchQuery.toLowerCase()),
+      ),
+    [conversations, searchQuery],
+  )
+
+  const groupedConversations = useMemo(
+    () => groupConversationsByDate(filteredConversations),
+    [filteredConversations],
+  )
+
+  const GROUP_LABELS = ['Today', 'Yesterday', 'This Week', 'Older'] as const
 
   const handleNewChat = () => {
     createConversation()
@@ -134,16 +181,80 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings }: SidebarPro
 
         {/* Conversations List (chat view) */}
         {isChatView ? (
-          <div className="flex-1 overflow-y-auto p-2">
-            {conversations.length === 0 ? (
-              <div className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>No conversations yet</div>
-            ) : (
-              <div className="space-y-1">
-                {conversations.map((conv) => (
-                  <ConversationItem key={conv.id} conversation={conv} isActive={conv.id === currentConversationId} onSelect={() => selectConversation(conv.id)} onDelete={() => deleteConversation(conv.id)} />
-                ))}
+          <div className="flex flex-col flex-1 min-h-0">
+            {/* Search input */}
+            <div className="px-2 pt-2 pb-1">
+              <div className="relative flex items-center">
+                <svg
+                  className="absolute left-2.5 w-3.5 h-3.5 pointer-events-none"
+                  style={{ color: 'var(--text-muted)' }}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search conversations..."
+                  className="w-full pl-8 pr-7 py-1.5 text-xs rounded-md focus:outline-none focus:ring-1 focus:ring-[var(--accent-indigo)]"
+                  style={{
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 p-0.5 rounded hover:opacity-70"
+                    aria-label="Clear search"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    <CloseIcon className="w-3 h-3" />
+                  </button>
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Grouped conversation list */}
+            <div className="flex-1 overflow-y-auto p-2">
+              {conversations.length === 0 ? (
+                <div className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>No conversations yet</div>
+              ) : filteredConversations.length === 0 ? (
+                <div className="text-center text-sm py-8" style={{ color: 'var(--text-muted)' }}>No results for "{searchQuery}"</div>
+              ) : (
+                <div className="space-y-3">
+                  {GROUP_LABELS.map((label) => {
+                    const group = groupedConversations[label]
+                    if (!group || group.length === 0) return null
+                    return (
+                      <div key={label}>
+                        <p
+                          className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          {label}
+                        </p>
+                        <div className="space-y-0.5">
+                          {group.map((conv) => (
+                            <ConversationItem
+                              key={conv.id}
+                              conversation={conv}
+                              isActive={conv.id === currentConversationId}
+                              onSelect={() => selectConversation(conv.id)}
+                              onDelete={() => deleteConversation(conv.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         ) : <div className="flex-1" />}
 

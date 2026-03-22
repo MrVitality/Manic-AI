@@ -8,7 +8,9 @@ import {
   type SyncFrequency,
 } from '@/lib/stores/connectorStore'
 
-const N8N_URL = 'http://localhost:5679'
+// Read n8n URL from environment variable; fall back to the standard local dev port.
+// Set NEXT_PUBLIC_N8N_URL in your .env.local to point at a remote n8n instance.
+const N8N_URL = process.env.NEXT_PUBLIC_N8N_URL ?? 'http://localhost:5679'
 
 const SYNC_OPTIONS: Array<{ value: SyncFrequency; label: string }> = [
   { value: '1h', label: 'Every hour' },
@@ -105,6 +107,10 @@ function ConnectorCard({ meta }: { readonly meta: ConnectorMeta }) {
   const isConnected = config.status === 'connected'
 
   const handleToggle = () => {
+    // NOTE: This is LOCAL-ONLY state. No API call is made to n8n or any backend.
+    // The connector is not actually connected or syncing — toggling here only
+    // persists a flag in the Zustand store (localStorage). Real connectivity
+    // requires importing the corresponding n8n workflow and activating it.
     const nextStatus = isConnected ? 'disconnected' : 'connected'
     updateConnector(meta.type, {
       status: nextStatus,
@@ -137,11 +143,11 @@ function ConnectorCard({ meta }: { readonly meta: ConnectorMeta }) {
         <div
           className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
           style={{
-            background: isConnected ? 'rgba(34,197,94,0.1)' : 'var(--bg-tertiary)',
-            border: `1px solid ${isConnected ? 'rgba(34,197,94,0.2)' : 'var(--glass-border)'}`,
+            background: isConnected ? 'rgba(234,179,8,0.1)' : 'var(--bg-tertiary)',
+            border: `1px solid ${isConnected ? 'rgba(234,179,8,0.2)' : 'var(--glass-border)'}`,
           }}
         >
-          <span className="w-5 h-5" style={{ color: isConnected ? '#22c55e' : 'var(--text-muted)' }}>
+          <span className="w-5 h-5" style={{ color: isConnected ? '#eab308' : 'var(--text-muted)' }}>
             {meta.icon}
           </span>
         </div>
@@ -152,15 +158,20 @@ function ConnectorCard({ meta }: { readonly meta: ConnectorMeta }) {
             <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
               {meta.name}
             </span>
+            {/* Status reflects local toggle state only — not actual n8n connectivity */}
             <span
               className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider"
-              style={{
-                background: isConnected ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-                color: isConnected ? '#22c55e' : '#ef4444',
-                border: `1px solid ${isConnected ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              style={isConnected ? {
+                background: 'rgba(234,179,8,0.1)',
+                color: '#eab308',
+                border: '1px solid rgba(234,179,8,0.2)',
+              } : {
+                background: 'rgba(113,113,122,0.1)',
+                color: '#71717a',
+                border: '1px solid rgba(113,113,122,0.2)',
               }}
             >
-              {isConnected ? 'Connected' : 'Disconnected'}
+              {isConnected ? 'Enabled (local)' : 'Disabled'}
             </span>
           </div>
           <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>

@@ -6,6 +6,7 @@ and uptime monitors can reach them without authentication.
 
 import asyncio
 import json
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,13 @@ from api.schemas.envelope import ok
 from api.services.rag import check_service
 
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# Simple time-based cache for the /health endpoint (5-second TTL).
+# Prevents hammering downstream services on every load-balancer probe.
+# ---------------------------------------------------------------------------
+_HEALTH_CACHE_TTL: float = 5.0
+_health_cache: Dict[str, Any] = {"data": None, "expires": 0.0}
 
 
 class ConnectionManager:
@@ -53,8 +61,12 @@ async def health_check(
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
 ) -> Dict[str, Any]:
+    now = time.monotonic()
+    if _health_cache["data"] is not None and now < _health_cache["expires"]:
+        return _health_cache["data"]
+
     ollama = await check_service(f"{settings.OLLAMA_URL}/api/tags", client)
-    return ok({
+    result = ok({
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "auth_enabled": bool(settings.API_SECRET_KEY),
@@ -68,6 +80,9 @@ async def health_check(
             "vector_dimension": settings.VECTOR_DIMENSION,
         },
     })
+    _health_cache["data"] = result
+    _health_cache["expires"] = now + _HEALTH_CACHE_TTL
+    return result
 
 
 async def _get_all_services(

@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from starlette.middleware.gzip import GZipMiddleware
+
 from api.auth import require_api_key
 from api.config import settings
 from api.exception_handlers import register_exception_handlers
@@ -12,6 +14,7 @@ from api.middleware.metrics import MetricsMiddleware
 from api.middleware.prometheus import PrometheusMiddleware
 from api.middleware.rate_limit import limiter
 from api.middleware.request_id import RequestIdMiddleware
+from api.middleware.request_size import RequestSizeLimitMiddleware
 from api.middleware.security_headers import SecurityHeadersMiddleware
 
 from api.database import init_pool, close_pool
@@ -101,13 +104,15 @@ def create_app() -> FastAPI:
     register_exception_handlers(_app)
 
     # --- Observability & security middleware ---
-    # Order matters: outermost runs first.
-    # RequestId -> SecurityHeaders -> Guardrails -> Prometheus -> Metrics
+    # Order matters: outermost runs first on request, last on response.
+    # GZip -> RequestSizeLimit -> RequestId -> SecurityHeaders -> Guardrails -> Prometheus -> Metrics
     _app.add_middleware(MetricsMiddleware)
     _app.add_middleware(PrometheusMiddleware)
     _app.add_middleware(GuardrailsMiddleware)
     _app.add_middleware(SecurityHeadersMiddleware)
     _app.add_middleware(RequestIdMiddleware)
+    _app.add_middleware(RequestSizeLimitMiddleware)
+    _app.add_middleware(GZipMiddleware, minimum_size=500)
 
     # --- API versioning ---
     v1_router = APIRouter(prefix="/v1")
