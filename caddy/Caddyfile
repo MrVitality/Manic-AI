@@ -1,0 +1,78 @@
+manixsystems.ai {
+    # Frontend (Next.js)
+    handle /chat* {
+        reverse_proxy frontend:3000
+    }
+    handle /dashboard* {
+        reverse_proxy frontend:3000
+    }
+    handle /settings* {
+        reverse_proxy frontend:3000
+    }
+    handle /admin* {
+        reverse_proxy frontend:3000
+    }
+    handle /documents* {
+        reverse_proxy frontend:3000
+    }
+    handle /models* {
+        reverse_proxy frontend:3000
+    }
+    handle /rag* {
+        reverse_proxy frontend:3000
+    }
+    handle /workbench* {
+        reverse_proxy frontend:3000
+    }
+    handle /arena* {
+        reverse_proxy frontend:3000
+    }
+    handle /tools* {
+        reverse_proxy frontend:3000
+    }
+    handle /_next/* {
+        reverse_proxy frontend:3000
+    }
+    handle /favicon* {
+        reverse_proxy frontend:3000
+    }
+
+    # API (FastAPI)
+    handle /v1/* {
+        reverse_proxy api:8081
+    }
+    handle /health* {
+        reverse_proxy api:8081
+    }
+    handle /metrics {
+        reverse_proxy api:8081
+    }
+    handle /ws/* {
+        reverse_proxy api:8081
+    }
+    handle /services/* {
+        reverse_proxy api:8081
+    }
+    handle /auth/* {
+        reverse_proxy api:8081
+    }
+
+    # Default to frontend
+    handle {
+        reverse_proxy frontend:3000
+    }
+
+    # Security headers
+    header {
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        -Server
+    }
+}
+
+# Redirect www to bare domain
+www.manixsystems.ai {
+    redir https://manixsystems.ai{uri} permanent
+}

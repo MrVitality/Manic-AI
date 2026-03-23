@@ -17,6 +17,7 @@ permissions:
   contents: read
   pull-requests: write
   security-events: write   # For SARIF upload
+  packages: write          # For GHCR image push
 
 jobs:
   # ------------------------------------------------------------------
@@ -181,14 +182,23 @@ jobs:
           name: openapi-spec
           path: api-openapi.json
       - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/Manic-AI-Prod'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v5
         with:
           context: ./api
-          push: false
-          load: true
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/Manic-AI-Prod' }}
+          load: ${{ github.event_name != 'push' || github.ref != 'refs/heads/Manic-AI-Prod' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: manic-ai-api:ci-${{ github.sha }}
+          tags: |
+            manic-ai-api:ci-${{ github.sha }}
+            ghcr.io/mrvitality/manic-ai-api:${{ github.sha }}
+            ghcr.io/mrvitality/manic-ai-api:latest
       # Trivy scan the built image
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@0.28.0
@@ -205,7 +215,7 @@ jobs:
           category: trivy-api
 
   build-frontend:
-    name: Build Frontend (Next.js)
+    name: Build Frontend (Next.js + Docker)
     runs-on: ubuntu-latest
     needs: [frontend-lint, frontend-typecheck, frontend-test]
     steps:
@@ -222,6 +232,22 @@ jobs:
           name: frontend-build
           path: frontend/.next/
           retention-days: 3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push' && github.ref == 'refs/heads/Manic-AI-Prod'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/Manic-AI-Prod' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ghcr.io/mrvitality/manic-ai-frontend:${{ github.sha }}
+            ghcr.io/mrvitality/manic-ai-frontend:latest
 
   # ------------------------------------------------------------------
   # Docker Compose validation
@@ -244,6 +270,7 @@ jobs:
           POSTGRES_PASSWORD=test
           POSTGRES_USER=postgres
           POSTGRES_DB=postgres
+          PUBLIC_DOMAIN=manixsystems.ai
           ENVEOF
           docker compose config --quiet
           echo "docker-compose.yml is valid"

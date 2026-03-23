@@ -12,9 +12,11 @@ COPY --chown=appuser:appgroup requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=appuser:appgroup . .
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 USER appuser
 
 EXPOSE 8081
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8081", "--timeout-graceful-shutdown", "30"]
+CMD ["/app/entrypoint.sh"]

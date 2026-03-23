@@ -2,6 +2,41 @@ name: manic-ai
 
 services:
   # ===========================================================================
+  # Edge — Reverse Proxy
+  # ===========================================================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: ai-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      - DOMAIN=${PUBLIC_DOMAIN:-manixsystems.ai}
+    depends_on:
+      - api
+      - frontend
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "1"
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
   # Core AI Services
   # ===========================================================================
   ollama:
@@ -1048,6 +1083,8 @@ networks:
     driver: bridge
 
 volumes:
+  caddy-data:
+  caddy-config:
   ollama-data:
   qdrant-data:
   redis-data:

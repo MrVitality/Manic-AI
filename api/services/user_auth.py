@@ -11,6 +11,7 @@ Usage:
 import asyncio
 import re
 import secrets
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import asyncpg
@@ -75,9 +76,9 @@ async def create_user(
     async with db.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO public.users (email, username, password_hash, api_key)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id::text, email, username, api_key, created_at
+            INSERT INTO public.users (email, username, password_hash, api_key, key_expires_at)
+            VALUES ($1, $2, $3, $4, NOW() + INTERVAL '90 days')
+            RETURNING id::text, email, username, api_key, created_at, key_expires_at
             """,
             email,
             username,
@@ -104,13 +105,25 @@ async def authenticate_by_api_key(
     async with db.acquire() as conn:
         row = await conn.fetchrow(
             """
-            SELECT id::text, email, username, is_admin, rate_limit_override
+            SELECT id::text, email, username, is_admin, rate_limit_override, key_expires_at
             FROM public.users
             WHERE api_key = $1 AND is_active = TRUE
             """,
             api_key,
         )
-    return dict(row) if row else None
+    if not row:
+        return None
+    record = dict(row)
+    key_expires_at = record.get("key_expires_at")
+    if key_expires_at is not None:
+        now = datetime.now(tz=timezone.utc)
+        # asyncpg returns timezone-aware datetimes for TIMESTAMPTZ columns;
+        # guard against naive datetimes just in case.
+        if key_expires_at.tzinfo is None:
+            key_expires_at = key_expires_at.replace(tzinfo=timezone.utc)
+        if now > key_expires_at:
+            return None
+    return record
 
 
 async def authenticate_by_email(

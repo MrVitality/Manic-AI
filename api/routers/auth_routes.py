@@ -6,6 +6,8 @@ here; rate limiting and guardrails middleware still run for every request.
 """
 
 import logging
+import secrets
+from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
 import asyncpg
@@ -132,3 +134,63 @@ async def register(
 
     logger.info("New user registered: %s (id=%s)", user["email"], user["id"])
     return ok({"message": "Account created", "api_key": user["api_key"]})
+
+
+@router.post("/auth/rotate-key", response_model=None, summary="Rotate the current API key")
+@limiter.limit("3/minute")
+async def rotate_key(
+    request: Request,
+    db: asyncpg.Pool = Depends(get_db),
+) -> Dict[str, Any]:
+    """Generate a new API key, invalidating the old one.
+
+    The caller must supply the current API key via ``X-API-Key``. On success
+    the response contains the new key and its expiry timestamp. The old key
+    is immediately invalidated.
+
+    Raises:
+        HTTPException 401: When no authenticated user is found on the request.
+    """
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    new_key = f"manic_{secrets.token_urlsafe(32)}"
+    new_expires = datetime.utcnow() + timedelta(days=90)
+    async with db.acquire() as conn:
+        await conn.execute(
+            "UPDATE public.users SET api_key = $1, key_expires_at = $2 WHERE id = $3",
+            new_key,
+            new_expires,
+            user["id"],
+        )
+    logger.info("API key rotated for user %s", user["id"])
+    return ok({"api_key": new_key, "expires_at": new_expires.isoformat()})
+
+
+@router.post("/auth/logout", response_model=None, summary="Invalidate the current API key")
+async def logout(
+    request: Request,
+    db: asyncpg.Pool = Depends(get_db),
+) -> Dict[str, Any]:
+    """Invalidate the current API key by replacing it with a new random key.
+
+    After calling this endpoint the caller's ``X-API-Key`` will no longer be
+    accepted. The replacement key is not returned to the client.
+
+    Raises:
+        HTTPException 401: When no authenticated user is found on the request.
+    """
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    new_key = f"manic_{secrets.token_urlsafe(32)}"
+    async with db.acquire() as conn:
+        await conn.execute(
+            "UPDATE public.users SET api_key = $1 WHERE id = $2",
+            new_key,
+            user["id"],
+        )
+    logger.info("User %s logged out — API key invalidated", user["id"])
+    return ok({"message": "Logged out. Previous API key is now invalid."})
