@@ -201,7 +201,7 @@ jobs:
             ghcr.io/mrvitality/manic-ai-api:latest
       # Trivy scan the built image
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: manic-ai-api:ci-${{ github.sha }}
           format: sarif
@@ -313,7 +313,7 @@ jobs:
 
       # Trivy filesystem scan (IaC, secrets, misconfig)
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: fs
           scan-ref: .
