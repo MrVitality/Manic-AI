@@ -181,6 +181,53 @@ async def websocket_status(
         manager.disconnect(websocket)
 
 
+@router.get("/health/ready", tags=["health"])
+async def readiness_check(
+    db: Optional[asyncpg.Pool] = Depends(get_db_optional),
+) -> Response:
+    """Readiness probe — returns 200 when DB and Redis are reachable, 503 otherwise.
+
+    Intended for use by load balancers and orchestrators to gate traffic.
+    No authentication required.
+    """
+    failures: list[str] = []
+
+    # Check DB pool
+    if db:
+        try:
+            async with db.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+        except Exception as exc:
+            logger.warning("Readiness: DB check failed: %s", exc)
+            failures.append("database")
+    else:
+        failures.append("database")
+
+    # Check Redis — read the raw client from the embedding module (shared ref)
+    try:
+        import api.services.embedding as _emb_mod
+        redis_client = _emb_mod._redis
+        if redis_client:
+            await redis_client.ping()
+        # Redis is optional — absence is not a failure, only an unreachable client is
+    except Exception as exc:
+        logger.warning("Readiness: Redis check failed: %s", exc)
+        failures.append("redis")
+
+    if failures:
+        return Response(
+            content=json.dumps({"status": "not ready", "failed": failures}),
+            status_code=503,
+            media_type="application/json",
+        )
+
+    return Response(
+        content=json.dumps({"status": "ready"}),
+        status_code=200,
+        media_type="application/json",
+    )
+
+
 @router.get("/metrics", tags=["health"], include_in_schema=False)
 async def prometheus_metrics():
     """Prometheus metrics endpoint for monitoring stack."""

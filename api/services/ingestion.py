@@ -14,6 +14,7 @@ import asyncpg
 import httpx
 
 from api.config import settings
+from api.metrics import ingest_chunks_total, ingest_documents_total
 from api.repositories.qdrant_vector import QdrantVectorRepository
 from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.schemas.ingest import IngestRequest, IngestResponse
@@ -315,6 +316,12 @@ async def ingest_document(
         else:
             status = "completed" if supabase_success else "failed"
 
+        # Record ingestion metrics
+        metric_status = "success" if status == "completed" else status  # "partial" or "failed"
+        ingest_documents_total.labels(status=metric_status).inc()
+        if status != "failed":
+            ingest_chunks_total.inc(len(chunks))
+
         return (
             IngestResponse(
                 document_id=document_id,
@@ -326,6 +333,7 @@ async def ingest_document(
         )
 
     except Exception as e:
+        ingest_documents_total.labels(status="failed").inc()
         if db and backend in ["supabase", "both"]:
             try:
                 doc_repo = SupabaseDocumentRepository(db)

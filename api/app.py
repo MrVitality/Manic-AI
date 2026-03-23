@@ -1,13 +1,18 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from starlette.middleware.gzip import GZipMiddleware
 
+from api.logging_config import setup_logging
 from api.auth import require_api_key
 from api.config import settings
+
+# Initialise JSON structured logging before any other code touches the log system
+setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 from api.exception_handlers import register_exception_handlers
 from api.middleware.guardrails import GuardrailsMiddleware
 from api.middleware.metrics import MetricsMiddleware
@@ -35,9 +40,25 @@ from api.routers import consensus as consensus_router
 logger = logging.getLogger(__name__)
 
 
+_SHUTDOWN_TIMEOUT = 30  # seconds to wait for tracked background tasks
+
+
+def track_task(app: FastAPI, coro) -> asyncio.Task:
+    """Schedule *coro* as an asyncio Task and register it for graceful shutdown.
+
+    The task is added to ``app.state.background_tasks`` and automatically
+    removed when it completes so the set does not grow unboundedly.
+    """
+    task = asyncio.create_task(coro)
+    app.state.background_tasks.add(task)
+    task.add_done_callback(app.state.background_tasks.discard)
+    return task
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup -- store resources on app.state for DI
+    app.state.background_tasks: set = set()
     await init_pool(settings.SUPABASE_DB_URL, app=app)
     await init_client(app=app)
     await init_redis(app=app)
@@ -54,7 +75,26 @@ async def lifespan(app: FastAPI):
 
     yield  # app runs
 
-    # Shutdown — cancel background tasks in reverse order.
+    # Shutdown — wait for in-flight ingestion jobs, then cancel infra tasks.
+    pending = set(app.state.background_tasks)
+    if pending:
+        logger.info(
+            "Waiting up to %ds for %d in-flight background task(s)...",
+            _SHUTDOWN_TIMEOUT,
+            len(pending),
+        )
+        try:
+            await asyncio.wait_for(
+                asyncio.shield(asyncio.gather(*pending, return_exceptions=True)),
+                timeout=_SHUTDOWN_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "%d background task(s) did not finish within %ds; proceeding with shutdown.",
+                len(pending),
+                _SHUTDOWN_TIMEOUT,
+            )
+
     await stop_folder_watcher()
     await stop_scheduler()
 
@@ -91,6 +131,15 @@ _TAGS_METADATA = [
 
 
 def create_app() -> FastAPI:
+    if settings.SENTRY_DSN:
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            environment=settings.SENTRY_ENVIRONMENT,
+            send_default_pii=False,
+        )
+
     _app = FastAPI(
         title="Manic AI API",
         description=(

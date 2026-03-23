@@ -208,23 +208,22 @@ def _detect_content_type(filename: str, mime_hint: Optional[str]) -> str:
 async def upload_and_ingest(
     request: Request,
     file: UploadFile,
+    background_tasks: BackgroundTasks,
     collection_id: Optional[str] = Form(None),
     backend: str = Form("supabase"),
     user_id: Optional[str] = Form(None),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
     client: httpx.AsyncClient = Depends(get_http_client),
 ):
-    """Accept a multipart/form-data file upload and ingest it synchronously.
+    """Accept a multipart/form-data file upload and ingest it asynchronously.
 
     Supported file types: ``.txt``, ``.md``, ``.html``, ``.docx``, ``.pdf``
 
-    PDF files are handled via the binary path (base64-encoded content passed to
-    the standard ingestion pipeline).  All other file types are decoded as UTF-8
-    text.
+    Returns 202 Accepted immediately with a ``document_id``.
+    Use ``GET /v1/ingest/{document_id}/status`` to poll for completion.
 
-    Returns the ingestion result immediately.  Duplicate files are detected by
-    SHA-256 hash of the raw bytes and return ``status: duplicate`` without
-    re-processing.
+    Duplicate files are detected by SHA-256 hash of the raw bytes and return
+    ``status: duplicate`` without re-processing.
     """
     import base64
     import os
@@ -295,8 +294,23 @@ async def upload_and_ingest(
         backend=backend,
     )
 
-    result, _flag = await ingest_document(ingest_req, db, client)
-    return ok(result.model_dump())
+    document_id = str(uuid4())
+
+    # Seed in-memory tracker
+    _update_job(document_id, status="pending", filename=filename)
+
+    # Seed database row (best-effort)
+    if db:
+        await create_ingest_job(db, document_id, filename)
+
+    # Schedule actual work in the background — return 202 immediately
+    background_tasks.add_task(run_ingest_background, document_id, ingest_req, db, client)
+
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=202,
+        content=ok(IngestAccepted(document_id=document_id, status="processing").model_dump()),
+    )
 
 
 # ---------------------------------------------------------------------------

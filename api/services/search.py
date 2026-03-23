@@ -11,6 +11,7 @@ import asyncpg
 import httpx
 
 from api.config import settings
+from api.metrics import rag_queries_total, search_latency_seconds
 from api.repositories.qdrant_vector import QdrantVectorRepository
 from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.repositories.supabase_vector import SupabaseVectorRepository
@@ -104,6 +105,13 @@ async def unified_search(
             cached = await _redis.get(cache_key)
             if cached:
                 logger.debug("Search cache hit for key %s", cache_key)
+                duration = time.time() - start
+                search_latency_seconds.labels(backend=backend).observe(duration)
+                rag_queries_total.labels(
+                    backend=backend,
+                    search_type="hybrid" if use_hybrid else "vector",
+                    cache_hit="true",
+                ).inc()
                 return json.loads(cached)
         except Exception as exc:
             logger.warning("Redis search cache get failed: %s", exc)
@@ -228,8 +236,17 @@ async def unified_search(
         except Exception as exc:
             logger.warning("Redis search cache set failed: %s", exc)
 
+    # Record Prometheus metrics for this search
+    _duration = time.time() - start
+    search_latency_seconds.labels(backend=backend).observe(_duration)
+    rag_queries_total.labels(
+        backend=backend,
+        search_type="hybrid" if use_hybrid else "vector",
+        cache_hit="false",
+    ).inc()
+
     # Log search event (best-effort, does not block response)
-    latency_ms = round((time.time() - start) * 1000, 1)
+    latency_ms = round(_duration * 1000, 1)
     task = asyncio.create_task(log_search(
         db=db,
         query=query_text,

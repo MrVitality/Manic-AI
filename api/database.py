@@ -7,15 +7,30 @@ compatibility with the health-logger background task and the DDL runner.
 """
 
 import asyncpg
+import logging
 from typing import Optional
 from fastapi import HTTPException
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
+logger = logging.getLogger(__name__)
 
 _pool: Optional[asyncpg.Pool] = None
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type((OSError, asyncpg.PostgresConnectionError)),
+    reraise=True,
+)
+async def _create_pool(dsn: str) -> asyncpg.Pool:
+    """Create the asyncpg connection pool with retry on transient failures."""
+    return await asyncpg.create_pool(dsn, min_size=2, max_size=10, command_timeout=30)
+
+
 async def init_pool(dsn: str, *, app=None):
     """Create the connection pool and optionally attach it to app.state."""
-    pool = await asyncpg.create_pool(dsn, min_size=2, max_size=10, command_timeout=30)
+    pool = await _create_pool(dsn)
     # Store module reference for legacy callers
     _set_pool(pool)
     if app is not None:

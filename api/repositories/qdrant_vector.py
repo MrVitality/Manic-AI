@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import httpx
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,25 @@ class QdrantVectorRepository:
     def __init__(self, base_url: str, client: httpx.AsyncClient) -> None:
         self._base_url = base_url.rstrip("/")
         self._client = client
+
+    @retry(
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=0.5, min=0.5, max=5),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
+        reraise=True,
+    )
+    async def _search_request(
+        self,
+        collection_name: str,
+        payload: Dict[str, Any],
+    ) -> Any:
+        response = await self._client.post(
+            f"{self._base_url}/collections/{collection_name}/points/search",
+            json=payload,
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        return response.json()
 
     async def search(
         self,
@@ -36,12 +56,7 @@ class QdrantVectorRepository:
                 "must": [{"key": k, "match": {"value": v}} for k, v in filters.items() if v]
             }
         try:
-            response = await self._client.post(
-                f"{self._base_url}/collections/{collection_name}/points/search",
-                json=payload,
-                timeout=30.0,
-            )
-            response.raise_for_status()
+            data = await self._search_request(collection_name, payload)
             return [
                 {
                     "id": str(r["id"]),
@@ -51,7 +66,7 @@ class QdrantVectorRepository:
                     "score": float(r["score"]),
                     "backend": "qdrant",
                 }
-                for r in response.json().get("result", [])
+                for r in data.get("result", [])
             ]
         except Exception as e:
             logger.error("Qdrant search: %s", e)
@@ -84,14 +99,9 @@ class QdrantVectorRepository:
                 "must": [{"key": k, "match": {"value": v}} for k, v in filters.items() if v]
             }
         try:
-            response = await self._client.post(
-                f"{self._base_url}/collections/{collection_name}/points/search",
-                json=payload,
-                timeout=30.0,
-            )
-            response.raise_for_status()
+            data = await self._search_request(collection_name, payload)
             results = []
-            for r in response.json().get("result", []):
+            for r in data.get("result", []):
                 # Qdrant may return a list (unnamed vectors) or a dict (named).
                 raw_vec = r.get("vector")
                 embedding: List[float] = raw_vec if isinstance(raw_vec, list) else []
@@ -109,18 +119,31 @@ class QdrantVectorRepository:
             logger.error("Qdrant search_with_vectors: %s", e)
             return []
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=0.5, min=0.5, max=5),
+        retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException)),
+        reraise=True,
+    )
+    async def _upsert_request(
+        self,
+        collection_name: str,
+        points: List[Dict[str, Any]],
+    ) -> None:
+        response = await self._client.put(
+            f"{self._base_url}/collections/{collection_name}/points",
+            json={"points": points},
+            timeout=60.0,
+        )
+        response.raise_for_status()
+
     async def upsert(
         self,
         collection_name: str,
         points: List[Dict[str, Any]],
     ) -> bool:
         try:
-            response = await self._client.put(
-                f"{self._base_url}/collections/{collection_name}/points",
-                json={"points": points},
-                timeout=60.0,
-            )
-            response.raise_for_status()
+            await self._upsert_request(collection_name, points)
             return True
         except Exception as e:
             logger.error("Qdrant upsert: %s", e)

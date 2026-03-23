@@ -2,12 +2,14 @@
 
 import json
 import logging
+import time
 from hashlib import sha256
 from typing import List, Optional
 
 import httpx
 
 from api.config import settings
+from api.metrics import embedding_cache_total, embedding_duration_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -52,20 +54,25 @@ async def generate_embedding(
         try:
             cached = await _redis.get(cache_key)
             if cached:
+                embedding_cache_total.labels(result="hit").inc()
                 return json.loads(cached)
         except Exception as e:
             logger.warning("Redis get failed: %s", e)
+
+    embedding_cache_total.labels(result="miss").inc()
 
     own_client = client is None
     if own_client:
         client = httpx.AsyncClient(timeout=60.0)
     try:
+        _embed_start = time.monotonic()
         response = await client.post(
             f"{settings.OLLAMA_URL}/api/embeddings",
             json={"model": model, "prompt": text},
         )
         response.raise_for_status()
         embedding = response.json()["embedding"]
+        embedding_duration_seconds.observe(time.monotonic() - _embed_start)
     finally:
         if own_client:
             await client.aclose()

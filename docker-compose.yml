@@ -16,6 +16,7 @@ services:
       resources:
         limits:
           memory: 8G
+          cpus: "4"
         reservations:
           devices:
             - driver: nvidia
@@ -50,6 +51,7 @@ services:
       resources:
         limits:
           memory: 2G
+          cpus: "2"
     networks:
       - app-network
     healthcheck:
@@ -125,6 +127,7 @@ services:
       resources:
         limits:
           memory: 2G
+          cpus: "2"
     networks:
       - db-network
     healthcheck:
@@ -560,6 +563,7 @@ services:
       dockerfile: Dockerfile
     container_name: manic-ai-api
     restart: unless-stopped
+    stop_grace_period: 35s
     ports:
       - "${BIND_IP}:8081:8081"
     environment:
@@ -579,6 +583,8 @@ services:
       LANGFUSE_HOST: http://langfuse:3000
       INFERENCE_BACKEND: ${INFERENCE_BACKEND:-ollama}
       VLLM_URL: ${VLLM_URL:-}
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://ai-jaeger:4317"
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -596,6 +602,7 @@ services:
       resources:
         limits:
           memory: 1G
+          cpus: "2"
     networks:
       - db-network
       - app-network
@@ -645,6 +652,7 @@ services:
       resources:
         limits:
           memory: 1G
+          cpus: "1"
     networks:
       - db-network
       - app-network
@@ -682,6 +690,7 @@ services:
       resources:
         limits:
           memory: 512M
+          cpus: "1"
     networks:
       - app-network
     healthcheck:

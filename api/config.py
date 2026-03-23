@@ -79,9 +79,17 @@ class Settings(BaseSettings):
     GUARDRAILS_ENABLED: bool = True
     PII_REDACTION_ENABLED: bool = False
 
+    # --- Sentry error tracking ---
+    SENTRY_DSN: str = ""
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+    SENTRY_ENVIRONMENT: str = "development"
+
     # --- OpenTelemetry distributed tracing ---
     OTEL_ENABLED: bool = False
     OTEL_EXPORTER_OTLP_ENDPOINT: str = ""  # e.g., "http://jaeger:4317"
+
+    # --- Logging ---
+    LOG_LEVEL: str = "INFO"
 
     # --- CORS ---
     CORS_ORIGINS: str = ""
