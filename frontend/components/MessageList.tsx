@@ -298,7 +298,7 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
               <span className="text-sm">Thinking...</span>
             </div>
           ) : (
-            <div className="prose-chat">
+            <div className="prose-chat" aria-live={message.isStreaming ? 'polite' : undefined} aria-atomic="false">
               <ReactMarkdown
                 remarkPlugins={[remarkMath]}
                 rehypePlugins={[rehypeKatex]}

@@ -1049,6 +1049,25 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: ai-blackbox-exporter
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    networks:
+      - monitoring-network
+      - app-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   node-exporter:
     image: prom/node-exporter:v1.7.0
     container_name: ai-node-exporter

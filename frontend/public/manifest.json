@@ -1,0 +1,12 @@
+{
+  "name": "Manic AI",
+  "short_name": "Manic AI",
+  "description": "Full-stack AI platform with RAG capabilities",
+  "start_url": "/chat",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#3b82f6",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

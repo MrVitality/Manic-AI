@@ -83,6 +83,7 @@ export const useUiStore = create<UiState>()(
         sidebarCollapsed: state.sidebarCollapsed,
         settings: state.settings,
         useRag: state.useRag,
+        useAgentMode: state.useAgentMode,
       }),
     }
   )

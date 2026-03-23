@@ -10,8 +10,20 @@ const jetbrains = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' }
 export const metadata: Metadata = {
   title: 'Manic AI',
   description: 'Chat with local AI models, manage documents, and more. Powered by Ollama.',
+  manifest: '/manifest.json',
   icons: {
     icon: '/favicon.svg',
+  },
+  openGraph: {
+    title: 'Manic AI',
+    description: 'Full-stack AI platform with RAG capabilities',
+    type: 'website',
+    siteName: 'Manic AI',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Manic AI',
+    description: 'Full-stack AI platform with RAG capabilities',
   },
 }
 

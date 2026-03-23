@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useChatStore } from '@/lib/store'
+import { useUiStore } from '@/lib/stores/uiStore'
 import { checkHealth } from '@/lib/api'
 import GlassPanel from '@/components/ui/GlassPanel'
 
@@ -9,6 +10,37 @@ export default function GeneralSettings() {
   const { settings, updateSettings } = useChatStore()
   const [showApiKey, setShowApiKey] = useState(false)
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
+  const [importError, setImportError] = useState<string | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
+
+  const handleExport = () => {
+    const currentSettings = useUiStore.getState().settings
+    const blob = new Blob([JSON.stringify(currentSettings, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'manic-ai-settings.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportError(null)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const imported = JSON.parse(ev.target?.result as string)
+        useUiStore.getState().updateSettings(imported)
+      } catch {
+        setImportError('Invalid settings file — could not parse JSON.')
+      }
+    }
+    reader.readAsText(file)
+    // Reset input so the same file can be re-imported if needed
+    e.target.value = ''
+  }
 
   const handleTestConnection = async () => {
     setTestStatus('testing')
@@ -166,6 +198,50 @@ export default function GeneralSettings() {
               onChange={(e) => updateSettings({ dashboardRefreshRate: parseInt(e.target.value) })}
               className="w-full accent-blue-500"
             />
+          </div>
+        </GlassPanel>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Settings Data</h3>
+        <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>Export your settings as a JSON file or import a previously saved configuration</p>
+        <GlassPanel className="p-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleExport}
+              className="px-3 py-1.5 text-xs rounded-lg font-medium transition-colors flex-shrink-0"
+              style={{
+                background: 'rgba(129,140,248,0.1)',
+                color: 'var(--accent-blue)',
+                border: '1px solid rgba(129,140,248,0.2)',
+              }}
+            >
+              Export Settings
+            </button>
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              className="px-3 py-1.5 text-xs rounded-lg font-medium transition-colors flex-shrink-0"
+              style={{
+                background: 'rgba(129,140,248,0.1)',
+                color: 'var(--accent-blue)',
+                border: '1px solid rgba(129,140,248,0.2)',
+              }}
+            >
+              Import Settings
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImport}
+              className="hidden"
+              aria-label="Import settings JSON file"
+            />
+            {importError && (
+              <span className="text-xs" style={{ color: '#ef4444' }}>{importError}</span>
+            )}
           </div>
         </GlassPanel>
       </div>

@@ -1,0 +1,53 @@
+# Production overrides — use with: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+services:
+  api:
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=WARNING
+      - OTEL_ENABLED=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://ai-jaeger:4317
+
+  frontend:
+    restart: always
+    environment:
+      - NODE_ENV=production
+
+  caddy:
+    restart: always
+
+  supabase-db:
+    restart: always
+
+  redis:
+    restart: always
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD}
+
+  qdrant:
+    restart: always
+
+  ollama:
+    restart: always
+
+  prometheus:
+    restart: always
+
+  grafana:
+    restart: always
+
+  loki:
+    restart: always
+
+  promtail:
+    restart: always
+
+  alertmanager:
+    restart: always
+
+  backup:
+    restart: always
