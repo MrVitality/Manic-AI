@@ -274,11 +274,11 @@ export default function WorkbenchPage() {
         </div>
       </div>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Left panel: inputs ~60% */}
+      <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
+        {/* Left panel: inputs */}
         <div
-          className="flex flex-col min-h-0 border-r"
-          style={{ width: '60%', borderColor: 'var(--border-color)' }}
+          className="w-full md:w-3/5 flex flex-col min-h-0 border-b md:border-b-0 md:border-r"
+          style={{ borderColor: 'var(--border-color)' }}
         >
           {/* System prompt */}
           <div className="flex flex-col flex-1 min-h-0 p-4 gap-2">
@@ -416,7 +416,7 @@ export default function WorkbenchPage() {
         </div>
 
         {/* Right panel: results grid or version panel */}
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="w-full md:flex-1 min-h-0 flex flex-col overflow-hidden">
           {showVersionPanel ? (
             <div className="flex flex-col h-full overflow-hidden">
               <div

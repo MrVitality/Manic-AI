@@ -9,9 +9,17 @@ import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import dynamic from 'next/dynamic'
+
+const SyntaxHighlighter = dynamic(
+  () => import('react-syntax-highlighter').then((mod) => mod.Prism || mod.default),
+  { ssr: false, loading: () => <pre className="p-4 rounded bg-black/20 animate-pulse">Loading...</pre> }
+)
+
+// oneDark is a plain JS object — import it statically so it's available when SyntaxHighlighter renders
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import MermaidDiagram from './MermaidDiagram'
+
+const MermaidDiagram = dynamic(() => import('./MermaidDiagram'), { ssr: false })
 import ToolCallCard from './ToolCallCard'
 import type { ToolCallData } from './ToolCallCard'
 import type { Message, RagSource, ToolCallInfo } from '@/types'

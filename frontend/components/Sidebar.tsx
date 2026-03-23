@@ -203,7 +203,7 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
       <aside
         role="navigation"
         aria-label="Main navigation"
-        className={`fixed md:relative inset-y-0 left-0 z-30 w-72 flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:w-0 md:border-0 md:overflow-hidden'}`}
+        className={`fixed md:relative inset-y-0 left-0 z-30 w-72 max-w-[85vw] flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:w-0 md:border-0 md:overflow-hidden'}`}
         style={{ background: 'var(--bg-secondary)', borderRight: '1px solid var(--border-color)' }}
       >
         {/* Header */}

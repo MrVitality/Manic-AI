@@ -142,6 +142,30 @@ export default function CommandPalette() {
     }
   }, [selectedIndex, filtered, close, setSelectedIndex, executeCommand])
 
+  // Focus trap: keep Tab navigation inside the palette
+  const handleOverlayKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== 'Tab') return
+    const palette = e.currentTarget.querySelector('[role="dialog"]') as HTMLElement | null
+    if (!palette) return
+    const focusable = palette.querySelectorAll<HTMLElement>(
+      'input, button, [tabindex]:not([tabindex="-1"])'
+    )
+    if (focusable.length === 0) return
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+  }, [])
+
   if (!isOpen) return null
 
   const categoryLabels: Record<string, string> = {
@@ -173,6 +197,7 @@ export default function CommandPalette() {
     <div
       className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
       onClick={close}
+      onKeyDown={handleOverlayKeyDown}
     >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-palette-enter" />

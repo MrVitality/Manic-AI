@@ -367,9 +367,9 @@ export default function ArenaPage() {
       </div>
 
       {/* Response panels */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-hidden">
         <ArenaPanel label="MODEL_A" model={modelA} state={panelA} accentVar="var(--accent-primary)" />
-        <div className="w-px shrink-0" style={{ background: 'var(--border-color)' }} />
+        <div className="md:w-px w-full h-px md:h-auto shrink-0" style={{ background: 'var(--border-color)' }} />
         <ArenaPanel label="MODEL_B" model={modelB} state={panelB} accentVar="var(--accent-cyan)" />
       </div>
 
@@ -475,7 +475,7 @@ function ArenaPanel({
   accentVar: string
 }) {
   return (
-    <div className="flex-1 flex flex-col min-h-0 min-w-0">
+    <div className="w-full md:flex-1 flex flex-col min-h-0 min-w-0">
       {/* Panel header */}
       <div
         className="flex items-center justify-between px-4 py-2.5 border-b shrink-0 text-xs"
