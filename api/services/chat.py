@@ -104,10 +104,11 @@ async def log_chat(
         async with db.acquire() as conn:
             await conn.execute(
                 """INSERT INTO public.chat_log
-                   (model, prompt_tokens, completion_tokens, total_tokens, latency_ms, has_rag)
-                   VALUES ($1, $2, $3, $4, $5, $6)""",
+                   (model, prompt_tokens, completion_tokens, total_tokens, latency_ms, has_rag, user_id)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)""",
                 model, prompt_tokens, completion_tokens,
                 prompt_tokens + completion_tokens, latency_ms, has_rag,
+                None,  # user_id: placeholder until per-request auth propagation is wired
             )
     except Exception:
         logger.warning("chat_log write failed", exc_info=True)

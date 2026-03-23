@@ -25,7 +25,8 @@ from api.services.health_logger import health_log_loop
 from api.plugins import load_plugins
 
 # Import all routers
-from api.routers import health, chat, ingest, documents, collections, qdrant, search, analytics, system, models, agent, eval as eval_router, feedback as feedback_router, plugins as plugins_router, admin as admin_router
+from api.routers import health, chat, ingest, documents, collections, qdrant, search, analytics, system, models, agent, eval as eval_router, feedback as feedback_router, plugins as plugins_router, admin as admin_router, conversations as conversations_router
+from api.routers import auth_routes
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ async def lifespan(app: FastAPI):
 
 _TAGS_METADATA = [
     {"name": "health", "description": "Health checks and service status (unauthenticated)"},
+    {"name": "auth", "description": "Authentication — obtain an API key via email + password (unauthenticated)"},
     {"name": "chat", "description": "Chat completion and streaming inference"},
     {"name": "search", "description": "Hybrid vector + BM25 search (POST bodies used for complex query parameters)"},
     {"name": "ingest", "description": "Document ingestion and embedding generation"},
@@ -69,6 +71,7 @@ _TAGS_METADATA = [
     {"name": "feedback", "description": "User feedback on chat responses for RAG quality tracking"},
     {"name": "plugins", "description": "Plugin management — list installed plugins and execute plugin tools"},
     {"name": "admin", "description": "Admin-only: user management, account control, and system statistics"},
+    {"name": "conversations", "description": "Server-side conversation and message persistence"},
 ]
 
 
@@ -125,6 +128,9 @@ def create_app() -> FastAPI:
     # Mounted at root for load-balancer probes.
     _app.include_router(health.router, tags=["health"])
 
+    # Auth router is public — clients need it to obtain their API key.
+    _app.include_router(auth_routes.router, tags=["auth"])
+
     # All other routers require API key authentication, under /v1/
     auth_dep = [Depends(require_api_key)]
     v1_router.include_router(chat.router, dependencies=auth_dep, tags=["chat"])
@@ -142,6 +148,7 @@ def create_app() -> FastAPI:
     v1_router.include_router(plugins_router.router, dependencies=auth_dep, tags=["plugins"])
     # Admin router: base auth_dep runs first, then require_admin enforces admin-level access per endpoint
     v1_router.include_router(admin_router.router, dependencies=auth_dep, tags=["admin"])
+    v1_router.include_router(conversations_router.router, dependencies=auth_dep, tags=["conversations"])
 
     _app.include_router(v1_router)
 

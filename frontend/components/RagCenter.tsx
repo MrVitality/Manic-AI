@@ -111,6 +111,7 @@ export default function RagCenter() {
               searchLatency={searchLatency}
               isSearching={isSearching}
               searchConfig={searchConfig}
+              collections={collections}
               onSearch={performSearch}
               onConfigChange={(updates) => setSearchConfig({ ...searchConfig, ...updates })}
             />

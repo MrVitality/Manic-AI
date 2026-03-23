@@ -67,11 +67,13 @@ export function useChatStore() {
     isGenerating: uiState.isGenerating,
     error: uiState.error,
     useRag: uiState.useRag,
+    useAgentMode: uiState.useAgentMode,
     serviceStatuses: uiState.serviceStatuses,
     settings: uiState.settings,
     setIsGenerating: uiState.setIsGenerating,
     setError: uiState.setError,
     setUseRag: uiState.setUseRag,
+    setUseAgentMode: uiState.setUseAgentMode,
     setServiceStatuses: uiState.setServiceStatuses,
     updateSettings: uiState.updateSettings,
   }

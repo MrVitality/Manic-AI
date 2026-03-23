@@ -37,6 +37,8 @@ export interface Conversation {
   model: string
   createdAt: Date
   updatedAt: Date
+  systemPrompt?: string
+  titleGenerated?: boolean
 }
 
 // Model types
@@ -236,6 +238,8 @@ export interface SearchConfig {
   backend: 'supabase' | 'qdrant' | 'both'
   collectionId: string | null
   includeVectors: boolean
+  rerank: boolean
+  keywordWeight: number
 }
 
 export interface SearchExplainResult {

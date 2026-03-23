@@ -22,6 +22,7 @@ import {
   DownloadIcon,
   UploadIcon,
   AdminIcon,
+  MarkdownIcon,
 } from '@/components/ui/Icons'
 
 interface SidebarProps {
@@ -76,7 +77,7 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
     createConversation, selectConversation, deleteConversation,
     clearConversations,
   } = useChatStore()
-  const { importConversation } = useConversationStore()
+  const { importConversation, exportAsMarkdown } = useConversationStore()
   const { models, selectedModel, setSelectedModel, isLoadingModels } = useModels()
   const { theme, toggleTheme } = useTheme()
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -344,6 +345,7 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
                               onSelect={() => selectConversation(conv.id)}
                               onDelete={() => deleteConversation(conv.id)}
                               onExport={() => handleExport(conv)}
+                              onExportMarkdown={() => exportAsMarkdown(conv.id)}
                             />
                           ))}
                         </div>
@@ -385,16 +387,32 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
   )
 }
 
-function ConversationItem({ conversation, isActive, onSelect, onDelete, onExport }: { conversation: { id: string; title: string; messages: Array<{ role: string }> }; isActive: boolean; onSelect: () => void; onDelete: () => void; onExport: () => void }) {
+function ConversationItem({
+  conversation,
+  isActive,
+  onSelect,
+  onDelete,
+  onExport,
+  onExportMarkdown,
+}: {
+  conversation: { id: string; title: string; messages: Array<{ role: string }> }
+  isActive: boolean
+  onSelect: () => void
+  onDelete: () => void
+  onExport: () => void
+  onExportMarkdown: () => void
+}) {
   return (
-    <div className="group relative flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors focus-within:opacity-100"
+    <div
+      className="group relative flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors focus-within:opacity-100"
       style={{
         background: isActive ? 'rgba(129, 140, 248, 0.08)' : 'transparent',
         borderLeft: isActive ? '2px solid var(--accent-indigo)' : '2px solid transparent',
         paddingLeft: isActive ? 10 : 12,
         color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}
-      onClick={onSelect}>
+      onClick={onSelect}
+    >
       <ChatBubbleIcon className="w-4 h-4 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm truncate">{conversation.title}</p>
@@ -402,8 +420,18 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete, onExport
       </div>
       <button
         tabIndex={0}
+        onClick={(e) => { e.stopPropagation(); onExportMarkdown() }}
+        aria-label={`Export as Markdown: ${conversation.title}`}
+        title="Export as Markdown"
+        className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-purple-500/20 focus:bg-purple-500/20 text-purple-400"
+      >
+        <MarkdownIcon className="w-3.5 h-3.5" />
+      </button>
+      <button
+        tabIndex={0}
         onClick={(e) => { e.stopPropagation(); onExport() }}
-        aria-label={`Export conversation: ${conversation.title}`}
+        aria-label={`Export conversation as JSON: ${conversation.title}`}
+        title="Export as JSON"
         className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-blue-500/20 focus:bg-blue-500/20 text-blue-400"
       >
         <DownloadIcon className="w-3.5 h-3.5" />
@@ -412,6 +440,7 @@ function ConversationItem({ conversation, isActive, onSelect, onDelete, onExport
         tabIndex={0}
         onClick={(e) => { e.stopPropagation(); onDelete() }}
         aria-label={`Delete conversation: ${conversation.title}`}
+        title="Delete"
         className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-red-500/20 focus:bg-red-500/20 text-red-500"
       >
         <TrashIcon className="w-3.5 h-3.5" />

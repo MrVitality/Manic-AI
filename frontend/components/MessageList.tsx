@@ -4,8 +4,12 @@ import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { RefreshIcon } from '@/components/ui/Icons'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import ReactMarkdown from 'react-markdown'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import MermaidDiagram from './MermaidDiagram'
 import ToolCallCard from './ToolCallCard'
 import type { ToolCallData } from './ToolCallCard'
 import type { Message, RagSource, ToolCallInfo } from '@/types'
@@ -174,9 +178,13 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
           ) : (
             <div className="prose-chat">
               <ReactMarkdown
+                remarkPlugins={[remarkMath]}
+                rehypePlugins={[rehypeKatex]}
                 components={{
                   code({ node, className, children, ...props }) {
                     const match = /language-(\w+)/.exec(className || '')
+                    const language = match?.[1] ?? ''
+                    const codeText = String(children).replace(/\n$/, '')
                     const isInline = !match && !String(children).includes('\n')
 
                     if (isInline) {
@@ -191,14 +199,20 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
                       )
                     }
 
+                    if (language === 'mermaid') {
+                      // Derive a stable ID from the message id and a hash of the code
+                      const diagramId = `${message.id}-${codeText.length}`
+                      return <MermaidDiagram code={codeText} id={diagramId} />
+                    }
+
                     return (
                       <div className="relative group">
                         <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          <CopyButton text={String(children).replace(/\n$/, '')} />
+                          <CopyButton text={codeText} />
                         </div>
                         <SyntaxHighlighter
                           style={oneDark}
-                          language={match?.[1] || 'text'}
+                          language={language || 'text'}
                           PreTag="div"
                           customStyle={{
                             margin: 0,
@@ -207,7 +221,7 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
                             border: '1px solid var(--border-color)',
                           }}
                         >
-                          {String(children).replace(/\n$/, '')}
+                          {codeText}
                         </SyntaxHighlighter>
                       </div>
                     )

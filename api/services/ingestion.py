@@ -1,11 +1,12 @@
 """Document ingestion business logic."""
 
 import asyncio
+import hashlib
 import json
 import logging
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
 import asyncpg
@@ -114,6 +115,37 @@ async def fetch_ingest_job(
 
 
 # ---------------------------------------------------------------------------
+# Duplicate detection helpers
+# ---------------------------------------------------------------------------
+
+def compute_content_hash(content: str) -> str:
+    """Return a SHA-256 hex digest of the UTF-8 encoded content string."""
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def compute_content_hash_bytes(data: bytes) -> str:
+    """Return a SHA-256 hex digest of raw bytes (used for binary content like PDFs)."""
+    return hashlib.sha256(data).hexdigest()
+
+
+async def find_duplicate_document(
+    db: asyncpg.Pool,
+    content_hash: str,
+) -> Optional[str]:
+    """Return the existing document_id if a document with this hash is already stored, else None."""
+    try:
+        async with db.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id::text FROM rag.documents WHERE content_hash = $1 LIMIT 1",
+                content_hash,
+            )
+            return row["id"] if row else None
+    except Exception:
+        logger.warning("Duplicate check query failed for hash %s", content_hash[:16])
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Core pipeline (runs synchronously or as a background task)
 # ---------------------------------------------------------------------------
 
@@ -121,8 +153,13 @@ async def ingest_document(
     request: IngestRequest,
     db: Optional[asyncpg.Pool],
     client: httpx.AsyncClient,
-) -> IngestResponse:
-    """Chunk, embed, and store a document in the requested backend(s)."""
+) -> Tuple[IngestResponse, str]:
+    """Chunk, embed, and store a document in the requested backend(s).
+
+    Returns a tuple of ``(IngestResponse, status_flag)`` where ``status_flag``
+    is ``"duplicate"`` when a document with the same content hash already exists,
+    otherwise ``"new"``.
+    """
     document_id = str(uuid4())
     backend = request.backend or "both"
     qdrant_success = False
@@ -132,6 +169,26 @@ async def ingest_document(
     try:
         # Preprocess content based on content_type
         content = detect_and_extract(request.content, request.content_type or "text/plain")
+
+        # Duplicate detection — hash the raw request content (pre-extraction)
+        content_hash = compute_content_hash(request.content)
+        if db:
+            existing_id = await find_duplicate_document(db, content_hash)
+            if existing_id:
+                logger.info(
+                    "Duplicate document detected for '%s' — existing id=%s",
+                    request.filename,
+                    existing_id,
+                )
+                return (
+                    IngestResponse(
+                        document_id=existing_id,
+                        filename=request.filename,
+                        chunks_created=0,
+                        status="duplicate",
+                    ),
+                    "duplicate",
+                )
 
         # Redact PII from content before chunking when enabled
         if settings.PII_REDACTION_ENABLED:
@@ -185,6 +242,7 @@ async def ingest_document(
                 chunk_embeddings=chunk_embeddings,
                 raw_content=request.content,
                 processing_time_ms=processing_time_ms,
+                content_hash=content_hash,
             )
             supabase_success = True
 
@@ -224,11 +282,14 @@ async def ingest_document(
         else:
             status = "completed" if supabase_success else "failed"
 
-        return IngestResponse(
-            document_id=document_id,
-            filename=request.filename,
-            chunks_created=len(chunks),
-            status=status,
+        return (
+            IngestResponse(
+                document_id=document_id,
+                filename=request.filename,
+                chunks_created=len(chunks),
+                status=status,
+            ),
+            "new",
         )
 
     except Exception as e:
@@ -261,7 +322,7 @@ async def run_ingest_background(
         await _db_set_status(db, document_id, "processing")
 
     try:
-        result = await ingest_document(request, db, client)
+        result, _flag = await ingest_document(request, db, client)
         _update_job(
             document_id,
             status=result.status,

@@ -214,6 +214,7 @@ export interface StreamEvent {
 export async function* streamChat(
   options: ChatOptions,
   signal?: AbortSignal,
+  endpoint: 'chat' | 'agent' = 'chat',
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const { model, messages, temperature = 0.7, systemPrompt, useRag = false } = options
 
@@ -221,7 +222,8 @@ export async function* streamChat(
     ? [{ role: 'system', content: systemPrompt }, ...messages]
     : messages
 
-  const response = await fetch(`${getApiV1()}/chat/stream`, {
+  const streamPath = endpoint === 'agent' ? '/agent/stream' : '/chat/stream'
+  const response = await fetch(`${getApiV1()}${streamPath}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -450,6 +452,8 @@ export async function searchExplain(request: {
   collection_id?: string | null
   include_vectors?: boolean
   backend?: string
+  rerank?: boolean
+  keyword_weight?: number
 }): Promise<SearchExplainResponse> {
   const response = await fetch(`${getApiV1()}/search/explain`, {
     method: 'POST',
@@ -503,6 +507,48 @@ export async function fetchSearchHistory(limit = 50, offset = 0): Promise<Search
   const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() })
   const response = await fetch(`${getApiV1()}/eval/search-history?${params}`)
   return unwrap<SearchLogEntry[]>(response)
+}
+
+export interface EvalRequest {
+  query: string
+  expected_doc_ids: string[]
+  top_k: number
+}
+
+export interface EvalMetrics {
+  precision: number
+  recall: number
+  ndcg: number
+  mrr: number
+  query?: string
+  top_k?: number
+}
+
+export interface BatchEvalRequest {
+  test_cases: EvalRequest[]
+}
+
+export interface BatchEvalResult {
+  results: EvalMetrics[]
+  aggregate: EvalMetrics
+}
+
+export async function runEval(request: EvalRequest): Promise<EvalMetrics> {
+  const response = await fetch(`${getApiV1()}/eval/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  return unwrap<EvalMetrics>(response)
+}
+
+export async function runBatchEval(request: BatchEvalRequest): Promise<BatchEvalResult> {
+  const response = await fetch(`${getApiV1()}/eval/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  return unwrap<BatchEvalResult>(response)
 }
 
 // =============================================================================

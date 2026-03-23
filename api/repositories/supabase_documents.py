@@ -149,16 +149,17 @@ class SupabaseDocumentRepository:
         chunk_embeddings: List[List[float]],
         raw_content: Optional[str] = None,
         processing_time_ms: Optional[int] = None,
+        content_hash: Optional[str] = None,
     ) -> None:
         """Transactionally insert a document and all its chunks."""
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 await conn.execute(
                     """
-                    INSERT INTO rag.documents (id, user_id, filename, content_type, file_size, status, chunk_count, metadata, raw_content)
-                    VALUES ($1, $2, $3, $4, $5, 'processing', $6, $7, $8)
+                    INSERT INTO rag.documents (id, user_id, filename, content_type, file_size, status, chunk_count, metadata, raw_content, content_hash)
+                    VALUES ($1, $2, $3, $4, $5, 'processing', $6, $7, $8, $9)
                     """,
-                    document_id, user_id, filename, content_type, file_size, chunk_count, metadata_json, raw_content,
+                    document_id, user_id, filename, content_type, file_size, chunk_count, metadata_json, raw_content, content_hash,
                 )
                 if collection_id:
                     await conn.execute(
@@ -409,6 +410,16 @@ class SupabaseDocumentRepository:
                 """,
             )
 
+            search_row = await conn.fetchrow(
+                """
+                SELECT
+                    COUNT(*)                        AS total,
+                    COALESCE(AVG(result_count), 0)  AS avg_results,
+                    COALESCE(AVG(avg_score), 0)     AS avg_score
+                FROM public.search_log
+                """,
+            )
+
         return {
             "documents": {"total": total_docs, "by_status": by_status},
             "chunks": {
@@ -417,10 +428,9 @@ class SupabaseDocumentRepository:
                 "total_tokens": chunk_row["total_tokens"],
             },
             "searches": {
-                "total": 0,
-                "avg_results": 0.0,
-                "avg_score": 0.0,
-                "avg_latency_ms": 0.0,
+                "total": search_row["total"],
+                "avg_results": round(float(search_row["avg_results"]), 2),
+                "avg_score": round(float(search_row["avg_score"]), 4),
             },
             "collections": {
                 "total": coll_row["total"],

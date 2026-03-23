@@ -4,7 +4,7 @@ import logging
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request, UploadFile
 import asyncpg
 import httpx
 
@@ -22,8 +22,10 @@ from api.schemas.ingest import (
 )
 from api.services.embedding import generate_embedding
 from api.services.ingestion import (
+    compute_content_hash_bytes,
     create_ingest_job,
     fetch_ingest_job,
+    find_duplicate_document,
     get_job_status,
     ingest_document,
     run_ingest_background,
@@ -163,3 +165,119 @@ async def ingest_status(
         )
 
     raise HTTPException(status_code=404, detail=f"No ingestion job found for document_id={document_id}")
+
+
+# ---------------------------------------------------------------------------
+# Multipart file upload endpoint
+# ---------------------------------------------------------------------------
+
+_ALLOWED_EXTENSIONS = {
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".html": "text/html",
+    ".htm": "text/html",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pdf": "application/pdf",
+}
+
+
+def _detect_content_type(filename: str, mime_hint: Optional[str]) -> str:
+    """Return a MIME type string derived from the filename extension.
+
+    Falls back to the ``content_type`` hint from the upload if the extension
+    is not explicitly mapped.
+    """
+    import os
+    ext = os.path.splitext(filename.lower())[1]
+    return _ALLOWED_EXTENSIONS.get(ext, mime_hint or "text/plain")
+
+
+@router.post("/ingest/upload", response_model=None, tags=["ingest"])
+async def upload_and_ingest(
+    file: UploadFile,
+    collection_id: Optional[str] = Form(None),
+    backend: str = Form("supabase"),
+    user_id: Optional[str] = Form(None),
+    db: Optional[asyncpg.Pool] = Depends(get_db_optional),
+    client: httpx.AsyncClient = Depends(get_http_client),
+):
+    """Accept a multipart/form-data file upload and ingest it synchronously.
+
+    Supported file types: ``.txt``, ``.md``, ``.html``, ``.docx``, ``.pdf``
+
+    PDF files are handled via the binary path (base64-encoded content passed to
+    the standard ingestion pipeline).  All other file types are decoded as UTF-8
+    text.
+
+    Returns the ingestion result immediately.  Duplicate files are detected by
+    SHA-256 hash of the raw bytes and return ``status: duplicate`` without
+    re-processing.
+    """
+    import base64
+    import os
+
+    filename = file.filename or "upload"
+    ext = os.path.splitext(filename.lower())[1]
+
+    if ext not in _ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(_ALLOWED_EXTENSIONS)}",
+        )
+
+    if backend not in ("supabase", "qdrant", "both"):
+        raise HTTPException(
+            status_code=400,
+            detail="backend must be one of: supabase, qdrant, both",
+        )
+
+    raw_bytes: bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    content_type = _detect_content_type(filename, file.content_type)
+
+    # Duplicate detection on raw bytes before doing any work
+    if db:
+        byte_hash = compute_content_hash_bytes(raw_bytes)
+        existing_id = await find_duplicate_document(db, byte_hash)
+        if existing_id:
+            logger.info("Upload duplicate detected for '%s' — existing id=%s", filename, existing_id)
+            return ok({
+                "document_id": existing_id,
+                "filename": filename,
+                "chunks_created": 0,
+                "status": "duplicate",
+            })
+
+    # Build the IngestRequest payload
+    if content_type == "application/pdf":
+        # PDF uses base64 binary path
+        content_str = base64.b64encode(raw_bytes).decode("ascii")
+    elif content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        # .docx: extract text here so the standard pipeline receives plain text
+        from api.services.preprocessor import extract_text_from_docx
+        content_str = extract_text_from_docx(raw_bytes)
+        content_type = "text/plain"
+    else:
+        try:
+            content_str = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=422,
+                detail="File content is not valid UTF-8. For binary formats use .pdf or .docx.",
+            )
+
+    from api.schemas.ingest import IngestRequest as _IngestRequest
+
+    ingest_req = _IngestRequest(
+        content=content_str,
+        filename=filename,
+        content_type=content_type,
+        user_id=user_id,
+        collection_id=collection_id,
+        backend=backend,
+    )
+
+    result, _flag = await ingest_document(ingest_req, db, client)
+    return ok(result.model_dump())

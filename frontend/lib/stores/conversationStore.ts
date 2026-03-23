@@ -15,7 +15,10 @@ interface ConversationState {
   deleteConversation: (id: string) => void
   selectConversation: (id: string) => void
   updateConversationTitle: (id: string, title: string) => void
+  markTitleGenerated: (id: string) => void
+  updateConversationSystemPrompt: (id: string, systemPrompt: string) => void
   clearConversations: () => void
+  exportAsMarkdown: (id: string) => void
   importConversation: (data: Record<string, unknown>) => void
   addMessage: (conversationId: string, message: Message) => void
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void
@@ -76,8 +79,50 @@ export const useConversationStore = create<ConversationState>()(
         }))
       },
 
+      markTitleGenerated: (id: string) => {
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === id ? { ...c, titleGenerated: true } : c
+          ),
+        }))
+      },
+
+      updateConversationSystemPrompt: (id: string, systemPrompt: string) => {
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === id ? { ...c, systemPrompt, updatedAt: new Date() } : c
+          ),
+        }))
+      },
+
       clearConversations: () => {
         set({ conversations: [], currentConversationId: null })
+      },
+
+      exportAsMarkdown: (id: string) => {
+        const conversation = get().conversations.find((c) => c.id === id)
+        if (!conversation) return
+
+        const lines: string[] = [`# ${conversation.title}`, '']
+
+        for (const message of conversation.messages) {
+          const roleLabel =
+            message.role === 'user'
+              ? '## User'
+              : message.role === 'assistant'
+                ? '## Assistant'
+                : '## System'
+          lines.push(roleLabel, '', message.content, '', '---', '')
+        }
+
+        const markdown = lines.join('\n')
+        const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${conversation.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${Date.now()}.md`
+        a.click()
+        URL.revokeObjectURL(url)
       },
 
       importConversation: (data: Record<string, unknown>) => {

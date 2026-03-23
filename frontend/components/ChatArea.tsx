@@ -12,11 +12,15 @@ import TokenCounter from './TokenCounter'
 import ErrorBoundary from './ErrorBoundary'
 
 export default function ChatArea() {
-  const { currentConversation, error, useRag, setUseRag, selectedModel } = useChatStore()
+  const { currentConversation, error, useRag, setUseRag, useAgentMode, setUseAgentMode, selectedModel } = useChatStore()
   const { sendMessage, stopGeneration, regenerateLastMessage, isGenerating } = useChat()
   const isArtifactPanelOpen = useArtifactStore((s) => s.isArtifactPanelOpen)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [inputText, setInputText] = useState('')
+
+  const handleSuggestionClick = (text: string) => {
+    setInputText(text)
+  }
 
   // Derive the currently-streaming assistant message content (if any)
   const streamingMessage = currentConversation?.messages.findLast(
@@ -36,7 +40,7 @@ export default function ChatArea() {
       {/* Chat Column */}
       <ErrorBoundary sectionName="Chat">
         <div className="flex flex-col min-h-0 min-w-0">
-          {/* RAG Toggle Bar */}
+          {/* Mode Toggle Bar */}
           <div className="flex items-center justify-center gap-3 px-4 py-2 border-b border-[var(--border-color)] bg-[var(--bg-secondary)]">
             <button
               onClick={() => setUseRag(!useRag)}
@@ -56,9 +60,27 @@ export default function ChatArea() {
               </svg>
               [RAG_MODE: {useRag ? 'ON' : 'OFF'}]
             </button>
-            {useRag && (
-              <span className="text-xs font-mono" style={{ color: 'var(--accent-primary)', opacity: 0.7 }}>
-                // Context injection active
+            <button
+              onClick={() => setUseAgentMode(!useAgentMode)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-sm text-xs font-mono tracking-wide transition-all uppercase border"
+              style={useAgentMode ? {
+                borderColor: 'var(--accent-cyan)',
+                color: 'var(--accent-cyan)',
+                background: 'color-mix(in srgb, var(--accent-cyan) 10%, transparent)',
+              } : {
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-muted)',
+                background: 'transparent',
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2" />
+              </svg>
+              [AGENT_MODE: {useAgentMode ? 'ON' : 'OFF'}]
+            </button>
+            {(useRag || useAgentMode) && (
+              <span className="text-xs font-mono" style={{ color: useAgentMode ? 'var(--accent-cyan)' : 'var(--accent-primary)', opacity: 0.7 }}>
+                {useAgentMode ? '// Agentic execution active' : '// Context injection active'}
               </span>
             )}
           </div>
@@ -66,7 +88,7 @@ export default function ChatArea() {
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto">
             {!currentConversation || currentConversation.messages.length === 0 ? (
-              <EmptyState />
+              <EmptyState onSuggestionClick={handleSuggestionClick} />
             ) : (
               <MessageList messages={currentConversation.messages} onRegenerate={regenerateLastMessage} />
             )}
@@ -87,7 +109,17 @@ export default function ChatArea() {
           {/* Input Area */}
           <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-primary)]">
             <MessageInput
-              onSend={(msg) => { sendMessage(msg); setInputText('') }}
+              onSend={(msg, attachments) => {
+                let fullMessage = msg
+                if (attachments && attachments.length > 0) {
+                  const parts = attachments
+                    .filter((a) => !a.isImage && a.text)
+                    .map((a) => `\n\n[Attached file: ${a.name}]\n\`\`\`\n${a.text}\n\`\`\``)
+                  if (parts.length > 0) fullMessage += parts.join('')
+                }
+                sendMessage(fullMessage)
+                setInputText('')
+              }}
               onStop={stopGeneration}
               isGenerating={isGenerating}
               inputText={inputText}
@@ -115,7 +147,14 @@ export default function ChatArea() {
   )
 }
 
-function EmptyState() {
+function EmptyState({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
+  const suggestions = [
+    { icon: '[?]', title: 'QUERY_CONCEPT', desc: 'Perform topic analysis', prompt: 'Explain the key concepts behind retrieval-augmented generation (RAG) and how it improves LLM accuracy.' },
+    { icon: '[/]', title: 'EXECUTE_CODE', desc: 'Synthesize algorithms', prompt: 'Write a Python function that implements binary search with full type hints and docstring.' },
+    { icon: '[T]', title: 'GEN_TEXT', desc: 'Output text stream', prompt: 'Write a concise technical summary of how transformer attention mechanisms work.' },
+    { icon: '[#]', title: 'PARSE_DATA', desc: 'Process datasets', prompt: 'Given a CSV with columns: date, value, category — write a Python script to compute monthly averages per category.' },
+  ]
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center font-mono">
       <div className="text-6xl mb-6 font-bold tracking-tighter" style={{ color: 'var(--accent-primary)' }}>
@@ -126,16 +165,15 @@ function EmptyState() {
         // Initialize sequence. Awaiting operator input parameter.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-lg w-full">
-        {[
-          { icon: '[?]', title: 'QUERY_CONCEPT', desc: 'Perform topic analysis' },
-          { icon: '[/]', title: 'EXECUTE_CODE', desc: 'Synthesize algorithms' },
-          { icon: '[T]', title: 'GEN_TEXT', desc: 'Output text stream' },
-          { icon: '[#]', title: 'PARSE_DATA', desc: 'Process datasets' },
-        ].map((s) => (
+        {suggestions.map((s) => (
           <div
             key={s.title}
+            role="button"
+            tabIndex={0}
             className="p-4 rounded-sm cursor-pointer transition-all flex flex-col items-start text-left"
             style={{ border: '1px solid var(--border-color)', background: 'var(--glass-bg)' }}
+            onClick={() => onSuggestionClick(s.prompt)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSuggestionClick(s.prompt) } }}
             onMouseEnter={(e) => {
               const el = e.currentTarget
               el.style.borderColor = 'var(--accent-primary)'

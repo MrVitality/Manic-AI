@@ -29,11 +29,15 @@ class Settings(BaseSettings):
     VECTOR_DIMENSION: int = 1024
 
     # --- Inference backend ---
-    INFERENCE_BACKEND: str = "ollama"  # "ollama", "vllm", or "openai"
+    INFERENCE_BACKEND: str = "ollama"  # "ollama", "vllm", "openai", or "anthropic"
     VLLM_URL: str = ""  # empty = disabled, use Ollama
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    # Comma-separated ordered list of backends to try when the primary fails.
+    # Only connection/timeout errors trigger fallback -- 4xx errors do not.
+    # Example: "ollama,anthropic,openai"  (empty = no fallback)
+    MODEL_FALLBACK_CHAIN: str = ""
 
     # --- RAG tuning ---
     RAG_TOP_K: int = 5

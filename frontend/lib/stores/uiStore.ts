@@ -32,6 +32,7 @@ interface UiState {
   error: string | null
   sidebarCollapsed: boolean
   useRag: boolean
+  useAgentMode: boolean
   serviceStatuses: Record<string, ServiceStatus>
   settings: Settings
 
@@ -40,6 +41,7 @@ interface UiState {
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleSidebar: () => void
   setUseRag: (useRag: boolean) => void
+  setUseAgentMode: (useAgentMode: boolean) => void
   setServiceStatuses: (statuses: Record<string, ServiceStatus>) => void
   updateSettings: (settings: Partial<Settings>) => void
 }
@@ -51,6 +53,7 @@ export const useUiStore = create<UiState>()(
       error: null,
       sidebarCollapsed: false,
       useRag: false,
+      useAgentMode: false,
       serviceStatuses: {},
       settings: defaultSettings,
 
@@ -59,6 +62,7 @@ export const useUiStore = create<UiState>()(
       setSidebarCollapsed: (collapsed: boolean) => set({ sidebarCollapsed: collapsed }),
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setUseRag: (useRag: boolean) => set({ useRag }),
+      setUseAgentMode: (useAgentMode: boolean) => set({ useAgentMode }),
       setServiceStatuses: (statuses: Record<string, ServiceStatus>) =>
         set({ serviceStatuses: statuses }),
       updateSettings: (newSettings: Partial<Settings>) =>

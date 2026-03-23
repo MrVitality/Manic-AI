@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import CommandPalette from '@/components/CommandPalette'
 import SettingsModal from '@/components/SettingsModal'
+import SystemPromptEditor from '@/components/SystemPromptEditor'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { MenuIcon } from '@/components/ui/Icons'
 import { useUiStore } from '@/lib/stores/uiStore'
@@ -78,6 +79,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [settings.fontSize])
 
   const title = viewTitleMap[pathname] || 'Manic AI'
+  const currentConversationId = useConversationStore((s) => s.currentConversationId)
+  const isChatRoute = pathname === '/chat' || pathname.startsWith('/chat/')
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -89,6 +92,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       />
 
       <main className="flex-1 flex flex-col min-w-0">
+        {/* Mobile top bar — shown on all routes */}
         <div className="md:hidden flex items-center gap-3 p-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -98,8 +102,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           >
             <MenuIcon className="w-6 h-6" />
           </button>
-          <h1 className="font-semibold truncate">{title}</h1>
+          <h1 className="font-semibold truncate flex-1">{title}</h1>
+          {isChatRoute && currentConversationId && (
+            <SystemPromptEditor conversationId={currentConversationId} />
+          )}
         </div>
+
+        {/* Desktop chat header strip — only on /chat with an active conversation */}
+        {isChatRoute && currentConversationId && (
+          <div
+            className="hidden md:flex items-center justify-end px-4 py-1.5"
+            style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}
+          >
+            <SystemPromptEditor conversationId={currentConversationId} />
+          </div>
+        )}
+
         {children}
       </main>
 

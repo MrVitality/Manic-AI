@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useChatStore, conversationStoreApi } from '@/lib/store'
 import { useArtifactStore } from '@/lib/stores/artifactStore'
-import { streamChat, generateMessageId } from '@/lib/api'
+import { streamChat, chat, generateMessageId } from '@/lib/api'
 import type { Message, RagSource, ToolCallInfo } from '@/types'
 
 export function useChat() {
@@ -14,6 +14,7 @@ export function useChat() {
     isGenerating,
     settings,
     useRag,
+    useAgentMode,
     createConversation,
     addMessage,
     updateMessage,
@@ -67,6 +68,12 @@ export function useChat() {
     try {
       const convState = conversationStoreApi.getState()
       const conversation = convState.conversations.find(c => c.id === conversationId)
+      // Per-conversation system prompt overrides global settings prompt when set
+      const effectiveSystemPrompt = conversation?.systemPrompt || settings.systemPrompt
+      const isFirstExchange = (conversation?.messages.filter(m => m.role === 'user').length ?? 0) <= 1
+      const shouldGenerateTitle = isFirstExchange && !conversation?.titleGenerated
+      const firstUserMessage = content.trim()
+
       const messages = conversation?.messages
         .filter(m => m.role !== 'system' && m.id !== assistantMessageId)
         .map(m => ({ role: m.role, content: m.content })) || []
@@ -79,9 +86,9 @@ export function useChat() {
         model: selectedModel,
         messages,
         temperature: settings.temperature,
-        systemPrompt: settings.systemPrompt,
+        systemPrompt: effectiveSystemPrompt,
         useRag,
-      }, controller.signal)) {
+      }, controller.signal, useAgentMode ? 'agent' : 'chat')) {
         if (event.type === 'content' && event.content) {
           fullContent += event.content
           updateMessage(conversationId, assistantMessageId, {
@@ -140,6 +147,14 @@ export function useChat() {
         sources: sources.length > 0 ? sources : undefined,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       })
+
+      // Generate an AI title after the first assistant response completes
+      if (shouldGenerateTitle && firstUserMessage) {
+        conversationStoreApi.getState().markTitleGenerated(conversationId)
+        generateConversationTitle(conversationId, firstUserMessage, selectedModel).catch(
+          (err) => console.warn('[useChat] title generation failed:', err)
+        )
+      }
     } catch (error) {
       // If the user aborted, don't treat it as a real error
       if (controller.signal.aborted) {
@@ -166,6 +181,7 @@ export function useChat() {
     isGenerating,
     settings,
     useRag,
+    useAgentMode,
     createConversation,
     addMessage,
     updateMessage,
@@ -239,5 +255,37 @@ function detectAndAddArtifacts(content: string) {
       language: isHtml || isMarkdown ? undefined : language,
       createdAt: new Date(),
     })
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AI title generation: calls the non-streaming chat endpoint to produce a
+// concise 3-6 word title from the user's first message, then persists it.
+// Fires after the first assistant response completes; errors are non-fatal.
+// ---------------------------------------------------------------------------
+async function generateConversationTitle(
+  conversationId: string,
+  firstUserMessage: string,
+  model: string
+): Promise<void> {
+  const truncated = firstUserMessage.slice(0, 300)
+  const result = await chat({
+    model,
+    messages: [
+      {
+        role: 'user',
+        content: `Generate a concise 3-6 word title for this conversation. Reply with ONLY the title, no punctuation, no quotes: ${truncated}`,
+      },
+    ],
+    temperature: 0.3,
+  })
+
+  const rawTitle = result.content.trim()
+  if (rawTitle) {
+    // Strip surrounding quotes/punctuation the model may add despite instructions
+    const cleanTitle = rawTitle.replace(/^["']|["']$/g, '').trim()
+    if (cleanTitle) {
+      conversationStoreApi.getState().updateConversationTitle(conversationId, cleanTitle)
+    }
   }
 }

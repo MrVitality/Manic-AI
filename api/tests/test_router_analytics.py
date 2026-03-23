@@ -31,6 +31,7 @@ async def test_rag_analytics(client, app):
     conn.fetchrow = AsyncMock(side_effect=[
         {"total": 0, "avg_tokens": 0, "total_tokens": 0},
         {"total": 0, "avg_docs": 0},
+        {"total": 0, "avg_results": 0, "avg_score": 0},
     ])
     resp = await client.get("/v1/analytics/rag")
     assert resp.status_code == 200

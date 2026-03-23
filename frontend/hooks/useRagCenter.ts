@@ -73,6 +73,8 @@ export function useRagCenter() {
         collection_id: config.collectionId,
         include_vectors: config.includeVectors,
         backend: config.backend,
+        rerank: config.rerank,
+        keyword_weight: config.useHybrid ? config.keywordWeight : undefined,
       })
       setSearchResults(response.results)
       setSearchLatency(response.search_latency_ms)

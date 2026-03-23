@@ -65,6 +65,8 @@ export const useRagStore = create<RagState>()((set) => ({
     backend: 'supabase',
     collectionId: null,
     includeVectors: false,
+    rerank: false,
+    keywordWeight: 0.3,
   },
   isSearching: false,
   setSearchQuery: (query) => set({ searchQuery: query }),

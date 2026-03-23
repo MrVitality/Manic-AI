@@ -5,7 +5,7 @@ import GlassPanel from '@/components/ui/GlassPanel'
 import ScoreBar from '@/components/ui/ScoreBar'
 import Badge from '@/components/ui/Badge'
 import EmptyState from '@/components/ui/EmptyState'
-import type { SearchConfig, SearchExplainResult } from '@/types'
+import type { SearchConfig, SearchExplainResult, CollectionInfo } from '@/types'
 
 interface RagSearchLabProps {
   searchQuery: string
@@ -13,6 +13,7 @@ interface RagSearchLabProps {
   searchLatency: number | null
   isSearching: boolean
   searchConfig: SearchConfig
+  collections: CollectionInfo[]
   onSearch: (query: string, config: SearchConfig) => void
   onConfigChange: (config: Partial<SearchConfig>) => void
 }
@@ -23,6 +24,7 @@ export default function RagSearchLab({
   searchLatency,
   isSearching,
   searchConfig,
+  collections,
   onSearch,
   onConfigChange,
 }: RagSearchLabProps) {
@@ -88,6 +90,8 @@ export default function RagSearchLab({
         <GlassPanel className="p-4 lg:col-span-1">
           <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>Search Config</h4>
           <div className="space-y-4">
+
+            {/* Top K */}
             <div>
               <label className="flex items-center justify-between text-xs mb-1">
                 <span style={{ color: 'var(--text-secondary)' }}>Top K</span>
@@ -99,6 +103,8 @@ export default function RagSearchLab({
                 className="w-full accent-blue-500"
               />
             </div>
+
+            {/* Threshold */}
             <div>
               <label className="flex items-center justify-between text-xs mb-1">
                 <span style={{ color: 'var(--text-secondary)' }}>Threshold</span>
@@ -110,21 +116,59 @@ export default function RagSearchLab({
                 className="w-full accent-blue-500"
               />
             </div>
+
+            {/* Hybrid Search toggle */}
             <div className="flex items-center justify-between">
               <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Hybrid Search</span>
               <button
                 onClick={() => handleConfigChange({ useHybrid: !searchConfig.useHybrid })}
                 className="w-9 h-5 rounded-full transition-colors relative"
                 style={{ background: searchConfig.useHybrid ? 'var(--accent-blue)' : 'var(--bg-tertiary)' }}
+                aria-pressed={searchConfig.useHybrid}
+                aria-label="Toggle hybrid search"
               >
                 <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all" style={{ left: searchConfig.useHybrid ? 18 : 2 }} />
               </button>
             </div>
+
+            {/* Keyword Weight — only when hybrid is active */}
+            {searchConfig.useHybrid && (
+              <div>
+                <label className="flex items-center justify-between text-xs mb-1">
+                  <span style={{ color: 'var(--text-secondary)' }}>Keyword Weight</span>
+                  <span className="font-mono" style={{ color: 'var(--text-muted)' }}>{searchConfig.keywordWeight.toFixed(1)}</span>
+                </label>
+                <input
+                  type="range" min={0} max={10} step={1} value={Math.round(searchConfig.keywordWeight * 10)}
+                  onChange={(e) => handleConfigChange({ keywordWeight: parseInt(e.target.value) / 10 })}
+                  className="w-full accent-blue-500"
+                />
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Vector weight: {(1 - searchConfig.keywordWeight).toFixed(1)}
+                </p>
+              </div>
+            )}
+
+            {/* Rerank toggle */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Rerank</span>
+              <button
+                onClick={() => handleConfigChange({ rerank: !searchConfig.rerank })}
+                className="w-9 h-5 rounded-full transition-colors relative"
+                style={{ background: searchConfig.rerank ? 'var(--accent-blue)' : 'var(--bg-tertiary)' }}
+                aria-pressed={searchConfig.rerank}
+                aria-label="Toggle reranking"
+              >
+                <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all" style={{ left: searchConfig.rerank ? 18 : 2 }} />
+              </button>
+            </div>
+
+            {/* Backend */}
             <div>
               <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Backend</label>
               <select
                 value={searchConfig.backend}
-                onChange={(e) => handleConfigChange({ backend: e.target.value as any })}
+                onChange={(e) => handleConfigChange({ backend: e.target.value as SearchConfig['backend'] })}
                 className="w-full px-2 py-1.5 rounded text-xs"
                 style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
               >
@@ -133,6 +177,23 @@ export default function RagSearchLab({
                 <option value="both">Both</option>
               </select>
             </div>
+
+            {/* Collection filter */}
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Collection</label>
+              <select
+                value={searchConfig.collectionId ?? ''}
+                onChange={(e) => handleConfigChange({ collectionId: e.target.value || null })}
+                className="w-full px-2 py-1.5 rounded text-xs"
+                style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+              >
+                <option value="">All Collections</option>
+                {collections.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
           </div>
         </GlassPanel>
 

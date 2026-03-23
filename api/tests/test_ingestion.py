@@ -135,12 +135,12 @@ async def test_run_ingest_background_updates_status_on_success(mock_db_pool, moc
 
     async def _mock_ingest(req, db, client):
         from api.schemas.ingest import IngestResponse
-        return IngestResponse(
+        return (IngestResponse(
             document_id="doc-bg",
             filename="test.txt",
             chunks_created=1,
             status="completed",
-        )
+        ), "new")
 
     with patch("api.services.ingestion.ingest_document", side_effect=_mock_ingest):
         await ing.run_ingest_background("doc-bg", request, None, mock_http_client)
