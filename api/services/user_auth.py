@@ -9,6 +9,7 @@ Usage:
 """
 
 import asyncio
+import hashlib
 import re
 import secrets
 from datetime import datetime, timezone
@@ -72,18 +73,23 @@ async def create_user(
 
     password_hash = await hash_password(password)
     api_key = f"manic_{secrets.token_urlsafe(32)}"
+    api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    api_key_prefix = api_key[:16]
 
     async with db.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO public.users (email, username, password_hash, api_key, key_expires_at)
-            VALUES ($1, $2, $3, $4, NOW() + INTERVAL '90 days')
+            INSERT INTO public.users (email, username, password_hash, api_key,
+                                      api_key_hash, api_key_prefix, key_expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '90 days')
             RETURNING id::text, email, username, api_key, created_at, key_expires_at
             """,
             email,
             username,
             password_hash,
             api_key,
+            api_key_hash,
+            api_key_prefix,
         )
     return dict(row)
 
@@ -102,13 +108,18 @@ async def authenticate_by_api_key(
         Mapping with id, email, username, is_admin, rate_limit_override,
         or None if the key is not found or the account is inactive.
     """
+    incoming_hash = hashlib.sha256(api_key.encode()).hexdigest()
     async with db.acquire() as conn:
+        # Primary path: compare against the stored hash (keys created after migration).
+        # Fallback: match the legacy plaintext api_key column for pre-migration keys.
         row = await conn.fetchrow(
             """
-            SELECT id::text, email, username, is_admin, rate_limit_override, key_expires_at
+            SELECT id::text, email, username, is_admin, rate_limit_override,
+                   key_expires_at, mfa_enabled
             FROM public.users
-            WHERE api_key = $1 AND is_active = TRUE
+            WHERE (api_key_hash = $1 OR api_key = $2) AND is_active = TRUE
             """,
+            incoming_hash,
             api_key,
         )
     if not row:
@@ -130,6 +141,7 @@ async def authenticate_by_email(
     db: asyncpg.Pool,
     email: str,
     password: str,
+    redis=None,
 ) -> Optional[Dict[str, Any]]:
     """Authenticate by email + password using bcrypt comparison.
 
@@ -137,15 +149,20 @@ async def authenticate_by_email(
         db: Database connection pool.
         email: User's email address.
         password: Plaintext password to verify.
+        redis: Optional Redis cache repo. When provided and the user has MFA
+            enabled, a short-lived MFA token is stored and returned instead of
+            the API key.
 
     Returns:
-        Mapping with id, email, username, api_key, is_admin,
-        or None if credentials are invalid or the account is inactive.
+        - Mapping with id, email, username, api_key, is_admin when MFA is off.
+        - Mapping with mfa_required=True and mfa_token when MFA is on.
+        - None if credentials are invalid or the account is inactive.
     """
     async with db.acquire() as conn:
         row = await conn.fetchrow(
             """
-            SELECT id::text, email, username, api_key, is_admin, password_hash
+            SELECT id::text, email, username, api_key, is_admin,
+                   password_hash, mfa_enabled
             FROM public.users
             WHERE email = $1 AND is_active = TRUE
             """,
@@ -157,4 +174,17 @@ async def authenticate_by_email(
         return None
     result = dict(row)
     result.pop("password_hash", None)
+
+    if result.get("mfa_enabled"):
+        # Generate a short-lived MFA token and store it in Redis (5 min TTL).
+        mfa_token = secrets.token_urlsafe(32)
+        if redis is not None:
+            await redis.setex(f"mfa_token:{mfa_token}", 300, result["id"])
+        result = {
+            "mfa_required": True,
+            "mfa_token": mfa_token,
+            "user_id": result["id"],
+            "email": result["email"],
+        }
+
     return result

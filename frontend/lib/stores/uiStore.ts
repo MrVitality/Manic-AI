@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Settings, ServiceStatus } from '@/types'
 
+const SETTINGS_VERSION = 2
+
 const HEALTH_CHECK_INTERVAL_MS = 30_000
 const DASHBOARD_REFRESH_INTERVAL_MS = 10_000
 
@@ -77,8 +79,23 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: 'manic-ai-ui',
+      version: SETTINGS_VERSION,
       storage: createJSONStorage(() => localStorage),
       skipHydration: true,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 2) {
+          // Added in v2: apiKey field
+          return {
+            ...persistedState,
+            settings: {
+              ...defaultSettings,
+              ...persistedState?.settings,
+              apiKey: persistedState?.settings?.apiKey ?? '',
+            },
+          }
+        }
+        return persistedState
+      },
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
         settings: state.settings,

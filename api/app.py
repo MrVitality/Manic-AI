@@ -14,6 +14,7 @@ from api.config import settings
 # Initialise JSON structured logging before any other code touches the log system
 setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 from api.exception_handlers import register_exception_handlers
+from api.middleware.audit import AuditMiddleware
 from api.middleware.guardrails import GuardrailsMiddleware
 from api.middleware.metrics import MetricsMiddleware
 from api.middleware.prometheus import PrometheusMiddleware
@@ -176,7 +177,8 @@ def create_app() -> FastAPI:
 
     # --- Observability & security middleware ---
     # Order matters: outermost runs first on request, last on response.
-    # GZip -> RequestSizeLimit -> RequestId -> SecurityHeaders -> Guardrails -> Prometheus -> Metrics
+    # GZip -> RequestSizeLimit -> RequestId -> SecurityHeaders -> Guardrails -> Prometheus -> Metrics -> Audit
+    _app.add_middleware(AuditMiddleware)
     _app.add_middleware(MetricsMiddleware)
     _app.add_middleware(PrometheusMiddleware)
     _app.add_middleware(GuardrailsMiddleware)

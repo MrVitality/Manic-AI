@@ -10,6 +10,7 @@ import SetupWizard from '@/components/SetupWizard'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { MenuIcon } from '@/components/ui/Icons'
+import { BottomNav } from '@/components/BottomNav'
 import { useUiStore } from '@/lib/stores/uiStore'
 import { useModelStore } from '@/lib/stores/modelStore'
 import { useConversationStore } from '@/lib/stores/conversationStore'
@@ -162,7 +163,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <main
         id="main-content"
-        className="flex-1 flex flex-col min-w-0 transition-all duration-300"
+        className="flex-1 flex flex-col min-w-0 transition-all duration-300 pb-14 md:pb-0"
         style={focusMode ? { maxWidth: '720px', margin: '0 auto', width: '100%' } : undefined}
       >
         {/* Mobile top bar — shown on all routes, hidden in focus mode */}
@@ -216,6 +217,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {!focusMode && sidebarOpen && (
         <div className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-20" onClick={() => setSidebarOpen(false)} />
       )}
+
+      {!focusMode && <BottomNav />}
     </div>
   )
 }
