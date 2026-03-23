@@ -39,8 +39,7 @@ CREATE INDEX idx_rag_documents_metadata ON rag.documents USING gin(metadata);
 
 -- -----------------------------------------------------------------------------
 -- RAG Chunks Table (Vector embeddings)
--- Using 768 dimensions for nomic-embed-text (Ollama)
--- Change to 1536 for OpenAI
+-- Using 1024 dimensions for bge-m3 (standardized embedding model)
 -- -----------------------------------------------------------------------------
 CREATE TABLE rag.chunks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -48,14 +47,20 @@ CREATE TABLE rag.chunks (
     chunk_index INTEGER NOT NULL,
     content TEXT NOT NULL,
     content_tokens INTEGER,
-    embedding VECTOR(768),
+    embedding VECTOR(1024),
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- HNSW index (15x faster than IVFFlat)
-CREATE INDEX idx_chunks_embedding_hnsw ON rag.chunks 
-    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+-- ef_construction = 128: better recall on larger datasets (default 64 undershoots at scale).
+-- m = 16 is left unchanged — higher m increases memory overhead without proportional recall gain.
+-- To apply to existing deployment:
+--   DROP INDEX IF EXISTS idx_chunks_embedding_hnsw;
+--   Then re-run this CREATE INDEX statement.
+--   This will trigger a full index rebuild (may take minutes for large datasets).
+CREATE INDEX idx_chunks_embedding_hnsw ON rag.chunks
+    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);
 
 -- Full-text search index for hybrid search
 CREATE INDEX idx_chunks_content_fts ON rag.chunks 
@@ -78,7 +83,7 @@ CREATE TABLE rag.collections (
     name TEXT NOT NULL,
     description TEXT,
     is_public BOOLEAN DEFAULT FALSE,
-    embedding_model TEXT DEFAULT 'nomic-embed-text',
+    embedding_model TEXT DEFAULT 'bge-m3',
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

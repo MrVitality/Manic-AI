@@ -57,8 +57,17 @@ class Settings(BaseSettings):
     # --- Agent ---
     AGENT_STATE_TTL_SECONDS: int = 86400  # 24 h (was hardcoded 1 h)
 
+    # --- Embedding concurrency ---
+    # Maximum number of concurrent embedding requests sent to Ollama at once.
+    # Keeps a large document from firing hundreds of parallel requests.
+    EMBEDDING_CONCURRENCY: int = 8
+
     # --- Embedding cache ---
-    EMBEDDING_CACHE_TTL: int = 3600  # seconds; controls Redis TTL for embedding results
+    # 24 hours: embeddings are deterministic for a given model+text, so a long TTL is safe.
+    EMBEDDING_CACHE_TTL: int = 86400  # seconds; controls Redis TTL for embedding results
+
+    # --- Search result cache ---
+    SEARCH_CACHE_TTL: int = 300  # seconds; 5 minutes for cached unified search results
 
     # --- Rate limiting ---
     RATE_LIMIT_PER_MINUTE: int = 60
@@ -156,3 +165,4 @@ LANGFUSE_HOST = settings.LANGFUSE_HOST
 INFERENCE_BACKEND = settings.INFERENCE_BACKEND
 VLLM_URL = settings.VLLM_URL
 OPENAI_BASE_URL = settings.OPENAI_BASE_URL
+EMBEDDING_CONCURRENCY = settings.EMBEDDING_CONCURRENCY

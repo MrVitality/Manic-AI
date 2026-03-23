@@ -14,6 +14,8 @@ class SearchRequest(BaseModel):
     user_id: Optional[str] = None
     backend: Literal["supabase", "qdrant", "both"] = "supabase"
     rerank: Optional[bool] = False
+    use_mmr: bool = False
+    mmr_lambda: float = 0.7
 
 
 class SearchResult(BaseModel):

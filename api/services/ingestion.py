@@ -27,6 +27,31 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Embedding concurrency throttle
+# ---------------------------------------------------------------------------
+
+_embed_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_embed_semaphore() -> asyncio.Semaphore:
+    """Return the module-level embedding semaphore, creating it lazily.
+
+    Lazy creation is required because ``asyncio.Semaphore`` must be
+    instantiated inside a running event loop on some Python versions.
+    """
+    global _embed_semaphore
+    if _embed_semaphore is None:
+        _embed_semaphore = asyncio.Semaphore(settings.EMBEDDING_CONCURRENCY)
+    return _embed_semaphore
+
+
+async def _throttled_embed(text: str, client: httpx.AsyncClient) -> list[float]:
+    """Wrap ``generate_embedding`` with the concurrency semaphore."""
+    async with _get_embed_semaphore():
+        return await generate_embedding(text, client=client)
+
+
+# ---------------------------------------------------------------------------
 # In-memory job tracker (supplement DB tracking for when DB is unavailable)
 # ---------------------------------------------------------------------------
 
@@ -224,7 +249,7 @@ async def ingest_document(
             )
 
         chunk_embeddings = await asyncio.gather(
-            *[generate_embedding(chunk["content"], client=client) for chunk in chunks],
+            *[_throttled_embed(chunk["content"], client=client) for chunk in chunks],
             return_exceptions=True,
         )
         failed = [e for e in chunk_embeddings if isinstance(e, BaseException)]

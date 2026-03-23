@@ -302,7 +302,7 @@ CREATE TABLE IF NOT EXISTS public.documents (
     id BIGSERIAL PRIMARY KEY,
     content TEXT,
     metadata JSONB,
-    embedding VECTOR(768)
+    embedding VECTOR(1024)
 );
 
 CREATE INDEX IF NOT EXISTS idx_public_documents_embedding ON public.documents
@@ -393,7 +393,7 @@ CREATE INDEX IF NOT EXISTS idx_rag_documents_created_at ON rag.documents(created
 CREATE INDEX IF NOT EXISTS idx_rag_documents_metadata ON rag.documents USING gin(metadata);
 
 -- -----------------------------------------------------------------------------
--- RAG Chunks (768-dim vectors for nomic-embed-text)
+-- RAG Chunks (1024-dim vectors for bge-m3)
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS rag.chunks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -401,7 +401,7 @@ CREATE TABLE IF NOT EXISTS rag.chunks (
     chunk_index INTEGER NOT NULL,
     content TEXT NOT NULL,
     content_tokens INTEGER,
-    embedding VECTOR(768),
+    embedding VECTOR(1024),
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -557,7 +557,7 @@ $$;
 
 -- Legacy: Match documents (backward compatibility with public.documents)
 CREATE OR REPLACE FUNCTION public.match_documents(
-    query_embedding VECTOR(768),
+    query_embedding VECTOR(1024),
     match_count INT DEFAULT 5,
     filter JSONB DEFAULT '{}'
 )
@@ -665,7 +665,7 @@ $$ LANGUAGE plpgsql;
 
 -- RAG: Pure vector similarity search
 CREATE OR REPLACE FUNCTION rag.search_similar_chunks(
-    query_embedding VECTOR(768),
+    query_embedding VECTOR(1024),
     match_threshold FLOAT DEFAULT 0.7,
     match_count INT DEFAULT 5,
     filter_collection_id UUID DEFAULT NULL,
@@ -704,7 +704,7 @@ $$;
 -- RAG: Hybrid search (vector + BM25 keyword with RRF fusion)
 CREATE OR REPLACE FUNCTION rag.hybrid_search(
     query_text TEXT,
-    query_embedding VECTOR(768),
+    query_embedding VECTOR(1024),
     match_count INT DEFAULT 10,
     keyword_weight FLOAT DEFAULT 0.3,
     filter_collection_id UUID DEFAULT NULL,
@@ -797,7 +797,7 @@ $$;
 
 -- RAG: Search with metadata filtering
 CREATE OR REPLACE FUNCTION rag.search_with_filters(
-    query_embedding VECTOR(768),
+    query_embedding VECTOR(1024),
     metadata_filter JSONB DEFAULT '{}',
     match_count INT DEFAULT 5,
     filter_user_id UUID DEFAULT NULL

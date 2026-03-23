@@ -26,6 +26,9 @@ async def init_redis(*, app=None):
         client = aioredis.from_url(settings.REDIS_URL)
         await client.ping()
         _set_redis(client)
+        # Wire the same client into the search cache.
+        from api.services.search import _set_redis as _search_set_redis
+        _search_set_redis(client)
         logger.info("Redis embedding cache enabled")
         if app is not None:
             from api.repositories.redis_cache import RedisCacheRepository
@@ -33,6 +36,8 @@ async def init_redis(*, app=None):
     except Exception as e:
         logger.warning("Redis unavailable, embedding cache disabled: %s", e)
         _set_redis(None)
+        from api.services.search import _set_redis as _search_set_redis
+        _search_set_redis(None)
 
 
 async def generate_embedding(
@@ -67,6 +72,7 @@ async def generate_embedding(
 
     if _redis:
         try:
+            # Embeddings are deterministic for a given model+text, so a long TTL is safe.
             await _redis.setex(cache_key, settings.EMBEDDING_CACHE_TTL, json.dumps(embedding))
         except Exception as e:
             logger.warning("Redis set failed: %s", e)

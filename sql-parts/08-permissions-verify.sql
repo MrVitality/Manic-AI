@@ -97,7 +97,7 @@ BEGIN
     RAISE NOTICE '║  HNSW indexes:         %                                     ', idx_count;
     RAISE NOTICE '║  RLS policies:         %                                     ', policy_count;
     RAISE NOTICE '╠══════════════════════════════════════════════════════════════╣';
-    RAISE NOTICE '║  Vector dimension:     768 (nomic-embed-text)                ║';
+    RAISE NOTICE '║  Vector dimension:     1024 (bge-m3)                         ║';
     RAISE NOTICE '║  Index type:           HNSW (m=16, ef_construction=64)       ║';
     RAISE NOTICE '║  Hybrid search:        Enabled (vector + BM25)               ║';
     RAISE NOTICE '╚══════════════════════════════════════════════════════════════╝';

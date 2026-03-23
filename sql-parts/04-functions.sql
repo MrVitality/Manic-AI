@@ -64,7 +64,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 -- Legacy: Match documents (backward compatibility)
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.match_documents(
-    query_embedding VECTOR(768),
+    query_embedding VECTOR(1024),
     match_count INT DEFAULT 5,
     filter JSONB DEFAULT '{}'
 )
@@ -113,7 +113,7 @@ GRANT EXECUTE ON FUNCTION public.execute_custom_sql(text) TO service_role;
 -- RAG: Pure vector similarity search
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION rag.search_similar_chunks(
-    query_embedding VECTOR(768),
+    query_embedding VECTOR(1024),
     match_threshold FLOAT DEFAULT 0.7,
     match_count INT DEFAULT 5,
     filter_collection_id UUID DEFAULT NULL,
@@ -155,7 +155,7 @@ $$;
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION rag.hybrid_search(
     query_text TEXT,
-    query_embedding VECTOR(768),
+    query_embedding VECTOR(1024),
     match_count INT DEFAULT 10,
     keyword_weight FLOAT DEFAULT 0.3,
     filter_collection_id UUID DEFAULT NULL,
@@ -251,7 +251,7 @@ $$;
 -- RAG: Search with metadata filtering
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION rag.search_with_filters(
-    query_embedding VECTOR(768),
+    query_embedding VECTOR(1024),
     metadata_filter JSONB DEFAULT '{}',
     match_count INT DEFAULT 5,
     filter_user_id UUID DEFAULT NULL

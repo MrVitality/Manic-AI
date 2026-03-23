@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     collection_id UUID REFERENCES collections(id) ON DELETE CASCADE,
     chunk_index INTEGER NOT NULL,
     content TEXT NOT NULL,
-    embedding vector(768),  -- nomic-embed-text dimension
+    embedding vector(1024),  -- bge-m3 dimension
     tokens INTEGER,
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -316,7 +316,7 @@ CREATE TRIGGER on_auth_user_created
 -- =============================================================================
 
 CREATE OR REPLACE FUNCTION search_documents(
-    query_embedding vector(768),
+    query_embedding vector(1024),
     query_text TEXT DEFAULT '',
     match_collection_id UUID DEFAULT NULL,
     match_threshold FLOAT DEFAULT 0.7,

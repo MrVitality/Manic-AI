@@ -50,6 +50,8 @@ async def search_documents(
             db=db,
             client=client,
             rerank=body.rerank or False,
+            use_mmr=body.use_mmr,
+            mmr_lambda=body.mmr_lambda,
         )
         return ok([SearchResult(**r).model_dump() for r in results])
     except Exception:

@@ -86,14 +86,14 @@ CREATE INDEX IF NOT EXISTS idx_rag_documents_status ON rag.documents(status);
 CREATE INDEX IF NOT EXISTS idx_rag_documents_created_at ON rag.documents(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_rag_documents_metadata ON rag.documents USING gin(metadata);
 
--- Document chunks with embeddings (768-dim for nomic-embed-text)
+-- Document chunks with embeddings (1024-dim for bge-m3)
 CREATE TABLE IF NOT EXISTS rag.chunks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     document_id UUID REFERENCES rag.documents(id) ON DELETE CASCADE,
     chunk_index INTEGER NOT NULL,
     content TEXT NOT NULL,
     content_tokens INTEGER,
-    embedding VECTOR(768),
+    embedding VECTOR(1024),
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -302,7 +302,7 @@ GRANT USAGE ON SCHEMA public TO anon;
 
 -- Pure vector similarity search
 CREATE OR REPLACE FUNCTION rag.search_similar_chunks(
-    query_embedding VECTOR(768),
+    query_embedding VECTOR(1024),
     match_threshold FLOAT DEFAULT 0.7,
     match_count INT DEFAULT 5,
     filter_collection_id UUID DEFAULT NULL,
@@ -341,7 +341,7 @@ $$;
 -- Hybrid search (vector + BM25 keyword with RRF fusion)
 CREATE OR REPLACE FUNCTION rag.hybrid_search(
     query_text TEXT,
-    query_embedding VECTOR(768),
+    query_embedding VECTOR(1024),
     match_count INT DEFAULT 10,
     keyword_weight FLOAT DEFAULT 0.3,
     filter_collection_id UUID DEFAULT NULL,

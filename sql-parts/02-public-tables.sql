@@ -130,11 +130,17 @@ CREATE TABLE public.documents (
     id BIGSERIAL PRIMARY KEY,
     content TEXT,
     metadata JSONB,
-    embedding VECTOR(768)
+    embedding VECTOR(1024)
 );
 
-CREATE INDEX idx_public_documents_embedding ON public.documents 
-    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+-- ef_construction = 128: better recall on larger datasets (default 64 undershoots at scale).
+-- m = 16 is left unchanged — higher m increases memory overhead without proportional recall gain.
+-- To apply to existing deployment:
+--   DROP INDEX IF EXISTS idx_public_documents_embedding;
+--   Then re-run this CREATE INDEX statement.
+--   This will trigger a full index rebuild (may take minutes for large datasets).
+CREATE INDEX idx_public_documents_embedding ON public.documents
+    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);
 
 -- -----------------------------------------------------------------------------
 -- RAG Pipeline State Table
