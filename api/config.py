@@ -88,11 +88,31 @@ class Settings(BaseSettings):
 
     @field_validator("SUPABASE_DB_URL")
     @classmethod
-    def warn_default_db_credentials(cls, v: str) -> str:
+    def validate_supabase_db_url(cls, v: str) -> str:
+        if not v:
+            raise ValueError(
+                "SUPABASE_DB_URL is required but not set. "
+                "Set it to postgresql://<user>:<password>@<host>:5432/<db> "
+                "or ensure POSTGRES_USER, POSTGRES_PASSWORD, and POSTGRES_DB are defined."
+            )
         if "postgres:postgres@" in v:
             logger.warning(
                 "SUPABASE_DB_URL contains default credentials (postgres:postgres). "
                 "Set a strong password before deploying to production."
+            )
+        return v
+
+    @field_validator("API_SECRET_KEY")
+    @classmethod
+    def validate_api_secret_key(cls, v: str, info) -> str:
+        import os
+
+        allow_unauth = os.getenv("ALLOW_UNAUTHENTICATED", "").strip().lower() == "true"
+        if not v and not allow_unauth:
+            raise ValueError(
+                "API_SECRET_KEY is required but not set. "
+                "Set a strong random value (e.g. openssl rand -hex 32) or set "
+                "ALLOW_UNAUTHENTICATED=true to disable authentication (development only)."
             )
         return v
 
@@ -123,6 +143,19 @@ class Settings(BaseSettings):
         if not 0.0 <= v <= 1.0:
             raise ValueError("RAG_KEYWORD_WEIGHT must be between 0.0 and 1.0")
         return v
+
+    def model_post_init(self, __context) -> None:
+        """Emit startup warnings for non-critical but important missing config."""
+        import os
+
+        env = os.getenv("ENVIRONMENT", self.INFERENCE_BACKEND).lower()
+        if not self.CORS_ORIGINS.strip() and env not in ("development", "dev", "local"):
+            logger.warning(
+                "CORS_ORIGINS is not set and ENVIRONMENT is '%s'. "
+                "All cross-origin requests will be rejected in production. "
+                "Set CORS_ORIGINS to a comma-separated list of allowed origins.",
+                env,
+            )
 
     def parse_cors_origins(self) -> List[str]:
         """Parse comma-separated CORS_ORIGINS into a list.

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 import asyncpg
 import httpx
 
+from api.auth import get_current_user_id
 from api.config import settings
 from api.dependencies import get_db_optional, get_http_client
 from api.middleware.rate_limit import limiter
@@ -37,6 +38,9 @@ async def search_documents(
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
 ):
     try:
+        # In multi_user mode, enforce tenant isolation by using the authenticated
+        # user's id rather than trusting the client-supplied body value.
+        effective_user_id = get_current_user_id(request) or body.user_id
         query_embedding = await generate_embedding(body.query, client=client)
         results = await unified_search(
             query_text=body.query,
@@ -46,7 +50,7 @@ async def search_documents(
             threshold=body.threshold or 0.7,
             use_hybrid=body.use_hybrid if body.use_hybrid is not None else True,
             collection_id=body.collection_id,
-            user_id=body.user_id,
+            user_id=effective_user_id,
             db=db,
             client=client,
             rerank=body.rerank or False,

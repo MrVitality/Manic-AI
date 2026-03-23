@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Conversation, Message } from '@/types'
-import { getApiUrl } from '@/lib/api'
+import { getApiUrl, getApiKey } from '@/lib/api'
 
 const generateId = () => crypto.randomUUID()
 
@@ -270,14 +270,19 @@ export const useConversationStore = create<ConversationState>()(
           `Summarize the following conversation in 1-2 sentences. Be concise and focus on the main topic.\n\n${transcript}\n\nSummary:`
 
         try {
+          const summaryHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+          const apiKey = getApiKey()
+          if (apiKey) summaryHeaders['X-API-Key'] = apiKey
+
           const response = await fetch(`${getApiUrl()}/v1/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: summaryHeaders,
             body: JSON.stringify({
               model: conversation.model || 'llama3.2:3b',
               messages: [{ role: 'user', content: prompt }],
               stream: false,
             }),
+            signal: AbortSignal.timeout(30_000),
           })
 
           if (!response.ok) return

@@ -7,6 +7,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from api.auth import get_current_user_id
 from api.config import settings
 from api.dependencies import get_document_repo
 from api.middleware.rate_limit import limiter
@@ -25,14 +26,17 @@ class CreateCollectionRequest(BaseModel):
 
 @router.get("/collections", response_model=None, tags=["collections"])
 async def list_collections(
+    request: Request,
     user_id: Optional[str] = None,
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     repo: SupabaseDocumentRepository = Depends(get_document_repo),
 ):
+    # In multi_user mode the authenticated user's id overrides any client-supplied value.
+    effective_user_id = get_current_user_id(request) or user_id
     results, total = await asyncio.gather(
-        repo.list_collections(user_id, limit, offset),
-        repo.count_collections(user_id),
+        repo.list_collections(effective_user_id, limit, offset),
+        repo.count_collections(effective_user_id),
     )
     return ok(results, meta={"total": total, "limit": limit, "offset": offset})
 
@@ -44,8 +48,10 @@ async def create_collection(
     body: CreateCollectionRequest,
     repo: SupabaseDocumentRepository = Depends(get_document_repo),
 ):
+    # Prefer the authenticated user's id over the client-supplied value.
+    effective_user_id = get_current_user_id(request) or body.user_id
     collection_id = str(uuid4())
-    await repo.create_collection(collection_id, body.user_id, body.name, body.description, body.is_public)
+    await repo.create_collection(collection_id, effective_user_id, body.name, body.description, body.is_public)
     return ok({"id": collection_id, "name": body.name, "status": "created"})
 
 

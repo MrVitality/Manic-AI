@@ -9,6 +9,7 @@ import asyncpg
 import httpx
 from pydantic import BaseModel, Field
 
+from api.auth import get_current_user_id
 from api.config import settings
 from api.middleware.rate_limit import limiter
 from api.dependencies import get_db_optional, get_http_client
@@ -73,6 +74,9 @@ async def ingest_document_endpoint(
     the ColPali-style multimodal pipeline is used instead: pages are converted
     to images and described via a vision LLM before embedding.
     """
+    # Derive user_id from auth token; fall back to body value in single-key mode.
+    effective_user_id = get_current_user_id(request) or body.user_id
+
     # Route to multimodal pipeline if requested
     if body.multimodal and body.content_type == "application/pdf":
         import base64
@@ -102,7 +106,7 @@ async def ingest_document_endpoint(
                     db,
                     client,
                     collection_id=body.collection_id,
-                    user_id=body.user_id,
+                    user_id=effective_user_id,
                     metadata=body.metadata,
                 )
                 _uj(doc_id, status=result["status"], chunks_created=result.get("pages_processed", 0))
@@ -125,6 +129,11 @@ async def ingest_document_endpoint(
     # Seed database row (best-effort)
     if db:
         await create_ingest_job(db, document_id, body.filename)
+
+    # Propagate the resolved user_id into the request body so the background
+    # task stores the correct ownership without trusting client-supplied values.
+    if effective_user_id is not None:
+        body = body.model_copy(update={"user_id": effective_user_id})
 
     # Schedule actual work in background
     background_tasks.add_task(run_ingest_background, document_id, body, db, client)
@@ -197,6 +206,7 @@ def _detect_content_type(filename: str, mime_hint: Optional[str]) -> str:
 
 @router.post("/ingest/upload", response_model=None, tags=["ingest"])
 async def upload_and_ingest(
+    request: Request,
     file: UploadFile,
     collection_id: Optional[str] = Form(None),
     backend: str = Form("supabase"),
@@ -273,11 +283,14 @@ async def upload_and_ingest(
 
     from api.schemas.ingest import IngestRequest as _IngestRequest
 
+    # Prefer authenticated user_id; fall back to form-supplied value in single-key mode.
+    effective_user_id = get_current_user_id(request) or user_id
+
     ingest_req = _IngestRequest(
         content=content_str,
         filename=filename,
         content_type=content_type,
-        user_id=user_id,
+        user_id=effective_user_id,
         collection_id=collection_id,
         backend=backend,
     )

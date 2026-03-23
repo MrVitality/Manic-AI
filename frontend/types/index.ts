@@ -86,6 +86,7 @@ export interface Settings {
   systemPrompt: string
   streamResponses: boolean
   apiUrl: string
+  apiKey: string
   theme: 'dark' | 'light'
   ragTopK: number
   ragThreshold: number

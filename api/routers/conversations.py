@@ -14,6 +14,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from api.auth import get_current_user_id
 from api.dependencies import get_db
 from api.schemas.envelope import ok
 
@@ -79,12 +80,17 @@ def _msg_row(row: Any) -> Dict[str, Any]:
 def _caller_id(request: Request) -> Optional[str]:
     """Extract the caller's user identity from the request.
 
-    Identity is read from the ``X-User-Id`` header, which is populated by the
-    authentication middleware for multi-user deployments.  When the header is
-    absent (e.g. single-key dev mode) None is returned and ownership checks
-    are skipped so that existing single-tenant deployments continue to work.
+    In multi_user mode, identity comes from ``request.state.user`` which is
+    populated by ``require_api_key`` after resolving the API key to a user
+    record.  This is the authoritative source and cannot be spoofed by clients.
+
+    Falls back to the ``X-User-Id`` header for backward compatibility with
+    deployments that set this header externally (e.g. a reverse proxy).
+
+    When neither source provides an identity (single-key dev mode), None is
+    returned and ownership checks are skipped.
     """
-    return request.headers.get("X-User-Id") or None
+    return get_current_user_id(request) or request.headers.get("X-User-Id") or None
 
 
 def _assert_owner(conv_row: Any, caller_id: Optional[str]) -> None:
@@ -112,14 +118,17 @@ def _assert_owner(conv_row: Any, caller_id: Optional[str]) -> None:
 
 @router.get("", response_model=None, tags=["conversations"])
 async def list_conversations(
+    request: Request,
     user_id: Optional[str] = Query(None, description="Filter by user_id stored in metadata"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: asyncpg.Pool = Depends(get_db),
 ):
     """List conversations with optional user_id filter and pagination."""
+    # In multi_user mode, scope results to the authenticated user.
+    effective_user_id = get_current_user_id(request) or user_id
     async with db.acquire() as conn:
-        if user_id:
+        if effective_user_id:
             rows = await conn.fetch(
                 """
                 SELECT id, title, system_prompt, metadata, created_at, updated_at
@@ -128,11 +137,11 @@ async def list_conversations(
                 ORDER BY updated_at DESC
                 LIMIT $2 OFFSET $3
                 """,
-                user_id, limit, offset,
+                effective_user_id, limit, offset,
             )
             total: int = await conn.fetchval(
                 "SELECT COUNT(*) FROM public.conversations WHERE metadata->>'user_id' = $1",
-                user_id,
+                effective_user_id,
             )
         else:
             rows = await conn.fetch(
@@ -186,14 +195,17 @@ async def get_conversation(
 
 @router.post("", response_model=None, tags=["conversations"])
 async def create_conversation(
+    request: Request,
     body: ConversationCreate,
     db: asyncpg.Pool = Depends(get_db),
 ):
     """Create a new conversation.  ``user_id`` is persisted inside ``metadata``."""
+    # Prefer the authenticated user's id; fall back to body value in single-key mode.
+    effective_user_id = get_current_user_id(request) or body.user_id
     conversation_id = str(uuid4())
     metadata: Dict[str, Any] = {}
-    if body.user_id:
-        metadata["user_id"] = body.user_id
+    if effective_user_id:
+        metadata["user_id"] = effective_user_id
 
     async with db.acquire() as conn:
         row = await conn.fetchrow(

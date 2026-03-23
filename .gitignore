@@ -41,4 +41,5 @@ Thumbs.db
 *.log
 
 # Database backups
-backups/
+backups/*
+!backups/.gitkeep

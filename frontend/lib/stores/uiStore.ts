@@ -15,6 +15,7 @@ const defaultSettings: Settings = {
   systemPrompt: 'You are a helpful AI assistant.',
   streamResponses: true,
   apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081',
+  apiKey: '',
   theme: 'dark',
   ragTopK: 5,
   ragThreshold: 0.7,

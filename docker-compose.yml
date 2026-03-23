@@ -814,7 +814,6 @@ services:
   prometheus:
     image: prom/prometheus:v2.51.0
     container_name: ai-prometheus
-    profiles: ["monitoring"]
     restart: unless-stopped
     ports:
       - "${BIND_IP}:9090:9090"
@@ -847,10 +846,33 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: ai-alertmanager
+    restart: unless-stopped
+    ports:
+      - "${BIND_IP}:9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - monitoring-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   grafana:
     image: grafana/grafana:10.4.0
     container_name: ai-grafana
-    profiles: ["monitoring"]
     restart: unless-stopped
     ports:
       - "${BIND_IP}:3009:3000"
@@ -886,7 +908,6 @@ services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: ai-cadvisor
-    profiles: ["monitoring"]
     restart: unless-stopped
     # privileged: true  # Replaced with explicit capabilities
     cap_add:
@@ -915,7 +936,6 @@ services:
   node-exporter:
     image: prom/node-exporter:v1.7.0
     container_name: ai-node-exporter
-    profiles: ["monitoring"]
     restart: unless-stopped
     pid: host
     volumes:
@@ -966,6 +986,48 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ===========================================================================
+  # Scheduled Backup (Postgres + Qdrant)
+  # ===========================================================================
+  backup:
+    image: python:3.11-slim
+    container_name: ai-backup
+    restart: unless-stopped
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./backups:/backups
+    environment:
+      - POSTGRES_HOST=supabase-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_API_KEY=${QDRANT_API_KEY}
+      - BACKUP_DIR=/backups
+      - BACKUP_RETENTION_DAYS=7
+    entrypoint: >
+      sh -c "
+        pip install psycopg2-binary -q &&
+        echo '0 3 * * * python /scripts/backup_db.py >> /var/log/backup.log 2>&1' | crontab - &&
+        crond -f
+      "
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    networks:
+      - db-network
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   db-network:
     driver: bridge
@@ -987,4 +1049,5 @@ volumes:
   langfuse-db-data:
   flowise-data:
   prometheus-data:
+  alertmanager-data:
   grafana-data:

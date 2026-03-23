@@ -8,16 +8,67 @@ Usage:
     python scripts/backup_db.py --schemas rag      # Backup only specific schemas
 """
 import argparse
+import json
 import os
 import stat
 import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
+
+
+QDRANT_COLLECTIONS = ["documents", "code", "conversations", "knowledge_base"]
+
+
+def backup_qdrant(output_dir: Path) -> None:
+    """Create and download Qdrant snapshots for each collection.
+
+    Uses the Qdrant snapshot API:
+      POST /collections/{name}/snapshots  — creates a snapshot
+      GET  /collections/{name}/snapshots/{snapshot_name} — downloads it
+
+    Auth is handled via the QDRANT_API_KEY environment variable when set.
+    """
+    qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333").rstrip("/")
+    api_key = os.getenv("QDRANT_API_KEY", "")
+
+    headers: dict[str, str] = {"Content-Type": "application/json"}
+    if api_key:
+        headers["api-key"] = api_key
+
+    for collection in QDRANT_COLLECTIONS:
+        print(f"Backing up Qdrant collection: {collection}...")
+
+        # Trigger snapshot creation
+        create_url = f"{qdrant_url}/collections/{collection}/snapshots"
+        create_req = urllib.request.Request(create_url, data=b"", headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(create_req, timeout=60) as resp:
+                body = json.loads(resp.read().decode())
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                print(f"  Collection '{collection}' not found — skipping.")
+                continue
+            raise RuntimeError(f"Snapshot creation failed for '{collection}': {exc}") from exc
+
+        snapshot_name: str = body["result"]["name"]
+
+        # Download the snapshot file
+        download_url = f"{qdrant_url}/collections/{collection}/snapshots/{snapshot_name}"
+        download_req = urllib.request.Request(download_url, headers=headers, method="GET")
+        dest = output_dir / f"qdrant_{collection}_{snapshot_name}"
+        start = time.time()
+        with urllib.request.urlopen(download_req, timeout=300) as resp:
+            dest.write_bytes(resp.read())
+
+        elapsed = time.time() - start
+        size_mb = dest.stat().st_size / (1024 * 1024)
+        print(f"  Saved: {dest.name} ({size_mb:.1f} MB, {elapsed:.1f}s)")
 
 
 def main():
@@ -170,6 +221,9 @@ def main():
 
     retained = min(len(backups), args.retain)
     print(f"Backups retained: {retained}")
+
+    # Qdrant vector store snapshots
+    backup_qdrant(output_dir)
 
 
 if __name__ == "__main__":

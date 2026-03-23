@@ -84,6 +84,42 @@ export const getApiUrl = (): string => {
   return _cachedApiUrl
 }
 
+/** Read the API key from settings persisted in localStorage. */
+export function getApiKey(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('manic-ai-ui')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        const key = parsed?.state?.settings?.apiKey
+        if (typeof key === 'string') return key
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+  return ''
+}
+
+/**
+ * Build a headers object that always includes Content-Type and, when an API
+ * key is configured, the X-API-Key header.
+ */
+function buildHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra }
+  const apiKey = getApiKey()
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey
+  }
+  return headers
+}
+
+/** Default timeout (ms) for regular (non-streaming) fetch calls. */
+const DEFAULT_TIMEOUT_MS = 30_000
+
+/** Timeout (ms) for streaming fetch calls. */
+const STREAM_TIMEOUT_MS = 120_000
+
 /** Return the versioned API base, e.g. ``http://localhost:8081/v1``. */
 const getApiV1 = (): string => `${getApiUrl()}/v1`
 
@@ -135,7 +171,10 @@ async function unwrap<T>(response: Response): Promise<T> {
 // =============================================================================
 
 export async function fetchModels(): Promise<Model[]> {
-  const response = await fetch(`${getApiV1()}/models`)
+  const response = await fetch(`${getApiV1()}/models`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   const data = await unwrap<ModelsResponse>(response)
   return data.models || []
 }
@@ -146,8 +185,9 @@ export async function pullModel(
 ): Promise<void> {
   const response = await fetch(`${getApiV1()}/models/pull`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify({ name: modelName }),
+    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
   })
 
   if (!response.body) throw new Error('No response body')
@@ -183,6 +223,8 @@ export async function pullModel(
 export async function deleteModel(modelName: string): Promise<void> {
   const response = await fetch(`${getApiV1()}/models/${encodeURIComponent(modelName)}`, {
     method: 'DELETE',
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
   await unwrap<unknown>(response)
 }
@@ -223,16 +265,19 @@ export async function* streamChat(
     : messages
 
   const streamPath = endpoint === 'agent' ? '/agent/stream' : '/chat/stream'
+  const combinedSignal = signal
+    ? (AbortSignal as unknown as { any: (signals: AbortSignal[]) => AbortSignal }).any([signal, AbortSignal.timeout(STREAM_TIMEOUT_MS)])
+    : AbortSignal.timeout(STREAM_TIMEOUT_MS)
   const response = await fetch(`${getApiV1()}${streamPath}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify({
       model,
       messages: allMessages,
       temperature,
       use_rag: useRag,
     }),
-    signal,
+    signal: combinedSignal,
   })
 
   if (!response.ok) {
@@ -279,7 +324,7 @@ export async function chat(options: ChatOptions): Promise<{ content: string; sou
 
   const response = await fetch(`${getApiV1()}/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify({
       model,
       messages: allMessages,
@@ -287,6 +332,7 @@ export async function chat(options: ChatOptions): Promise<{ content: string; sou
       use_rag: useRag,
       stream: false,
     }),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
 
   const data = await unwrap<{ message?: { content?: string }; sources?: RagSource[] }>(response)
@@ -301,7 +347,10 @@ export async function chat(options: ChatOptions): Promise<{ content: string; sou
 // =============================================================================
 
 export async function fetchDocuments(): Promise<DocumentInfo[]> {
-  const response = await fetch(`${getApiV1()}/documents`)
+  const response = await fetch(`${getApiV1()}/documents`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<DocumentInfo[]>(response)
 }
 
@@ -312,8 +361,9 @@ export async function ingestDocument(
 ): Promise<{ document_id: string; chunks_created: number }> {
   const response = await fetch(`${getApiV1()}/ingest`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify({ content, filename, content_type: contentType }),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
   return unwrap<{ document_id: string; chunks_created: number }>(response)
 }
@@ -321,6 +371,8 @@ export async function ingestDocument(
 export async function deleteDocument(documentId: string): Promise<void> {
   const response = await fetch(`${getApiV1()}/documents/${documentId}`, {
     method: 'DELETE',
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
   await unwrap<unknown>(response)
 }
@@ -330,13 +382,17 @@ export async function deleteDocument(documentId: string): Promise<void> {
 // =============================================================================
 
 export async function fetchServicesStatus(): Promise<ServicesStatusResponse> {
-  const response = await fetch(`${getApiUrl()}/services/status`)
+  const response = await fetch(`${getApiUrl()}/services/status`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<ServicesStatusResponse>(response)
 }
 
 export async function checkHealth(): Promise<boolean> {
   try {
     const response = await fetch(`${getApiUrl()}/health`, {
+      headers: buildHeaders(),
       signal: AbortSignal.timeout(5000),
     })
     if (!response.ok) return false
@@ -354,8 +410,9 @@ export async function checkHealth(): Promise<boolean> {
 export async function generateEmbedding(text: string, model?: string): Promise<number[]> {
   const response = await fetch(`${getApiV1()}/embed`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify({ text, model }),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
   const data = await unwrap<{ embedding: number[]; model: string; dimensions: number }>(response)
   return data.embedding
@@ -406,17 +463,26 @@ export async function fetchUsageAnalytics(
   if (startDate) params.set('start_date', startDate)
   if (endDate) params.set('end_date', endDate)
   if (model) params.set('model', model)
-  const response = await fetch(`${getApiV1()}/analytics/usage?${params}`)
+  const response = await fetch(`${getApiV1()}/analytics/usage?${params}`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<UsageAnalyticsData>(response)
 }
 
 export async function fetchModelAnalytics(): Promise<ModelAnalyticsData> {
-  const response = await fetch(`${getApiV1()}/analytics/models`)
+  const response = await fetch(`${getApiV1()}/analytics/models`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<ModelAnalyticsData>(response)
 }
 
 export async function fetchRagAnalytics(): Promise<RagAnalyticsData> {
-  const response = await fetch(`${getApiV1()}/analytics/rag`)
+  const response = await fetch(`${getApiV1()}/analytics/rag`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<RagAnalyticsData>(response)
 }
 
@@ -426,7 +492,10 @@ export async function fetchServiceHistory(
 ): Promise<{ history: ServiceHealthSnapshot[] }> {
   const params = new URLSearchParams({ hours: hours.toString() })
   if (service) params.set('service', service)
-  const response = await fetch(`${getApiV1()}/analytics/services/history?${params}`)
+  const response = await fetch(`${getApiV1()}/analytics/services/history?${params}`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<{ history: ServiceHealthSnapshot[] }>(response)
 }
 
@@ -440,7 +509,10 @@ export async function fetchDocumentChunks(
   offset: number = 0
 ): Promise<{ chunks: ChunkInfo[]; total: number }> {
   const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() })
-  const response = await fetch(`${getApiV1()}/documents/${documentId}/chunks?${params}`)
+  const response = await fetch(`${getApiV1()}/documents/${documentId}/chunks?${params}`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<{ chunks: ChunkInfo[]; total: number }>(response)
 }
 
@@ -457,19 +529,26 @@ export async function searchExplain(request: {
 }): Promise<SearchExplainResponse> {
   const response = await fetch(`${getApiV1()}/search/explain`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify(request),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
   return unwrap<SearchExplainResponse>(response)
 }
 
 export async function fetchRagStats(): Promise<RagStatsData> {
-  const response = await fetch(`${getApiV1()}/rag/stats`)
+  const response = await fetch(`${getApiV1()}/rag/stats`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<RagStatsData>(response)
 }
 
 export async function fetchCollections(): Promise<CollectionInfo[]> {
-  const response = await fetch(`${getApiV1()}/collections`)
+  const response = await fetch(`${getApiV1()}/collections`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<CollectionInfo[]>(response)
 }
 
@@ -479,8 +558,9 @@ export async function createCollection(
 ): Promise<unknown> {
   const response = await fetch(`${getApiV1()}/collections`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify({ name, description: description || undefined }),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
   return unwrap<unknown>(response)
 }
@@ -505,7 +585,10 @@ export interface SearchLogEntry {
 
 export async function fetchSearchHistory(limit = 50, offset = 0): Promise<SearchLogEntry[]> {
   const params = new URLSearchParams({ limit: limit.toString(), offset: offset.toString() })
-  const response = await fetch(`${getApiV1()}/eval/search-history?${params}`)
+  const response = await fetch(`${getApiV1()}/eval/search-history?${params}`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<SearchLogEntry[]>(response)
 }
 
@@ -536,8 +619,9 @@ export interface BatchEvalResult {
 export async function runEval(request: EvalRequest): Promise<EvalMetrics> {
   const response = await fetch(`${getApiV1()}/eval/run`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify(request),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
   return unwrap<EvalMetrics>(response)
 }
@@ -545,8 +629,9 @@ export async function runEval(request: EvalRequest): Promise<EvalMetrics> {
 export async function runBatchEval(request: BatchEvalRequest): Promise<BatchEvalResult> {
   const response = await fetch(`${getApiV1()}/eval/batch`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify(request),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
   return unwrap<BatchEvalResult>(response)
 }
@@ -566,8 +651,9 @@ export async function submitFeedback(feedback: {
 }): Promise<{ id: string; rating: number }> {
   const response = await fetch(`${getApiV1()}/feedback`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify(feedback),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
   return unwrap<{ id: string; rating: number }>(response)
 }
@@ -577,12 +663,19 @@ export async function submitFeedback(feedback: {
 // =============================================================================
 
 export async function fetchSystemInfo(): Promise<SystemInfo> {
-  const response = await fetch(`${getApiV1()}/system/info`)
+  const response = await fetch(`${getApiV1()}/system/info`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<SystemInfo>(response)
 }
 
 export async function clearCache(): Promise<{ cleared: boolean; keys_removed: number }> {
-  const response = await fetch(`${getApiV1()}/system/cache/clear`, { method: 'POST' })
+  const response = await fetch(`${getApiV1()}/system/cache/clear`, {
+    method: 'POST',
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
   return unwrap<{ cleared: boolean; keys_removed: number }>(response)
 }
 

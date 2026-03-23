@@ -6,16 +6,17 @@ here; rate limiting and guardrails middleware still run for every request.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
+from api.config import settings
 from api.dependencies import get_db
 from api.middleware.rate_limit import limiter
 from api.schemas.envelope import ok
-from api.services.user_auth import authenticate_by_email
+from api.services.user_auth import authenticate_by_email, create_user
 
 logger = logging.getLogger(__name__)
 
@@ -67,3 +68,67 @@ async def login(
             email=user["email"],
         ).model_dump()
     )
+
+
+class RegisterRequest(BaseModel):
+    """Self-service account creation payload."""
+
+    email: EmailStr
+    password: str
+    display_name: Optional[str] = None
+
+
+@router.post(
+    "/auth/register",
+    response_model=None,
+    status_code=201,
+    summary="Create a new user account (multi_user mode only)",
+)
+@limiter.limit("3/minute")
+async def register(
+    request: Request,
+    body: RegisterRequest,
+    db: asyncpg.Pool = Depends(get_db),
+) -> Dict[str, Any]:
+    """Register a new user account and return the issued API key.
+
+    Only available when ``AUTH_MODE=multi_user``. Returns HTTP 404 in
+    single-user mode so the endpoint is not discoverable in that configuration.
+
+    Rate limited to 3 requests per minute per IP to prevent abuse.
+
+    Returns:
+        HTTP 201 with ``{ "message": "Account created", "api_key": "..." }``
+
+    Raises:
+        HTTPException 404: When AUTH_MODE is not multi_user.
+        HTTPException 409: When the email address is already registered.
+        HTTPException 400: When the email address format is invalid.
+    """
+    if settings.AUTH_MODE != "multi_user":
+        raise HTTPException(status_code=404, detail="Not found")
+
+    try:
+        user = await create_user(
+            db,
+            email=str(body.email),
+            password=body.password,
+            username=body.display_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        # asyncpg raises UniqueViolationError for duplicate email/username.
+        # Import lazily to avoid a hard dependency on asyncpg internals.
+        import asyncpg as _asyncpg
+
+        if isinstance(exc, _asyncpg.UniqueViolationError):
+            raise HTTPException(
+                status_code=409,
+                detail="An account with this email address already exists.",
+            )
+        logger.exception("Unexpected error during user registration")
+        raise HTTPException(status_code=500, detail="Registration failed")
+
+    logger.info("New user registered: %s (id=%s)", user["email"], user["id"])
+    return ok({"message": "Account created", "api_key": user["api_key"]})
