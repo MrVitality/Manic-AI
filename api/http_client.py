@@ -17,7 +17,9 @@ def _set_client(client: Optional[httpx.AsyncClient]):
 
 
 async def init_client(*, app=None):
-    client = httpx.AsyncClient(timeout=60.0)
+    # 30 s global default — callers that need longer (e.g. Ollama inference)
+    # should pass an explicit per-request timeout via the `timeout` parameter.
+    client = httpx.AsyncClient(timeout=30.0)
     _set_client(client)
     if app is not None:
         app.state.http_client = client

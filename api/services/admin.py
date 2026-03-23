@@ -113,7 +113,7 @@ async def update_user(
     """
     # SECURITY: field names below are hardcoded constants — they MUST NOT come
     # from user input. The allowlist below documents and enforces this invariant.
-    ALLOWED_FIELDS = {"is_active", "is_admin", "display_name"}
+    ALLOWED_FIELDS = {"is_active", "is_admin", "username", "rate_limit_override"}
 
     set_clauses: List[str] = []
     values: List[Any] = []
@@ -148,7 +148,7 @@ async def update_user(
     # never derived from user input.
     for clause in set_clauses:
         field = clause.split("=")[0].strip()
-        if field not in ALLOWED_FIELDS and field not in {"rate_limit_override", "username"}:
+        if field not in ALLOWED_FIELDS:
             raise ValueError(f"Unexpected field in update clause: {field!r}")
 
     set_clauses.append("updated_at = NOW()")

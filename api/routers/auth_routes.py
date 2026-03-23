@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
 from api.dependencies import get_db
+from api.middleware.rate_limit import limiter
 from api.schemas.envelope import ok
 from api.services.user_auth import authenticate_by_email
 
@@ -37,7 +38,9 @@ class LoginResponse(BaseModel):
 
 
 @router.post("/auth/login", response_model=None, summary="Obtain an API key via email + password")
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     body: LoginRequest,
     db: asyncpg.Pool = Depends(get_db),
 ) -> Dict[str, Any]:

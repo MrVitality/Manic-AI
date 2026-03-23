@@ -91,30 +91,18 @@ END;
 $$;
 
 -- -----------------------------------------------------------------------------
--- Admin: Execute custom SQL (restricted to SELECT only)
+-- Admin: Execute custom SQL
+-- WARNING: THIS FUNCTION IS DISABLED FOR SECURITY REASONS.
+-- The original LIKE 'SELECT%' prefix check is trivially bypassed via subqueries
+-- that contain mutations (e.g. SELECT (DELETE FROM ...) or CTEs with DML).
+-- Do not re-enable without a proper allowlist-based SQL parser.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.execute_custom_sql(sql_query TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql SECURITY DEFINER
 AS $$
-DECLARE
-    result JSONB;
 BEGIN
-    IF NOT (UPPER(TRIM(sql_query)) LIKE 'SELECT%') THEN
-        RETURN jsonb_build_object(
-            'error', 'Only SELECT queries are allowed',
-            'detail', 'PERMISSION_DENIED'
-        );
-    END IF;
-    
-    EXECUTE 'SELECT COALESCE(jsonb_agg(t), ''[]''::jsonb) FROM (' || sql_query || ') t' INTO result;
-    RETURN result;
-EXCEPTION
-    WHEN OTHERS THEN
-        RETURN jsonb_build_object(
-            'error', SQLERRM,
-            'detail', SQLSTATE
-        );
+    RAISE EXCEPTION 'execute_custom_sql is disabled for security';
 END;
 $$;
 

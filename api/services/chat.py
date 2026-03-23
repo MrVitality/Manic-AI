@@ -108,7 +108,10 @@ async def log_chat(
                    VALUES ($1, $2, $3, $4, $5, $6, $7)""",
                 model, prompt_tokens, completion_tokens,
                 prompt_tokens + completion_tokens, latency_ms, has_rag,
-                None,  # user_id: placeholder until per-request auth propagation is wired
+                # TODO: propagate user_id from the authenticated request context.
+                # ChatRequest carries user_id but log_chat does not currently accept it.
+                # Wire it through once per-request auth context is available end-to-end.
+                None,
             )
     except Exception:
         logger.warning("chat_log write failed", exc_info=True)

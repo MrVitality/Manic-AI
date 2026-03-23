@@ -102,7 +102,7 @@ async def _process_file(
     db_pool: Any,
 ) -> None:
     """Ingest a single file and move it to done/ or failed/."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     filename = path.name
     suffix = path.suffix.lower()
     content_type = _CONTENT_TYPE_MAP.get(suffix, "text/plain")
@@ -130,7 +130,7 @@ async def _process_file(
             content_type=content_type,
             metadata={
                 "source": "folder_watcher",
-                "original_path": str(path),
+                "original_path": path.name,
                 "ingested_at": datetime.now(timezone.utc).isoformat(),
             },
         )
@@ -144,7 +144,7 @@ async def _process_file(
     except Exception:
         logger.exception("folder_watcher: failed to ingest %s", filename)
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, _move_file_sync, path, FAILED_DIR)
         except Exception:
             logger.exception(
@@ -159,7 +159,7 @@ async def _process_file(
 async def _watcher_loop(http_client: httpx.AsyncClient, db_pool: Any) -> None:
     """Infinite loop that scans the inbox and processes new files."""
     logger.info("folder_watcher: started — watching %s", INBOX_DIR.resolve())
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     # Ensure inbox structure exists before first scan.
     await loop.run_in_executor(None, _ensure_directories)

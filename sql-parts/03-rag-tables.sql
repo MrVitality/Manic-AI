@@ -16,7 +16,8 @@ DROP TABLE IF EXISTS rag.documents CASCADE;
 -- -----------------------------------------------------------------------------
 CREATE TABLE rag.documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID,
+    -- NOT NULL: system-owned documents should use a dedicated system user UUID
+    user_id UUID NOT NULL,
     filename TEXT NOT NULL,
     content_type TEXT,
     file_size BIGINT,
@@ -72,7 +73,8 @@ CREATE INDEX idx_chunks_metadata ON rag.chunks USING gin(metadata);
 -- -----------------------------------------------------------------------------
 CREATE TABLE rag.collections (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID,
+    -- NOT NULL: system-owned collections should use a dedicated system user UUID
+    user_id UUID NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
     is_public BOOLEAN DEFAULT FALSE,

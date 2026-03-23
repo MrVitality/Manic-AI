@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import time
+from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
@@ -28,12 +29,19 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # In-memory job tracker (supplement DB tracking for when DB is unavailable)
 # ---------------------------------------------------------------------------
-_job_status: Dict[str, Dict[str, Any]] = {}
+
+_JOB_STATUS_MAX_SIZE = 1000
+
+# Bounded OrderedDict: when the cap is reached the oldest entry is evicted.
+_job_status: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
 
 
 def _update_job(document_id: str, **fields: Any) -> None:
-    """Update the in-memory job record."""
+    """Update the in-memory job record, evicting the oldest entry if the cap is exceeded."""
     if document_id not in _job_status:
+        # Evict the oldest entry before inserting a new one when at capacity.
+        if len(_job_status) >= _JOB_STATUS_MAX_SIZE:
+            _job_status.popitem(last=False)
         _job_status[document_id] = {}
     _job_status[document_id].update(fields, updated_at=datetime.now(timezone.utc).isoformat())
 

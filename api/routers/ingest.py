@@ -296,8 +296,7 @@ class _PiiScanRequest(BaseModel):
 
 
 class _PiiEntity(BaseModel):
-    type: str
-    value: str
+    entity_type: str
     start: int
     end: int
 
@@ -312,17 +311,17 @@ async def pii_scan(body: _PiiScanRequest):
     """Scan text for PII without storing anything.
 
     Runs the regex-based PII detector and returns a report of every entity
-    found, including its type, redacted value, and character offsets.
+    found, including its type and character offsets.
 
-    The ``value`` field in each entity contains the raw matched string so
-    callers can make an informed decision about whether to redact before
-    ingestion.  No data is persisted by this endpoint.
+    Raw PII values are intentionally omitted from the response to avoid
+    echoing sensitive data back to the caller.  Use the ``start``/``end``
+    offsets to locate the match in the original text.  No data is persisted
+    by this endpoint.
     """
     findings = detect_pii(body.content)
     entities = [
         _PiiEntity(
-            type=f["type"],
-            value=f["value"],
+            entity_type=f["type"],
             start=f["start"],
             end=f["end"],
         )

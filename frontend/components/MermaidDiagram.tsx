@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import DOMPurify from 'dompurify'
 
 interface MermaidDiagramProps {
   code: string
@@ -31,7 +32,7 @@ export default function MermaidDiagram({ code, id }: MermaidDiagramProps) {
             secondaryColor: '#1e293b',
             tertiaryColor: '#0f172a',
           },
-          securityLevel: 'loose',
+          securityLevel: 'strict',
         })
 
         // mermaid.render requires a unique element ID each call to avoid collisions
@@ -39,7 +40,7 @@ export default function MermaidDiagram({ code, id }: MermaidDiagramProps) {
         const { svg } = await mermaid.render(diagramId, code)
 
         if (!cancelled && containerRef.current) {
-          containerRef.current.innerHTML = svg
+          containerRef.current.innerHTML = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true }, FORBID_TAGS: ['script'], FORBID_ATTR: ['onerror', 'onload', 'onclick'] })
           // Make the generated SVG responsive
           const svgEl = containerRef.current.querySelector('svg')
           if (svgEl) {

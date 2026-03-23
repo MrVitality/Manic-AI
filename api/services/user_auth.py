@@ -8,6 +8,7 @@ Usage:
     Default AUTH_MODE=single (current behavior, shared API key).
 """
 
+import asyncio
 import re
 import secrets
 from typing import Any, Dict, Optional
@@ -18,14 +19,31 @@ import bcrypt
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def hash_password(password: str) -> str:
-    """Hash a password using bcrypt (constant-time, salted)."""
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("ascii")
+async def hash_password(password: str) -> str:
+    """Hash a password using bcrypt (constant-time, salted).
+
+    Runs the blocking bcrypt call in a thread-pool executor so it does not
+    stall the asyncio event loop.
+    """
+    loop = asyncio.get_running_loop()
+    hashed: bytes = await loop.run_in_executor(
+        None,
+        lambda: bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()),
+    )
+    return hashed.decode("ascii")
 
 
-def verify_password(plain: str, hashed: str) -> bool:
-    """Verify a plaintext password against a bcrypt hash."""
-    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("ascii"))
+async def verify_password(plain: str, hashed: str) -> bool:
+    """Verify a plaintext password against a bcrypt hash.
+
+    Runs the blocking bcrypt call in a thread-pool executor so it does not
+    stall the asyncio event loop.
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None,
+        lambda: bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("ascii")),
+    )
 
 
 async def create_user(
@@ -51,7 +69,7 @@ async def create_user(
     if not _EMAIL_RE.match(email):
         raise ValueError(f"Invalid email address: {email!r}")
 
-    password_hash = hash_password(password)
+    password_hash = await hash_password(password)
     api_key = f"manic_{secrets.token_urlsafe(32)}"
 
     async with db.acquire() as conn:
@@ -122,7 +140,7 @@ async def authenticate_by_email(
         )
     if not row:
         return None
-    if not verify_password(password, row["password_hash"]):
+    if not await verify_password(password, row["password_hash"]):
         return None
     result = dict(row)
     result.pop("password_hash", None)

@@ -1,25 +1,9 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Conversation, Message } from '@/types'
+import { getApiUrl } from '@/lib/api'
 
 const generateId = () => crypto.randomUUID()
-
-const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
-
-function getApiUrl(): string {
-  if (typeof window === 'undefined') return DEFAULT_API_URL
-  try {
-    const stored = localStorage.getItem('manic-ai-ui')
-    if (stored) {
-      const parsed = JSON.parse(stored) as { state?: { settings?: { apiUrl?: string } } }
-      const candidate = parsed?.state?.settings?.apiUrl
-      if (candidate && typeof candidate === 'string') return candidate
-    }
-  } catch {
-    // ignore
-  }
-  return DEFAULT_API_URL
-}
 
 interface ConversationState {
   conversations: Conversation[]

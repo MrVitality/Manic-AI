@@ -3,6 +3,12 @@
 -- Run after Part 1
 -- =============================================================================
 
+-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+-- WARNING: DATA DESTRUCTIVE — This script drops and recreates all tables.
+-- DO NOT run against a database containing real data.
+-- For production migrations, use incremental ALTER TABLE statements.
+-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 -- Drop existing tables (safe cleanup)
 DROP TABLE IF EXISTS public.agent_messages CASCADE;
 DROP TABLE IF EXISTS public.agent_conversations CASCADE;

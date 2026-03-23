@@ -77,6 +77,25 @@ class SupabaseDocumentRepository:
             for r in results
         ]
 
+    async def get_document_user_id(self, document_id: str) -> Optional[str]:
+        """Return the user_id of a document, or None if the document does not exist.
+
+        Used to perform ownership checks before mutating a document.
+        Returns the string UUID of the owning user, or None for anonymous/
+        unowned documents and missing documents alike.  Callers should treat
+        a missing document and a wrong owner identically (return 404) to
+        prevent enumeration.
+        """
+        async with self._pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT user_id::text FROM rag.documents WHERE id = $1",
+                document_id,
+            )
+        if row is None:
+            return None
+        # user_id may legitimately be NULL for documents ingested without auth
+        return row["user_id"]
+
     async def delete_document(self, document_id: str) -> bool:
         async with self._pool.acquire() as conn:
             result = await conn.execute(

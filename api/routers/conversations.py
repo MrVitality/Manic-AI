@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from api.dependencies import get_db
@@ -72,6 +72,40 @@ def _msg_row(row: Any) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Ownership verification helper
+# ---------------------------------------------------------------------------
+
+
+def _caller_id(request: Request) -> Optional[str]:
+    """Extract the caller's user identity from the request.
+
+    Identity is read from the ``X-User-Id`` header, which is populated by the
+    authentication middleware for multi-user deployments.  When the header is
+    absent (e.g. single-key dev mode) None is returned and ownership checks
+    are skipped so that existing single-tenant deployments continue to work.
+    """
+    return request.headers.get("X-User-Id") or None
+
+
+def _assert_owner(conv_row: Any, caller_id: Optional[str]) -> None:
+    """Raise HTTP 404 if the caller does not own the conversation.
+
+    Returns 404 instead of 403 to avoid leaking the existence of resources
+    belonging to other users (IDOR enumeration prevention).
+
+    When ``caller_id`` is None (unauthenticated / single-key mode), the check
+    is skipped so that existing deployments without per-user auth are not
+    broken.
+    """
+    if caller_id is None:
+        return
+    metadata: Dict[str, Any] = conv_row["metadata"] or {}
+    owner_id: Optional[str] = metadata.get("user_id")
+    if owner_id is not None and owner_id != caller_id:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -121,6 +155,7 @@ async def list_conversations(
 @router.get("/{conversation_id}", response_model=None, tags=["conversations"])
 async def get_conversation(
     conversation_id: str,
+    request: Request,
     db: asyncpg.Pool = Depends(get_db),
 ):
     """Return a conversation and all its messages ordered by creation time."""
@@ -131,6 +166,8 @@ async def get_conversation(
         )
         if not conv:
             raise HTTPException(status_code=404, detail=f"Conversation {conversation_id} not found")
+
+        _assert_owner(conv, _caller_id(request))
 
         messages = await conn.fetch(
             """
@@ -178,6 +215,7 @@ async def create_conversation(
 async def update_conversation(
     conversation_id: str,
     body: ConversationUpdate,
+    request: Request,
     db: asyncpg.Pool = Depends(get_db),
 ):
     """Update ``title`` and/or ``system_prompt`` on an existing conversation."""
@@ -186,10 +224,12 @@ async def update_conversation(
 
     async with db.acquire() as conn:
         existing = await conn.fetchrow(
-            "SELECT id FROM public.conversations WHERE id = $1", conversation_id,
+            "SELECT id, metadata FROM public.conversations WHERE id = $1", conversation_id,
         )
         if not existing:
             raise HTTPException(status_code=404, detail=f"Conversation {conversation_id} not found")
+
+        _assert_owner(existing, _caller_id(request))
 
         row = await conn.fetchrow(
             """
@@ -212,10 +252,19 @@ async def update_conversation(
 @router.delete("/{conversation_id}", response_model=None, tags=["conversations"])
 async def delete_conversation(
     conversation_id: str,
+    request: Request,
     db: asyncpg.Pool = Depends(get_db),
 ):
     """Delete a conversation and all its messages (cascade is handled by the DB FK)."""
     async with db.acquire() as conn:
+        existing = await conn.fetchrow(
+            "SELECT id, metadata FROM public.conversations WHERE id = $1", conversation_id,
+        )
+        if not existing:
+            raise HTTPException(status_code=404, detail=f"Conversation {conversation_id} not found")
+
+        _assert_owner(existing, _caller_id(request))
+
         result = await conn.execute(
             "DELETE FROM public.conversations WHERE id = $1", conversation_id,
         )
@@ -230,15 +279,18 @@ async def delete_conversation(
 async def add_message(
     conversation_id: str,
     body: MessageCreate,
+    request: Request,
     db: asyncpg.Pool = Depends(get_db),
 ):
     """Append a message to a conversation."""
     async with db.acquire() as conn:
-        conv_exists = await conn.fetchval(
-            "SELECT id FROM public.conversations WHERE id = $1", conversation_id,
+        conv_row = await conn.fetchrow(
+            "SELECT id, metadata FROM public.conversations WHERE id = $1", conversation_id,
         )
-        if not conv_exists:
+        if not conv_row:
             raise HTTPException(status_code=404, detail=f"Conversation {conversation_id} not found")
+
+        _assert_owner(conv_row, _caller_id(request))
 
         row = await conn.fetchrow(
             """

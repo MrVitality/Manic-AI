@@ -40,6 +40,20 @@ async def delete_document(
     repo: SupabaseDocumentRepository = Depends(get_document_repo),
     qdrant: QdrantVectorRepository = Depends(get_qdrant_repo),
 ):
+    # Fetch the document's owner before deleting so we can enforce IDOR
+    # protection.  We return 404 in all non-owned cases to avoid enumeration.
+    caller_id: Optional[str] = request.headers.get("X-User-Id") or None
+    owner_id = await repo.get_document_user_id(document_id)
+
+    if owner_id is None and caller_id is not None:
+        # Document does not exist — return 404 regardless of caller identity.
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if caller_id is not None and owner_id is not None and owner_id != caller_id:
+        # Caller exists, document exists, but caller is not the owner.
+        # Return 404 (not 403) to prevent enumeration of other users' docs.
+        raise HTTPException(status_code=404, detail="Document not found")
+
     deleted = await repo.delete_document(document_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Document not found")

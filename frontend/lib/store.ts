@@ -30,8 +30,13 @@ export function useChatStore() {
   const documentState = useDocumentStore()
   const uiState = useUiStore()
 
-  // Derived: currentConversation (replaces stored currentConversation)
-  const currentConversation = conversationState.getCurrentConversation()
+  // Derived: currentConversation — use a stable selector to avoid a new object
+  // reference on every render when nothing has actually changed.
+  const currentConversation = useConversationStore(
+    (s) => s.currentConversationId
+      ? s.conversations.find((c) => c.id === s.currentConversationId) ?? null
+      : null
+  )
 
   return {
     // Conversation state

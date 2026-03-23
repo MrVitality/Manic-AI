@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react'
 import { useUiStore } from '@/lib/stores/uiStore'
+import { validateUploadedFile } from '@/lib/validation'
 
 interface AttachedFile {
   name: string
@@ -126,6 +127,7 @@ export default function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
   const [isReadingFile, setIsReadingFile] = useState(false)
+  const [fileError, setFileError] = useState<string | null>(null)
 
   // --- Slash command state ---
   const [showSlashMenu, setShowSlashMenu] = useState(false)
@@ -359,9 +361,24 @@ export default function MessageInput({
     // Reset the input so the same file can be picked again
     e.target.value = ''
 
+    // Validate file size and type before reading
+    const isImage = IMAGE_MIME_TYPES.has(file.type)
+    if (!isImage) {
+      const validation = validateUploadedFile(file)
+      if (!validation.valid) {
+        setFileError(validation.error ?? 'Invalid file')
+        setTimeout(() => setFileError(null), 5000)
+        return
+      }
+    } else if (file.size > 10 * 1024 * 1024) {
+      setFileError('Image too large (max 10 MB)')
+      setTimeout(() => setFileError(null), 5000)
+      return
+    }
+    setFileError(null)
+
     setIsReadingFile(true)
     try {
-      const isImage = IMAGE_MIME_TYPES.has(file.type)
 
       if (isImage) {
         const base64 = await readAsDataURL(file)
@@ -477,12 +494,19 @@ export default function MessageInput({
         </div>
       )}
 
+      {/* File validation error */}
+      {fileError && (
+        <div className="mb-2 px-3 py-1.5 rounded-sm text-xs font-mono" style={{ background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171' }}>
+          {fileError}
+        </div>
+      )}
+
       {/* File Chips */}
       {attachedFiles.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
           {attachedFiles.map((file, index) => (
             <div
-              key={index}
+              key={`${file.name}-${index}`}
               className="flex items-center gap-1.5 px-2 py-1 rounded-sm text-xs font-mono border"
               style={{
                 borderColor: 'var(--accent-cyan)',

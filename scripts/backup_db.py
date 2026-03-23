@@ -137,6 +137,11 @@ def main():
             *schema_args,
             "postgres",
         ]
+        # NOTE: capture_output=True buffers the entire dump in memory before
+        # writing it to disk. This is acceptable for small databases but will
+        # exhaust available RAM on large ones. For large databases, use the
+        # primary pg_dump path (install pg_dump locally) which streams output
+        # through gzip without buffering.
         result = subprocess.run(docker_cmd, capture_output=True)
         if result.returncode != 0:
             print(f"Error: {result.stderr.decode()}")

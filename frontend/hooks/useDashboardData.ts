@@ -84,18 +84,28 @@ export function useDashboardData() {
     let ws: WebSocket | null = null
     let reconnectTimeout: ReturnType<typeof setTimeout>
     let usingSse = false
+    let retryCount = 0
+    const MAX_RETRIES = 10
 
     const connectWs = () => {
+      if (retryCount >= MAX_RETRIES) {
+        setError('Live status connection failed after maximum retries. Falling back to polling.')
+        return
+      }
+
       try {
         ws = connectStatusWebSocket(
           (data) => {
             applyServiceData(data)
             setIsStreaming(true)
+            retryCount = 0  // reset on successful message
           },
           () => {
-            // WebSocket error — reconnect after 5s
+            // WebSocket error — reconnect with exponential backoff
             setIsStreaming(false)
-            reconnectTimeout = setTimeout(connectWs, 5000)
+            retryCount++
+            const delay = Math.min(5000 * Math.pow(2, retryCount - 1), 60000)
+            reconnectTimeout = setTimeout(connectWs, delay)
           },
         )
 
@@ -107,7 +117,13 @@ export function useDashboardData() {
           setIsStreaming(false)
           // Only reconnect on unexpected closes (not a clean teardown from cleanup)
           if (!event.wasClean) {
-            reconnectTimeout = setTimeout(connectWs, 5000)
+            retryCount++
+            if (retryCount <= MAX_RETRIES) {
+              const delay = Math.min(5000 * Math.pow(2, retryCount - 1), 60000)
+              reconnectTimeout = setTimeout(connectWs, delay)
+            } else {
+              setError('Live status connection failed after maximum retries. Falling back to polling.')
+            }
           }
         }
       } catch {

@@ -40,7 +40,7 @@ services:
       - name: cors
       - name: key-auth
         config:
-          hide_credentials: false
+          hide_credentials: true
   - name: rest-v1
     url: http://supabase-rest:3000/
     routes:
@@ -52,7 +52,7 @@ services:
       - name: cors
       - name: key-auth
         config:
-          hide_credentials: false
+          hide_credentials: true
   - name: storage-v1
     url: http://supabase-storage:5000/
     routes:

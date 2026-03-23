@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { PlusIcon, CloseIcon, TrashIcon } from '@/components/ui/Icons'
+import { getApiUrl } from '@/lib/api'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,8 +47,6 @@ interface CreateUserForm {
 // API helpers
 // ---------------------------------------------------------------------------
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8081'
-
 function getApiKey(): string {
   // sessionStorage: not accessible after tab close, reduces XSS exfiltration window
   if (typeof window === 'undefined') return ''
@@ -58,7 +57,7 @@ async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(`${getApiUrl()}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

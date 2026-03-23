@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, memo, useMemo, useRef } from 'react'
+import { useState, useCallback, memo, useMemo, useRef, useEffect } from 'react'
 import { useArtifactStore } from '@/lib/stores/artifactStore'
 import type { Artifact, ArtifactType } from '@/lib/stores/artifactStore'
 import ReactMarkdown from 'react-markdown'
@@ -378,6 +378,8 @@ const ArtifactContent = memo(function ArtifactContent({
   const [copied, setCopied] = useState(false)
   // sandbox state: null = not yet run, string = srcdoc to render
   const [sandboxSrc, setSandboxSrc] = useState<string | null>(null)
+  // User must explicitly approve before executable code runs in the sandbox
+  const [codeApproved, setCodeApproved] = useState(false)
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(artifact.content)
@@ -404,12 +406,35 @@ const ArtifactContent = memo(function ArtifactContent({
     setSandboxSrc(null)
   }, [])
 
+  // Reset approval whenever the artifact content changes
+  useEffect(() => {
+    setCodeApproved(false)
+    setSandboxSrc(null)
+  }, [artifact.content])
+
   if (artifact.type === 'code') {
     const canRun = isSandboxable(artifact.language)
     const isPython = artifact.language === 'python'
 
     return (
       <div className="flex flex-col h-full">
+        {/* Execution approval warning banner */}
+        {canRun && !isPython && !codeApproved && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 text-xs font-mono"
+            style={{ background: 'rgba(234,179,8,0.10)', borderBottom: '1px solid rgba(234,179,8,0.35)', color: '#ca8a04' }}
+          >
+            <span className="flex-1">This artifact contains executable code from the AI.</span>
+            <button
+              onClick={() => { setCodeApproved(true); handleRun() }}
+              className="px-2 py-0.5 border font-semibold uppercase transition-colors"
+              style={{ borderColor: 'rgba(234,179,8,0.6)', color: '#ca8a04', background: 'rgba(234,179,8,0.12)' }}
+            >
+              Run
+            </button>
+          </div>
+        )}
+
         {/* Code toolbar */}
         <div
           className="flex items-center gap-1.5 px-3 py-1.5 border-b"
@@ -429,19 +454,21 @@ const ArtifactContent = memo(function ArtifactContent({
 
           {canRun && (
             <>
-              <button
-                onClick={handleRun}
-                className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono border uppercase font-semibold transition-colors"
-                style={{
-                  background: 'rgba(16,185,129,0.08)',
-                  borderColor: 'rgba(16,185,129,0.35)',
-                  color: 'var(--accent-emerald)',
-                }}
-                title={isPython ? 'Python execution requires backend' : 'Run in sandbox'}
-              >
-                <PlayIcon className="w-3 h-3" />
-                [RUN]
-              </button>
+              {codeApproved && (
+                <button
+                  onClick={handleRun}
+                  className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono border uppercase font-semibold transition-colors"
+                  style={{
+                    background: 'rgba(16,185,129,0.08)',
+                    borderColor: 'rgba(16,185,129,0.35)',
+                    color: 'var(--accent-emerald)',
+                  }}
+                  title={isPython ? 'Python execution requires backend' : 'Run in sandbox'}
+                >
+                  <PlayIcon className="w-3 h-3" />
+                  [RUN]
+                </button>
+              )}
 
               {sandboxSrc !== null && (
                 <button
@@ -583,24 +610,43 @@ const ArtifactContent = memo(function ArtifactContent({
   if (artifact.type === 'html') {
     return (
       <div className="flex flex-col h-full">
+        {/* Execution approval warning banner */}
+        {!codeApproved && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 text-xs font-mono"
+            style={{ background: 'rgba(234,179,8,0.10)', borderBottom: '1px solid rgba(234,179,8,0.35)', color: '#ca8a04' }}
+          >
+            <span className="flex-1">This artifact contains executable code from the AI.</span>
+            <button
+              onClick={() => { setCodeApproved(true); handleRun() }}
+              className="px-2 py-0.5 border font-semibold uppercase transition-colors"
+              style={{ borderColor: 'rgba(234,179,8,0.6)', color: '#ca8a04', background: 'rgba(234,179,8,0.12)' }}
+            >
+              Run
+            </button>
+          </div>
+        )}
+
         {/* HTML preview toolbar */}
         <div
           className="flex items-center gap-1.5 px-3 py-1.5 border-b"
           style={{ borderColor: 'var(--border-color)', background: 'var(--bg-secondary)' }}
         >
-          <button
-            onClick={handleRun}
-            className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono border uppercase font-semibold transition-colors"
-            style={{
-              background: 'rgba(16,185,129,0.08)',
-              borderColor: 'rgba(16,185,129,0.35)',
-              color: 'var(--accent-emerald)',
-            }}
-            title="Reload preview"
-          >
-            <PlayIcon className="w-3 h-3" />
-            [RUN]
-          </button>
+          {codeApproved && (
+            <button
+              onClick={handleRun}
+              className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono border uppercase font-semibold transition-colors"
+              style={{
+                background: 'rgba(16,185,129,0.08)',
+                borderColor: 'rgba(16,185,129,0.35)',
+                color: 'var(--accent-emerald)',
+              }}
+              title="Reload preview"
+            >
+              <PlayIcon className="w-3 h-3" />
+              [RUN]
+            </button>
+          )}
           {sandboxSrc !== null && (
             <button
               onClick={handleClearOutput}
@@ -616,7 +662,7 @@ const ArtifactContent = memo(function ArtifactContent({
           )}
         </div>
 
-        {sandboxSrc !== null ? (
+        {sandboxSrc !== null && (
           <div className="flex flex-col flex-1 min-h-0">
             <div
               className="flex-shrink-0 overflow-auto"
@@ -661,14 +707,6 @@ const ArtifactContent = memo(function ArtifactContent({
               />
             </div>
           </div>
-        ) : (
-          <iframe
-            srcDoc={artifact.content}
-            sandbox="allow-scripts"
-            className="w-full flex-1 border-0"
-            style={{ background: '#fff' }}
-            title="HTML Artifact Preview"
-          />
         )}
       </div>
     )

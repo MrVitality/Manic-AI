@@ -7,7 +7,6 @@ import asyncpg
 import httpx
 from fastapi import APIRouter, Depends, Query
 
-from api.auth import require_api_key
 from api.dependencies import get_db_optional, get_http_client, get_redis
 from api.repositories.redis_cache import RedisCacheRepository
 from api.schemas.envelope import ok
@@ -19,7 +18,8 @@ from api.services.analytics import (
 )
 from api.services.cache import get_cached, set_cached
 
-router = APIRouter(dependencies=[Depends(require_api_key)])
+# Auth is enforced at the v1_router level in app.py — no per-router dependency needed.
+router = APIRouter()
 
 _PERIOD_INTERVALS = {
     "hour": "1 hour",
@@ -34,7 +34,7 @@ _CACHE_PREFIX = "manic:cache:analytics"
 def _params_hash(*parts: Any) -> str:
     """Stable short hash of cache-key parameters."""
     raw = ":".join(str(p) for p in parts)
-    return hashlib.md5(raw.encode()).hexdigest()[:12]
+    return hashlib.sha256(raw.encode()).hexdigest()[:12]
 
 
 @router.get("/analytics/usage", response_model=None, tags=["analytics"])

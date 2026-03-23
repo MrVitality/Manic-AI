@@ -509,7 +509,7 @@ const SourceCitations = memo(function SourceCitations({ sources }: { sources: Ra
         <div className="mt-3 space-y-2 animate-fade-in">
           {sources.map((source, idx) => (
             <div
-              key={source.id || idx}
+              key={source.id || `source-${idx}-${source.document_id}`}
               className="p-3 rounded-none text-sm border-l-2 border-y border-r"
               style={{
                 borderColor: 'var(--border-color)',

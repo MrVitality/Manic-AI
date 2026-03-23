@@ -54,7 +54,7 @@ export function invalidateApiUrlCache(): void {
   _cachedApiUrl = null
 }
 
-const getApiUrl = (): string => {
+export const getApiUrl = (): string => {
   if (_cachedApiUrl !== null) return _cachedApiUrl
 
   // Check localStorage for user-configured API URL (from settings)

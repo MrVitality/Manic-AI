@@ -23,6 +23,7 @@ export function useChat() {
   } = useChatStore()
 
   const abortControllerRef = useRef<AbortController | null>(null)
+  const detectedBlockHashesRef = useRef(new Set<string>())
 
   // Cancel any in-flight stream when the component using this hook unmounts.
   useEffect(() => {
@@ -30,6 +31,12 @@ export function useChat() {
       abortControllerRef.current?.abort()
     }
   }, [])
+
+  // Clear the artifact dedup set whenever the active conversation changes so
+  // blocks from a previous conversation are never skipped in a new one.
+  useEffect(() => {
+    detectedBlockHashesRef.current.clear()
+  }, [currentConversationId])
 
   const sendMessage = useCallback(async (content: string) => {
     if (!content.trim() || isGenerating) return
@@ -96,7 +103,7 @@ export function useChat() {
           })
 
           // Detect artifact patterns in streamed content
-          detectAndAddArtifacts(fullContent)
+          detectAndAddArtifacts(fullContent, detectedBlockHashesRef.current)
         } else if (event.type === 'sources' && event.sources) {
           sources = event.sources
           updateMessage(conversationId, assistantMessageId, {
@@ -226,9 +233,11 @@ export function useChat() {
 // Artifact detection: parses completed fenced code blocks from streamed
 // content and opens them in the artifact panel for large blocks (>6 lines).
 // ---------------------------------------------------------------------------
-const detectedBlockHashes = new Set<string>()
+// NOTE: detectedBlockHashes is now passed in per-hook-instance so it is
+// scoped to a single conversation session and cleared automatically when
+// the hook unmounts or the conversation changes.  See useChat() above.
 
-function detectAndAddArtifacts(content: string) {
+function detectAndAddArtifacts(content: string, detectedBlockHashes: Set<string>) {
   const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g
   let match: RegExpExecArray | null
 
