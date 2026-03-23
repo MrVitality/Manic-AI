@@ -1,0 +1,24 @@
+# Manic AI Code Owners
+# These owners are automatically requested for review on PRs.
+
+# Default — all files
+* @MrVitality
+
+# Frontend
+/frontend/ @MrVitality
+
+# API
+/api/ @MrVitality
+
+# Infrastructure
+/docker-compose*.yml @MrVitality
+/supabase/ @MrVitality
+/sql-parts/ @MrVitality
+
+# CI/CD
+/.github/ @MrVitality
+
+# Security-sensitive files require explicit review
+/api/auth.py @MrVitality
+/api/middleware/ @MrVitality
+/api/plugins/code_exec/ @MrVitality

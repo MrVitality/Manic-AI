@@ -1,0 +1,61 @@
+version: 2
+updates:
+  # Python (pip) — API dependencies
+  - package-ecosystem: pip
+    directory: /api
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - python
+    open-pull-requests-limit: 5
+    groups:
+      opentelemetry:
+        patterns:
+          - "opentelemetry-*"
+      fastapi:
+        patterns:
+          - "fastapi"
+          - "uvicorn*"
+          - "pydantic*"
+
+  # npm — Frontend dependencies
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - javascript
+    open-pull-requests-limit: 5
+    groups:
+      next:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+          - "@next/*"
+      types:
+        patterns:
+          - "@types/*"
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ci
+    open-pull-requests-limit: 3
+
+  # Docker
+  - package-ecosystem: docker
+    directory: /api
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+      - docker

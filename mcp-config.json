@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "manic-ai": {
-      "command": "python",
-      "args": ["-m", "api.mcp_main"],
-      "cwd": "./api"
-    }
-  }
-}
