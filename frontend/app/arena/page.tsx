@@ -109,6 +109,8 @@ export default function ArenaPage() {
   const abortA = useRef<AbortController | null>(null)
   const abortB = useRef<AbortController | null>(null)
 
+  useEffect(() => { document.title = 'Arena — Manic AI' }, [])
+
   useEffect(() => {
     setVotes(loadVotes())
   }, [])

@@ -3,12 +3,15 @@
 import { useState, useRef, DragEvent } from 'react'
 import { useDocuments } from '@/hooks/useDocuments'
 import { formatFileSize, formatDate } from '@/lib/api'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/components/Toast'
 
 export default function DocumentManager() {
   const { documents, isLoadingDocuments, uploadDocument, deleteDocument, loadDocuments } = useDocuments()
+  const { addToast } = useToast()
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDrop = async (e: DragEvent) => {
@@ -42,8 +45,14 @@ export default function DocumentManager() {
   }
 
   const handleDelete = async (id: string) => {
-    await deleteDocument(id)
-    setDeleteConfirm(null)
+    try {
+      await deleteDocument(id)
+      addToast('Document deleted', 'success')
+    } catch {
+      addToast('Failed to delete document', 'error')
+    } finally {
+      setDeleteTarget(null)
+    }
   }
 
   const statusColors: Record<string, string> = {
@@ -111,21 +120,23 @@ export default function DocumentManager() {
                 <span className={`px-2.5 py-1 text-xs font-medium rounded-full border ${statusColors[doc.status] || ''}`}>
                   {doc.status}
                 </span>
-                {deleteConfirm === doc.id ? (
-                  <div className="flex gap-1">
-                    <button onClick={() => handleDelete(doc.id)} className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded transition-colors">Yes</button>
-                    <button onClick={() => setDeleteConfirm(null)} className="px-2 py-1 text-xs rounded transition-colors" style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>No</button>
-                  </div>
-                ) : (
-                  <button onClick={() => setDeleteConfirm(doc.id)} className="p-2 opacity-0 group-hover:opacity-100 hover:bg-white/10 rounded-lg transition-all">
-                    <svg className="w-4 h-4" style={{ color: 'var(--text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
-                )}
+                <button onClick={() => setDeleteTarget(doc.id)} className="p-2 opacity-0 group-hover:opacity-100 hover:bg-white/10 rounded-lg transition-all">
+                  <svg className="w-4 h-4" style={{ color: 'var(--text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete Document"
+        message="This will permanently remove the document and all its chunks from the knowledge base."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

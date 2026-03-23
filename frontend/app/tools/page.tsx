@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,6 +92,8 @@ export default function ToolsPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<PreviewResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => { document.title = 'Tools — Manic AI' }, [])
 
   const handlePreview = useCallback(async () => {
     if (!docContent.trim() || isLoading) return

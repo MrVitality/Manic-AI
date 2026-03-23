@@ -5,13 +5,16 @@ import { useModels } from '@/hooks/useModels'
 import { pullModel, deleteModel } from '@/lib/api'
 import { formatModelSize } from '@/lib/api'
 import type { PullProgress } from '@/types'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/components/Toast'
 
 export default function ModelManager() {
   const { models, isLoadingModels, refreshModels } = useModels()
+  const { addToast } = useToast()
   const [pullName, setPullName] = useState('')
   const [isPulling, setIsPulling] = useState(false)
   const [pullProgress, setPullProgress] = useState<PullProgress | null>(null)
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handlePull = async () => {
@@ -36,10 +39,13 @@ export default function ModelManager() {
   const handleDelete = async (name: string) => {
     try {
       await deleteModel(name)
-      setDeleteConfirm(null)
+      setDeleteTarget(null)
       refreshModels()
+      addToast(`Model "${name}" deleted`, 'success')
     } catch (err) {
+      setDeleteTarget(null)
       setError(err instanceof Error ? err.message : 'Failed to delete model')
+      addToast('Failed to delete model', 'error')
     }
   }
 
@@ -125,21 +131,23 @@ export default function ModelManager() {
                     {model.details?.quantization_level && <span>{model.details.quantization_level}</span>}
                   </div>
                 </div>
-                {deleteConfirm === model.name ? (
-                  <div className="flex gap-1">
-                    <button onClick={() => handleDelete(model.name)} className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 rounded transition-colors">Delete</button>
-                    <button onClick={() => setDeleteConfirm(null)} className="px-2 py-1 text-xs rounded transition-colors" style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}>Cancel</button>
-                  </div>
-                ) : (
-                  <button onClick={() => setDeleteConfirm(model.name)} className="p-2 opacity-0 group-hover:opacity-100 hover:bg-white/10 rounded-lg transition-all">
-                    <svg className="w-4 h-4" style={{ color: 'var(--text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
-                )}
+                <button onClick={() => setDeleteTarget(model.name)} className="p-2 opacity-0 group-hover:opacity-100 hover:bg-white/10 rounded-lg transition-all">
+                  <svg className="w-4 h-4" style={{ color: 'var(--text-muted)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete Model"
+        message="This will remove the model from Ollama. You can re-pull it later."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

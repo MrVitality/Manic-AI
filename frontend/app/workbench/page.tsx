@@ -68,6 +68,9 @@ export default function WorkbenchPage() {
 
   const abortRefs = useRef<Map<string, AbortController>>(new Map())
 
+  // Set page title
+  useEffect(() => { document.title = 'Workbench — Manic AI' }, [])
+
   // Load versions from localStorage once
   useEffect(() => {
     setVersions(loadVersions())

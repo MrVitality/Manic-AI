@@ -10,6 +10,7 @@ import httpx
 
 from api.config import settings
 from api.metrics import embedding_cache_total, embedding_duration_seconds
+from api.services.circuit_breaker import ollama_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,12 @@ async def generate_embedding(
 
     embedding_cache_total.labels(result="miss").inc()
 
+    if not ollama_breaker.can_execute():
+        logger.warning(
+            "Circuit breaker open for Ollama — skipping embedding request for model %s", model
+        )
+        raise RuntimeError("Ollama circuit breaker is open; embedding request rejected")
+
     own_client = client is None
     if own_client:
         client = httpx.AsyncClient(timeout=60.0)
@@ -73,6 +80,10 @@ async def generate_embedding(
         response.raise_for_status()
         embedding = response.json()["embedding"]
         embedding_duration_seconds.observe(time.monotonic() - _embed_start)
+        ollama_breaker.record_success()
+    except (httpx.ConnectError, httpx.TimeoutException) as exc:
+        ollama_breaker.record_failure()
+        raise
     finally:
         if own_client:
             await client.aclose()

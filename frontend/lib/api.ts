@@ -565,6 +565,17 @@ export async function createCollection(
   return unwrap<unknown>(response)
 }
 
+export async function deleteCollection(name: string): Promise<void> {
+  const response = await fetch(`${getApiV1()}/collections/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to delete collection: ${response.statusText}`)
+  }
+}
+
 // =============================================================================
 // RAG Evaluation
 // =============================================================================
