@@ -8,6 +8,7 @@ import SettingsModal from '@/components/SettingsModal'
 import SystemPromptEditor from '@/components/SystemPromptEditor'
 import SetupWizard from '@/components/SetupWizard'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { MenuIcon } from '@/components/ui/Icons'
 import { useUiStore } from '@/lib/stores/uiStore'
 import { useModelStore } from '@/lib/stores/modelStore'
@@ -64,6 +65,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const setFocusMode = useUiStore((s) => s.setFocusMode)
 
   useKeyboardShortcuts()
+  const isOnline = useOnlineStatus()
 
   // Rehydrate persisted stores on client mount (skipHydration: true keeps SSR safe)
   useEffect(() => {
@@ -188,6 +190,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}
           >
             <SystemPromptEditor conversationId={currentConversationId} />
+          </div>
+        )}
+
+        {!isOnline && (
+          <div className="bg-yellow-500 text-black text-sm text-center py-2 px-4 font-medium">
+            You are offline. Some features may not work until your connection is restored.
           </div>
         )}
 

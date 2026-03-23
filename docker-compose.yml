@@ -132,6 +132,30 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.58.0
+    container_name: ai-redis-exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://ai-redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    ports:
+      - "${BIND_IP}:9121:9121"
+    depends_on:
+      - redis
+    networks:
+      - db-network
+      - monitoring-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # ===========================================================================
   # Supabase Stack
   # ===========================================================================
@@ -1065,6 +1089,12 @@ services:
       - "${BIND_IP}:4317:4317"    # OTLP gRPC
     environment:
       - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=badger
+      - BADGER_EPHEMERAL=false
+      - BADGER_DIRECTORY_VALUE=/badger/data
+      - BADGER_DIRECTORY_KEY=/badger/key
+    volumes:
+      - jaeger-data:/badger
     deploy:
       resources:
         limits:
@@ -1147,3 +1177,4 @@ volumes:
   grafana-data:
   loki-data:
   promtail-positions:
+  jaeger-data:

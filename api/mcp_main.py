@@ -8,14 +8,17 @@ Usage:
 """
 
 import asyncio
-import logging
+import os
 
 from mcp.server.stdio import stdio_server
 
 from api.config import settings
+from api.logging_config import setup_logging
 from api.mcp_server import server, set_db_pool, set_http_client
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+setup_logging(os.getenv("LOG_LEVEL", "INFO"))
+
+import logging
 logger = logging.getLogger(__name__)
 
 
