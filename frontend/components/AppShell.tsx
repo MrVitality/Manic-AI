@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import CommandPalette from '@/components/CommandPalette'
 import SettingsModal from '@/components/SettingsModal'
 import SystemPromptEditor from '@/components/SystemPromptEditor'
+import SetupWizard from '@/components/SetupWizard'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { MenuIcon } from '@/components/ui/Icons'
 import { useUiStore } from '@/lib/stores/uiStore'
@@ -37,6 +38,15 @@ const viewTitleMap: Record<string, string> = {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
+  // Show setup wizard on first visit (localStorage flag not yet set)
+  const [showWizard, setShowWizard] = useState(false)
+
+  useEffect(() => {
+    if (!localStorage.getItem('manic-ai-setup-complete')) {
+      setShowWizard(true)
+    }
+  }, [])
+
   // Start open on desktop, closed on mobile. SSR defaults to true (desktop-first).
   // A useEffect immediately corrects to false on mobile before first paint is committed.
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -186,6 +196,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <CommandPalette />
+      {showWizard && (
+        <SetupWizard
+          onComplete={() => {
+            localStorage.setItem('manic-ai-setup-complete', 'true')
+            setShowWizard(false)
+          }}
+        />
+      )}
 
       {!focusMode && sidebarOpen && (
         <div className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-20" onClick={() => setSidebarOpen(false)} />
