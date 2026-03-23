@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatStore } from '@/lib/store'
 import { useConversationStore } from '@/lib/stores/conversationStore'
@@ -77,7 +77,7 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
     createConversation, selectConversation, deleteConversation,
     clearConversations,
   } = useChatStore()
-  const { importConversation, exportAsMarkdown } = useConversationStore()
+  const { importConversation, exportAsMarkdown, forkConversation, generateSummary } = useConversationStore()
   const { models, selectedModel, setSelectedModel, isLoadingModels } = useModels()
   const { theme, toggleTheme } = useTheme()
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -185,6 +185,9 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
     { path: '/models', label: 'Models', icon: <CpuIcon className="w-5 h-5" />, hint: 'Ctrl+M' },
     { path: '/dashboard', label: 'Health', icon: <DashboardIcon className="w-5 h-5" />, hint: 'Ctrl+H' },
     { path: '/rag', label: 'RAG', icon: <RagIcon className="w-5 h-5" />, hint: 'Ctrl+R' },
+    { path: '/workbench', label: 'Workbench', icon: <WorkbenchIcon className="w-5 h-5" /> },
+    { path: '/arena', label: 'Arena', icon: <ArenaIcon className="w-5 h-5" /> },
+    { path: '/tools', label: 'Tools', icon: <ToolsIcon className="w-5 h-5" /> },
     { path: '/settings', label: 'Config', icon: <SettingsIcon className="w-5 h-5" />, hint: 'Ctrl+,' },
     ...(isAdmin
       ? [{ path: '/admin', label: 'Admin', icon: <AdminIcon className="w-5 h-5" /> }]
@@ -328,6 +331,17 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
                   {GROUP_LABELS.map((label) => {
                     const group = groupedConversations[label]
                     if (!group || group.length === 0) return null
+                    // Separate root conversations from branches so branches
+                    // are rendered indented beneath their parent.
+                    const roots = group.filter((c) => !c.parentId)
+                    const branchMap = new Map<string, Conversation[]>()
+                    for (const c of group) {
+                      if (c.parentId) {
+                        const arr = branchMap.get(c.parentId) ?? []
+                        arr.push(c)
+                        branchMap.set(c.parentId, arr)
+                      }
+                    }
                     return (
                       <div key={label}>
                         <p
@@ -337,16 +351,43 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
                           {label}
                         </p>
                         <div className="space-y-0.5">
-                          {group.map((conv) => (
-                            <ConversationItem
-                              key={conv.id}
-                              conversation={conv}
-                              isActive={conv.id === currentConversationId}
-                              onSelect={() => selectConversation(conv.id)}
-                              onDelete={() => deleteConversation(conv.id)}
-                              onExport={() => handleExport(conv)}
-                              onExportMarkdown={() => exportAsMarkdown(conv.id)}
-                            />
+                          {roots.map((conv) => (
+                            <div key={conv.id}>
+                              <ConversationItem
+                                conversation={conv}
+                                isActive={conv.id === currentConversationId}
+                                onSelect={() => selectConversation(conv.id)}
+                                onDelete={() => deleteConversation(conv.id)}
+                                onExport={() => handleExport(conv)}
+                                onExportMarkdown={() => exportAsMarkdown(conv.id)}
+                                onFork={(idx) => {
+                                  const newId = forkConversation(conv.id, idx)
+                                  if (newId) router.push('/chat')
+                                }}
+                                onGenerateSummary={() => generateSummary(conv.id)}
+                                hasBranches={(conv.branches?.length ?? 0) > 0}
+                              />
+                              {/* Render branch children indented */}
+                              {(branchMap.get(conv.id) ?? []).map((branch) => (
+                                <div key={branch.id} className="ml-4 pl-2 border-l" style={{ borderColor: 'var(--border-color)' }}>
+                                  <ConversationItem
+                                    conversation={branch}
+                                    isActive={branch.id === currentConversationId}
+                                    isBranch
+                                    onSelect={() => selectConversation(branch.id)}
+                                    onDelete={() => deleteConversation(branch.id)}
+                                    onExport={() => handleExport(branch)}
+                                    onExportMarkdown={() => exportAsMarkdown(branch.id)}
+                                    onFork={(idx) => {
+                                      const newId = forkConversation(branch.id, idx)
+                                      if (newId) router.push('/chat')
+                                    }}
+                                    onGenerateSummary={() => generateSummary(branch.id)}
+                                    hasBranches={(branch.branches?.length ?? 0) > 0}
+                                  />
+                                </div>
+                              ))}
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -387,64 +428,216 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
   )
 }
 
+function BranchIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12m0 0a3 3 0 103 3m-3-3h6m0-9a3 3 0 113 3m-3-3v6" />
+    </svg>
+  )
+}
+
+function ForkIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8M8 12h4m-4 5h8M5 7a2 2 0 11-4 0 2 2 0 014 0zM5 17a2 2 0 11-4 0 2 2 0 014 0zM19 12a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+  )
+}
+
 function ConversationItem({
   conversation,
   isActive,
+  isBranch = false,
+  hasBranches = false,
   onSelect,
   onDelete,
   onExport,
   onExportMarkdown,
+  onFork,
+  onGenerateSummary,
 }: {
-  conversation: { id: string; title: string; messages: Array<{ role: string }> }
+  conversation: Conversation
   isActive: boolean
+  isBranch?: boolean
+  hasBranches?: boolean
   onSelect: () => void
   onDelete: () => void
   onExport: () => void
   onExportMarkdown: () => void
+  onFork: (atMessageIndex: number) => void
+  onGenerateSummary: () => void
 }) {
+  const [summaryVisible, setSummaryVisible] = useState(false)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+
+  const handleTldr = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (conversation.summary) {
+        setSummaryVisible((v) => !v)
+        return
+      }
+      setSummaryLoading(true)
+      setSummaryVisible(true)
+      await onGenerateSummary()
+      setSummaryLoading(false)
+    },
+    [conversation.summary, onGenerateSummary]
+  )
+
+  const handleForkLast = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      // Fork at the last message index by default from sidebar
+      const lastIdx = Math.max(0, conversation.messages.length - 1)
+      onFork(lastIdx)
+    },
+    [conversation.messages.length, onFork]
+  )
+
   return (
-    <div
-      className="group relative flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors focus-within:opacity-100"
-      style={{
-        background: isActive ? 'rgba(129, 140, 248, 0.08)' : 'transparent',
-        borderLeft: isActive ? '2px solid var(--accent-indigo)' : '2px solid transparent',
-        paddingLeft: isActive ? 10 : 12,
-        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-      }}
-      onClick={onSelect}
-    >
-      <ChatBubbleIcon className="w-4 h-4 flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm truncate">{conversation.title}</p>
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{conversation.messages.length} messages</p>
+    <div>
+      <div
+        className="group relative flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer transition-colors focus-within:opacity-100"
+        style={{
+          background: isActive ? 'rgba(129, 140, 248, 0.08)' : 'transparent',
+          borderLeft: isActive ? '2px solid var(--accent-indigo)' : '2px solid transparent',
+          paddingLeft: isActive ? 10 : 12,
+          color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+        }}
+        onClick={onSelect}
+      >
+        {isBranch ? (
+          <BranchIcon className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent-cyan)' } as React.CSSProperties} />
+        ) : (
+          <ChatBubbleIcon className="w-4 h-4 flex-shrink-0" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1 min-w-0">
+            <p className="text-sm truncate">{conversation.title}</p>
+            {hasBranches && (
+              <span
+                className="text-[9px] px-1 rounded flex-shrink-0 font-mono"
+                style={{ background: 'rgba(34, 211, 238, 0.1)', color: 'var(--accent-cyan)' }}
+                title="Has branches"
+              >
+                BRANCHED
+              </span>
+            )}
+          </div>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{conversation.messages.length} messages</p>
+        </div>
+
+        {/* TL;DR button — visible on hover */}
+        <button
+          tabIndex={0}
+          onClick={handleTldr}
+          aria-label={`TL;DR summary for: ${conversation.title}`}
+          title="Show TL;DR summary"
+          className="px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all"
+          style={{ background: 'rgba(99, 102, 241, 0.12)', color: 'var(--accent-indigo)', border: '1px solid rgba(99, 102, 241, 0.25)' }}
+        >
+          TL;DR
+        </button>
+
+        {/* Fork button — visible on hover */}
+        <button
+          tabIndex={0}
+          onClick={handleForkLast}
+          aria-label={`Fork conversation: ${conversation.title}`}
+          title="Fork conversation here"
+          className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-emerald-500/20 focus:bg-emerald-500/20"
+          style={{ color: 'var(--accent-emerald, #10b981)' }}
+        >
+          <ForkIcon className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); onExportMarkdown() }}
+          aria-label={`Export as Markdown: ${conversation.title}`}
+          title="Export as Markdown"
+          className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-purple-500/20 focus:bg-purple-500/20 text-purple-400"
+        >
+          <MarkdownIcon className="w-3.5 h-3.5" />
+        </button>
+        <button
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); onExport() }}
+          aria-label={`Export conversation as JSON: ${conversation.title}`}
+          title="Export as JSON"
+          className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-blue-500/20 focus:bg-blue-500/20 text-blue-400"
+        >
+          <DownloadIcon className="w-3.5 h-3.5" />
+        </button>
+        <button
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); onDelete() }}
+          aria-label={`Delete conversation: ${conversation.title}`}
+          title="Delete"
+          className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-red-500/20 focus:bg-red-500/20 text-red-500"
+        >
+          <TrashIcon className="w-3.5 h-3.5" />
+        </button>
       </div>
-      <button
-        tabIndex={0}
-        onClick={(e) => { e.stopPropagation(); onExportMarkdown() }}
-        aria-label={`Export as Markdown: ${conversation.title}`}
-        title="Export as Markdown"
-        className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-purple-500/20 focus:bg-purple-500/20 text-purple-400"
-      >
-        <MarkdownIcon className="w-3.5 h-3.5" />
-      </button>
-      <button
-        tabIndex={0}
-        onClick={(e) => { e.stopPropagation(); onExport() }}
-        aria-label={`Export conversation as JSON: ${conversation.title}`}
-        title="Export as JSON"
-        className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-blue-500/20 focus:bg-blue-500/20 text-blue-400"
-      >
-        <DownloadIcon className="w-3.5 h-3.5" />
-      </button>
-      <button
-        tabIndex={0}
-        onClick={(e) => { e.stopPropagation(); onDelete() }}
-        aria-label={`Delete conversation: ${conversation.title}`}
-        title="Delete"
-        className="p-1 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-red-500/20 focus:bg-red-500/20 text-red-500"
-      >
-        <TrashIcon className="w-3.5 h-3.5" />
-      </button>
+
+      {/* TL;DR summary panel */}
+      {summaryVisible && (
+        <div
+          className="mx-3 mb-1 px-2 py-1.5 rounded text-xs italic"
+          style={{
+            background: 'var(--bg-tertiary)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-muted)',
+            lineHeight: '1.4',
+          }}
+        >
+          {summaryLoading && !conversation.summary ? (
+            <span className="opacity-60">Generating summary...</span>
+          ) : conversation.summary ? (
+            <span
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              } as React.CSSProperties}
+            >
+              {conversation.summary}
+            </span>
+          ) : (
+            <span className="opacity-60">No summary available.</span>
+          )}
+        </div>
+      )}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Inline icons for new nav items (avoids modifying Icons.tsx)
+// ---------------------------------------------------------------------------
+
+function WorkbenchIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18" />
+    </svg>
+  )
+}
+
+function ArenaIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+    </svg>
+  )
+}
+
+function ToolsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
   )
 }

@@ -1,0 +1,6 @@
+{
+  "name": "Code Executor",
+  "version": "1.0.0",
+  "description": "Execute Python code snippets in a sandboxed subprocess",
+  "author": "Manic AI"
+}

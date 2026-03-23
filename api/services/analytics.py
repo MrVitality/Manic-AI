@@ -44,6 +44,29 @@ async def usage_analytics(
             interval, model,
         )
 
+        # Percentile latency over the full period — a single aggregate query
+        # avoids pulling raw rows into Python for computation.
+        pct_row = await conn.fetchrow(
+            """
+            SELECT
+                ROUND(PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY latency_ms)::numeric, 1) AS p50,
+                ROUND(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY latency_ms)::numeric, 1) AS p95,
+                ROUND(PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY latency_ms)::numeric, 1) AS p99
+            FROM public.chat_log
+            WHERE created_at > NOW() - $1::INTERVAL
+              AND ($2::text IS NULL OR model = $2)
+              AND latency_ms IS NOT NULL
+            """,
+            interval, model,
+        )
+
+    def _f(v) -> Optional[float]:
+        return float(v) if v is not None else None
+
+    p50 = _f(pct_row["p50"]) if pct_row else None
+    p95 = _f(pct_row["p95"]) if pct_row else None
+    p99 = _f(pct_row["p99"]) if pct_row else None
+
     data_points = [
         {
             "timestamp": r["bucket"].isoformat(),
@@ -67,6 +90,9 @@ async def usage_analytics(
             "total_tokens": total_tokens,
             "total_requests": total_requests,
             "avg_latency_ms": round(total_latency / max(total_requests, 1), 1),
+            "p50_latency_ms": p50,
+            "p95_latency_ms": p95,
+            "p99_latency_ms": p99,
         },
     }
 

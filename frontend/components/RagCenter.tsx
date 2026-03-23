@@ -9,6 +9,8 @@ import RagCollections from '@/components/rag/RagCollections'
 import RagSearchLab from '@/components/rag/RagSearchLab'
 import RagAnalytics from '@/components/rag/RagAnalytics'
 import RagEval from '@/components/rag/RagEval'
+import RagGraph from '@/components/rag/RagGraph'
+import RagEmbeddings from '@/components/rag/RagEmbeddings'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import type { RagCenterTab } from '@/types'
 
@@ -26,6 +28,8 @@ const TABS: Array<{ key: string; label: string }> = [
   { key: 'search-lab', label: 'Search Lab' },
   { key: 'analytics', label: 'Analytics' },
   { key: 'eval', label: 'Evaluation' },
+  { key: 'graph', label: 'Graph' },
+  { key: 'embeddings', label: 'Embeddings' },
 ]
 
 export default function RagCenter() {
@@ -123,6 +127,14 @@ export default function RagCenter() {
 
           {ragTab === 'eval' && (
             <RagEval />
+          )}
+
+          {ragTab === 'graph' && (
+            <RagGraph />
+          )}
+
+          {ragTab === 'embeddings' && (
+            <RagEmbeddings />
           )}
         </ErrorBoundary>
       </div>

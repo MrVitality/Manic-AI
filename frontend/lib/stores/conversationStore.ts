@@ -4,6 +4,23 @@ import type { Conversation, Message } from '@/types'
 
 const generateId = () => crypto.randomUUID()
 
+const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+
+function getApiUrl(): string {
+  if (typeof window === 'undefined') return DEFAULT_API_URL
+  try {
+    const stored = localStorage.getItem('manic-ai-ui')
+    if (stored) {
+      const parsed = JSON.parse(stored) as { state?: { settings?: { apiUrl?: string } } }
+      const candidate = parsed?.state?.settings?.apiUrl
+      if (candidate && typeof candidate === 'string') return candidate
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_API_URL
+}
+
 interface ConversationState {
   conversations: Conversation[]
   currentConversationId: string | null
@@ -23,6 +40,8 @@ interface ConversationState {
   addMessage: (conversationId: string, message: Message) => void
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void
   deleteMessage: (conversationId: string, messageId: string) => void
+  forkConversation: (conversationId: string, atMessageIndex: number) => string | null
+  generateSummary: (id: string) => Promise<void>
 }
 
 export const useConversationStore = create<ConversationState>()(
@@ -213,6 +232,93 @@ export const useConversationStore = create<ConversationState>()(
             return c
           }),
         }))
+      },
+
+      forkConversation: (conversationId: string, atMessageIndex: number) => {
+        const { conversations } = get()
+        const parent = conversations.find((c) => c.id === conversationId)
+        if (!parent) return null
+
+        const forkedMessages = parent.messages
+          .slice(0, atMessageIndex + 1)
+          .map((m) => ({ ...m }))
+
+        const newId = generateId()
+        const branchLabel = `${parent.title} (branch)`
+        const newConversation: Conversation = {
+          id: newId,
+          title: branchLabel,
+          messages: forkedMessages,
+          model: parent.model,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          systemPrompt: parent.systemPrompt,
+          parentId: conversationId,
+        }
+
+        set((state) => ({
+          conversations: [
+            newConversation,
+            ...state.conversations.map((c) =>
+              c.id === conversationId
+                ? { ...c, branches: [...(c.branches ?? []), newId] }
+                : c
+            ),
+          ],
+          currentConversationId: newId,
+        }))
+
+        return newId
+      },
+
+      generateSummary: async (id: string) => {
+        const { conversations } = get()
+        const conversation = conversations.find((c) => c.id === id)
+        if (!conversation || conversation.messages.length === 0) return
+
+        // Build a condensed transcript for the summarization prompt
+        const transcript = conversation.messages
+          .filter((m) => m.role !== 'system')
+          .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.slice(0, 300)}`)
+          .join('\n')
+
+        const prompt =
+          `Summarize the following conversation in 1-2 sentences. Be concise and focus on the main topic.\n\n${transcript}\n\nSummary:`
+
+        try {
+          const response = await fetch(`${getApiUrl()}/v1/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: conversation.model || 'llama3.2:3b',
+              messages: [{ role: 'user', content: prompt }],
+              stream: false,
+            }),
+          })
+
+          if (!response.ok) return
+
+          const data = await response.json() as {
+            message?: { content?: string }
+            data?: { message?: { content?: string } }
+          }
+
+          // Handle both direct and enveloped responses
+          const summary =
+            data?.message?.content ??
+            data?.data?.message?.content ??
+            null
+
+          if (typeof summary === 'string' && summary.trim().length > 0) {
+            set((state) => ({
+              conversations: state.conversations.map((c) =>
+                c.id === id ? { ...c, summary: summary.trim() } : c
+              ),
+            }))
+          }
+        } catch {
+          // Silently fail — summary is optional
+        }
       },
     }),
     {

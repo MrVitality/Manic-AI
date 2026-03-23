@@ -1,0 +1,6 @@
+{
+  "name": "n8n Workflow Trigger",
+  "version": "1.0.0",
+  "description": "Trigger n8n workflows via webhook",
+  "author": "Manic AI"
+}

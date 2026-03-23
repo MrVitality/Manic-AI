@@ -1,12 +1,13 @@
 """Ingest and embed routes."""
 
 import logging
-from typing import Optional
+from typing import List, Literal, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request, UploadFile
 import asyncpg
 import httpx
+from pydantic import BaseModel, Field
 
 from api.config import settings
 from api.middleware.rate_limit import limiter
@@ -32,6 +33,8 @@ from api.services.ingestion import (
     _update_job,
 )
 from api.services.multimodal_ingest import ingest_pdf_as_images
+from api.services.pii_detector import detect_pii
+from api.services.chunking import chunk_document
 
 logger = logging.getLogger(__name__)
 
@@ -281,3 +284,101 @@ async def upload_and_ingest(
 
     result, _flag = await ingest_document(ingest_req, db, client)
     return ok(result.model_dump())
+
+
+# ---------------------------------------------------------------------------
+# PII scan endpoint
+# ---------------------------------------------------------------------------
+
+
+class _PiiScanRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500_000)
+
+
+class _PiiEntity(BaseModel):
+    type: str
+    value: str
+    start: int
+    end: int
+
+
+class _PiiScanResponse(BaseModel):
+    entities: List[_PiiEntity]
+    total_found: int
+
+
+@router.post("/ingest/pii-scan", response_model=None, tags=["ingest"])
+async def pii_scan(body: _PiiScanRequest):
+    """Scan text for PII without storing anything.
+
+    Runs the regex-based PII detector and returns a report of every entity
+    found, including its type, redacted value, and character offsets.
+
+    The ``value`` field in each entity contains the raw matched string so
+    callers can make an informed decision about whether to redact before
+    ingestion.  No data is persisted by this endpoint.
+    """
+    findings = detect_pii(body.content)
+    entities = [
+        _PiiEntity(
+            type=f["type"],
+            value=f["value"],
+            start=f["start"],
+            end=f["end"],
+        )
+        for f in findings
+    ]
+    return ok(_PiiScanResponse(entities=entities, total_found=len(entities)).model_dump())
+
+
+# ---------------------------------------------------------------------------
+# Chunking preview endpoint
+# ---------------------------------------------------------------------------
+
+
+class _ChunkPreviewRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=1_000_000)
+    strategy: Literal["simple", "semantic"] = "simple"
+    chunk_size: int = Field(default=500, ge=50, le=10_000)
+    overlap: int = Field(default=50, ge=0, le=2_000)
+
+
+class _ChunkPreviewResponse(BaseModel):
+    strategy: str
+    chunk_count: int
+    chunks: List[dict]
+
+
+@router.post("/ingest/preview-chunks", response_model=None, tags=["ingest"])
+async def preview_chunks(body: _ChunkPreviewRequest):
+    """Preview how a document would be chunked without storing anything.
+
+    Accepts raw text plus chunking parameters and returns the chunks that
+    would be produced by the ingest pipeline.  Use this to compare
+    strategies and tune chunk_size / overlap before committing an ingestion.
+
+    For ``strategy="simple"``: ``chunk_size`` and ``overlap`` are character
+    counts passed directly to the simple chunker.
+
+    For ``strategy="semantic"``: ``chunk_size`` is treated as the
+    retrieval token target (``chunk_size // 4`` characters ≈ tokens) and
+    ``overlap`` as the overlap token budget.  The semantic chunker produces
+    parent context chunks in addition to retrieval chunks.
+    """
+    chunks = chunk_document(
+        text=body.content,
+        strategy=body.strategy,
+        chunk_size=body.chunk_size,
+        chunk_overlap=body.overlap,
+        # Map chunk_size to retrieval_token_size for semantic strategy.
+        # Simple heuristic: 1 token ≈ 4 characters.
+        retrieval_token_size=max(50, body.chunk_size // 4),
+        context_token_size=max(200, body.chunk_size),
+    )
+    return ok(
+        _ChunkPreviewResponse(
+            strategy=body.strategy,
+            chunk_count=len(chunks),
+            chunks=chunks,
+        ).model_dump()
+    )

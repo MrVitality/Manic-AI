@@ -27,6 +27,8 @@ export interface Message {
   error?: string
   sources?: RagSource[]
   toolCalls?: ToolCallInfo[]
+  parentMessageIndex?: number
+  branchId?: string
 }
 
 // Conversation types
@@ -39,6 +41,9 @@ export interface Conversation {
   updatedAt: Date
   systemPrompt?: string
   titleGenerated?: boolean
+  parentId?: string
+  branches?: string[]
+  summary?: string
 }
 
 // Model types
@@ -142,8 +147,8 @@ export type ActiveView = 'chat' | 'documents' | 'models' | 'dashboard' | 'rag' |
 
 // Dashboard types
 export type DashboardTab = 'overview' | 'services' | 'performance'
-export type RagCenterTab = 'pipeline' | 'collections' | 'search-lab' | 'analytics' | 'eval'
-export type SettingsSection = 'general' | 'models' | 'rag' | 'inference' | 'appearance' | 'data' | 'connectors' | 'shortcuts'
+export type RagCenterTab = 'pipeline' | 'collections' | 'search-lab' | 'analytics' | 'eval' | 'graph' | 'embeddings'
+export type SettingsSection = 'general' | 'models' | 'rag' | 'inference' | 'appearance' | 'data' | 'connectors' | 'shortcuts' | 'automation'
 
 // Service health snapshot
 export interface ServiceHealthSnapshot {

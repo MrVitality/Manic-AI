@@ -33,6 +33,7 @@ interface UiState {
   sidebarCollapsed: boolean
   useRag: boolean
   useAgentMode: boolean
+  focusMode: boolean
   serviceStatuses: Record<string, ServiceStatus>
   settings: Settings
 
@@ -42,6 +43,8 @@ interface UiState {
   toggleSidebar: () => void
   setUseRag: (useRag: boolean) => void
   setUseAgentMode: (useAgentMode: boolean) => void
+  setFocusMode: (focusMode: boolean) => void
+  toggleFocusMode: () => void
   setServiceStatuses: (statuses: Record<string, ServiceStatus>) => void
   updateSettings: (settings: Partial<Settings>) => void
 }
@@ -54,6 +57,7 @@ export const useUiStore = create<UiState>()(
       sidebarCollapsed: false,
       useRag: false,
       useAgentMode: false,
+      focusMode: false,
       serviceStatuses: {},
       settings: defaultSettings,
 
@@ -63,6 +67,8 @@ export const useUiStore = create<UiState>()(
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setUseRag: (useRag: boolean) => set({ useRag }),
       setUseAgentMode: (useAgentMode: boolean) => set({ useAgentMode }),
+      setFocusMode: (focusMode: boolean) => set({ focusMode }),
+      toggleFocusMode: () => set((state) => ({ focusMode: !state.focusMode })),
       setServiceStatuses: (statuses: Record<string, ServiceStatus>) =>
         set({ serviceStatuses: statuses }),
       updateSettings: (newSettings: Partial<Settings>) =>

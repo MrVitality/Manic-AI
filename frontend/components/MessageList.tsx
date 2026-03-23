@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, memo } from 'react'
+import { useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { RefreshIcon } from '@/components/ui/Icons'
 import { useVirtualizer } from '@tanstack/react-virtual'
+import { useConversationStore } from '@/lib/stores/conversationStore'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
@@ -14,16 +16,25 @@ import ToolCallCard from './ToolCallCard'
 import type { ToolCallData } from './ToolCallCard'
 import type { Message, RagSource, ToolCallInfo } from '@/types'
 import FeedbackButtons from './FeedbackButtons'
+import PinnedDrawer from './PinnedDrawer'
+import { usePinnedStore } from '@/lib/stores/pinnedStore'
 
 interface MessageListProps {
   messages: Message[]
   onRegenerate?: () => void
 }
 
+export interface MessageListHandle {
+  scrollToMessage: (id: string) => void
+}
+
 /** Estimated height per message for virtualizer */
 const ESTIMATED_MESSAGE_HEIGHT = 150
 
-export default function MessageList({ messages, onRegenerate }: MessageListProps) {
+const MessageList = forwardRef<MessageListHandle, MessageListProps>(function MessageList(
+  { messages, onRegenerate },
+  ref
+) {
   const parentRef = useRef<HTMLDivElement>(null)
 
   const virtualizer = useVirtualizer({
@@ -43,49 +54,108 @@ export default function MessageList({ messages, onRegenerate }: MessageListProps
     }
   }, [shouldAutoScroll, messages.length, lastMessage?.content?.length, virtualizer])
 
+  // Expose scrollToMessage via ref
+  useImperativeHandle(ref, () => ({
+    scrollToMessage: (id: string) => {
+      const idx = messages.findIndex((m) => m.id === id)
+      if (idx !== -1) {
+        virtualizer.scrollToIndex(idx, { align: 'start' })
+        // After scroll, briefly highlight
+        requestAnimationFrame(() => {
+          const el = parentRef.current?.querySelector(`[data-message-id="${id}"]`)
+          if (el) {
+            el.classList.add('message-highlight')
+            setTimeout(() => el.classList.remove('message-highlight'), 1500)
+          }
+        })
+      }
+    },
+  }), [messages, virtualizer])
+
+  const scrollToMessage = useCallback((id: string) => {
+    const idx = messages.findIndex((m) => m.id === id)
+    if (idx !== -1) {
+      virtualizer.scrollToIndex(idx, { align: 'start' })
+    }
+  }, [messages, virtualizer])
+
+  // Deep-link: read ?conv=CONV_ID&msg=MSG_INDEX on mount and scroll to the target message.
+  // Uses a ref so it only fires once after the virtualizer has rendered items.
+  const searchParams = useSearchParams()
+  const deepLinkHandledRef = useRef(false)
+  const selectConversation = useConversationStore((s) => s.selectConversation)
+
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return
+    const convParam = searchParams.get('conv')
+    const msgParam = searchParams.get('msg')
+    if (!convParam || msgParam === null) return
+
+    // Switch to the referenced conversation if needed
+    selectConversation(convParam)
+
+    const msgIndex = parseInt(msgParam, 10)
+    if (Number.isNaN(msgIndex) || msgIndex < 0) return
+
+    // Wait one frame for the virtualizer to measure and render
+    const raf = requestAnimationFrame(() => {
+      virtualizer.scrollToIndex(msgIndex, { align: 'start' })
+      deepLinkHandledRef.current = true
+    })
+    return () => cancelAnimationFrame(raf)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, messages.length])
+
   return (
-    <div
-      ref={parentRef}
-      className="h-full overflow-auto"
-      style={{ contain: 'strict' }}
-    >
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Pinned messages drawer sits at top of the message area */}
+      <PinnedDrawer onScrollToMessage={scrollToMessage} />
+
       <div
-        style={{
-          height: `${virtualizer.getTotalSize()}px`,
-          width: '100%',
-          position: 'relative',
-        }}
+        ref={parentRef}
+        className="flex-1 overflow-auto"
+        style={{ contain: 'strict' }}
       >
-        {virtualizer.getVirtualItems().map((virtualRow) => {
-          const message = messages[virtualRow.index]
-          const isLast = virtualRow.index === messages.length - 1
-          return (
-            <div
-              key={virtualRow.key}
-              data-index={virtualRow.index}
-              ref={virtualizer.measureElement}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-            >
-              <MemoizedMessageItem
-                message={message}
-                isLast={isLast}
-                onRegenerate={
-                  message.role === 'assistant' && isLast ? onRegenerate : undefined
-                }
-              />
-            </div>
-          )
-        })}
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const message = messages[virtualRow.index]
+            const isLast = virtualRow.index === messages.length - 1
+            return (
+              <div
+                key={virtualRow.key}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <MemoizedMessageItem
+                  message={message}
+                  isLast={isLast}
+                  onRegenerate={
+                    message.role === 'assistant' && isLast ? onRegenerate : undefined
+                  }
+                />
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
-}
+})
+
+export default MessageList
 
 interface MessageItemProps {
   message: Message
@@ -99,13 +169,18 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
   onRegenerate,
 }) {
   const [copied, setCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const linkCopyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { pinMessage, unpinMessage, isPinned } = usePinnedStore()
+  const pinned = isPinned(message.id)
 
   useEffect(() => {
     return () => {
       if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current)
+      if (linkCopyTimerRef.current !== null) clearTimeout(linkCopyTimerRef.current)
     }
   }, [])
 
@@ -128,9 +203,48 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
     copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
   }, [message.content])
 
+  const handlePin = useCallback(() => {
+    if (pinned) {
+      unpinMessage(message.id)
+    } else {
+      pinMessage(message)
+    }
+  }, [pinned, message, pinMessage, unpinMessage])
+
+  // Reads the message's index in the messages array from the DOM data-index attribute
+  // on the virtualizer row, so we don't need to thread the index as a prop.
+  const handleBookmark = useCallback(async () => {
+    const convId = useConversationStore.getState().currentConversationId
+    if (!convId) return
+
+    const conversation = useConversationStore.getState().conversations.find((c) => c.id === convId)
+    const msgIndex = conversation?.messages.findIndex((m) => m.id === message.id) ?? -1
+    if (msgIndex === -1) return
+
+    const url = `${window.location.origin}/chat?conv=${encodeURIComponent(convId)}&msg=${msgIndex}`
+
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = url
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+
+    setLinkCopied(true)
+    if (linkCopyTimerRef.current !== null) clearTimeout(linkCopyTimerRef.current)
+    linkCopyTimerRef.current = setTimeout(() => setLinkCopied(false), 2500)
+  }, [message.id])
+
   return (
     <div
-      className="px-4 py-6 animate-fade-in border-b border-[var(--border-color)]"
+      data-message-id={message.id}
+      className="px-4 py-6 animate-fade-in border-b border-[var(--border-color)] transition-colors duration-300"
       style={{
         background: isUser ? 'rgba(129, 140, 248, 0.03)' : 'transparent',
       }}
@@ -277,27 +391,65 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
             <SourceCitations sources={message.sources} />
           )}
 
-          {/* Actions */}
-          {isAssistant && !message.isStreaming && message.content && (
+          {/* Actions — shown on all non-streaming messages that have content */}
+          {!message.isStreaming && message.content && (
             <div className="flex items-center gap-2 mt-3">
+              {/* Pin button — available on every message */}
               <button
-                onClick={handleCopy}
+                onClick={handlePin}
                 className="text-xs flex items-center gap-1 transition-colors hover:opacity-80"
-                style={{ color: 'var(--text-muted)' }}
+                style={{ color: pinned ? 'var(--accent-cyan)' : 'var(--text-muted)' }}
+                title={pinned ? 'Unpin message' : 'Pin message'}
+                aria-label={pinned ? 'Unpin message' : 'Pin message'}
               >
-                {copied ? (
+                <PinIcon className="w-4 h-4" filled={pinned} />
+                {pinned ? 'Pinned' : 'Pin'}
+              </button>
+
+              {/* Bookmark / deep-link — available on every message */}
+              <button
+                onClick={handleBookmark}
+                className="text-xs flex items-center gap-1 transition-colors hover:opacity-80"
+                style={{ color: linkCopied ? 'var(--accent-emerald)' : 'var(--text-muted)' }}
+                title="Copy link to this message"
+                aria-label="Copy link to this message"
+              >
+                {linkCopied ? (
                   <>
                     <CheckIcon className="w-4 h-4" />
-                    Copied!
+                    Link copied!
                   </>
                 ) : (
                   <>
-                    <CopyIcon className="w-4 h-4" />
-                    Copy
+                    <BookmarkIcon className="w-4 h-4" />
+                    Link
                   </>
                 )}
               </button>
-              {onRegenerate && (
+
+              {/* Copy — assistant messages only */}
+              {isAssistant && (
+                <button
+                  onClick={handleCopy}
+                  className="text-xs flex items-center gap-1 transition-colors hover:opacity-80"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {copied ? (
+                    <>
+                      <CheckIcon className="w-4 h-4" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon className="w-4 h-4" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Regenerate — assistant only, last message */}
+              {isAssistant && onRegenerate && (
                 <button
                   onClick={onRegenerate}
                   className="text-xs flex items-center gap-1 transition-colors hover:opacity-80"
@@ -307,11 +459,14 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
                   Regenerate
                 </button>
               )}
-              <FeedbackButtons
-                messageId={message.id}
-                responseText={message.content}
-                hadRag={(message.sources?.length ?? 0) > 0}
-              />
+
+              {isAssistant && (
+                <FeedbackButtons
+                  messageId={message.id}
+                  responseText={message.content}
+                  hadRag={(message.sources?.length ?? 0) > 0}
+                />
+              )}
             </div>
           )}
         </div>
@@ -453,3 +608,23 @@ function CheckIcon({ className }: { className?: string }) {
   )
 }
 
+function PinIcon({ className, filled }: { className?: string; filled?: boolean }) {
+  return (
+    <svg className={className} fill={filled ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+    </svg>
+  )
+}
+
+function BookmarkIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+      />
+    </svg>
+  )
+}

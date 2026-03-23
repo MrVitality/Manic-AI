@@ -7,6 +7,7 @@ import RagSettingsPanel from '@/components/settings/RagSettingsPanel'
 import AppearanceSettings from '@/components/settings/AppearanceSettings'
 import DataSettings from '@/components/settings/DataSettings'
 import ConnectorSettings from '@/components/settings/ConnectorSettings'
+import AutomationSettings from '@/components/settings/AutomationSettings'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { fetchRagStats } from '@/lib/api'
 import type { SettingsSection, RagStatsData } from '@/types'
@@ -18,6 +19,7 @@ const SECTIONS: Array<{ id: SettingsSection; label: string; icon: JSX.Element }>
   { id: 'appearance', label: 'Appearance', icon: <PaletteIcon /> },
   { id: 'data', label: 'Data', icon: <StorageIcon /> },
   { id: 'connectors', label: 'Connectors', icon: <ConnectorIcon /> },
+  { id: 'automation', label: 'Automation', icon: <AutomationIcon /> },
   { id: 'shortcuts', label: 'Shortcuts', icon: <KeyboardIcon /> },
 ]
 
@@ -80,6 +82,7 @@ export default function AdvancedSettings() {
             {activeSection === 'appearance' && <AppearanceSettings />}
             {activeSection === 'data' && <DataSettings ragStats={ragStats} />}
             {activeSection === 'connectors' && <ConnectorSettings />}
+            {activeSection === 'automation' && <AutomationSettings />}
             {activeSection === 'shortcuts' && <ShortcutsReference />}
           </div>
         </ErrorBoundary>
@@ -130,4 +133,5 @@ function DatabaseIcon() { return <svg fill="none" stroke="currentColor" viewBox=
 function PaletteIcon() { return <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg> }
 function StorageIcon() { return <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" /></svg> }
 function ConnectorIcon() { return <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> }
+function AutomationIcon() { return <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> }
 function KeyboardIcon() { return <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg> }

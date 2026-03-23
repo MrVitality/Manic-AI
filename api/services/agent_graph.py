@@ -1,13 +1,14 @@
 """Stateful Agent Graph -- Generator-Critic loop with Redis state persistence.
 
 Implements a multi-step reasoning pipeline:
-    plan -> retrieve -> generate -> critique -> (revise | complete)
+    plan -> retrieve -> generate (with ReAct tool loop) -> critique -> (revise | complete)
 
 State is persisted in Redis so each step can be resumed independently.
 """
 
 import json
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional
@@ -23,6 +24,15 @@ logger = logging.getLogger(__name__)
 
 MAX_REVISION_CYCLES = 3
 CRITIQUE_PASS_THRESHOLD = 7
+MAX_TOOL_CALLS_PER_GENERATION = 5
+
+# Matches: <tool_call name="tool_name">{"arg": "value"}</tool_call>
+_TOOL_CALL_RE = re.compile(
+    r'<tool_call\s+name=["\'](?P<name>[^"\']+)["\']>'
+    r'(?P<args>.*?)'
+    r'</tool_call>',
+    re.DOTALL,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +142,45 @@ async def _retrieve(
         return []
 
 
+def _build_tool_description_string() -> str:
+    """Build a human-readable tool catalogue from the plugin registry."""
+    from api.plugins import list_tools
+    tools = list_tools()
+    if not tools:
+        return ""
+    lines = ["You have access to these tools:"]
+    for t in tools:
+        lines.append(f"  - {t['name']}: {t['description']}")
+    lines.append(
+        '\nTo use a tool, write exactly: '
+        '<tool_call name="tool_name">{"arg": "value"}</tool_call>\n'
+        "Wait for the tool result before continuing your response."
+    )
+    return "\n".join(lines)
+
+
+async def _execute_tool_call(name: str, args_json: str) -> str:
+    """Look up and call a plugin tool, returning a string result."""
+    from api.plugins import get_tool
+    func = get_tool(name)
+    if func is None:
+        return f"[tool_error: unknown tool '{name}']"
+
+    try:
+        args = json.loads(args_json) if args_json.strip() else {}
+    except json.JSONDecodeError as exc:
+        return f"[tool_error: invalid JSON arguments for '{name}': {exc}]"
+
+    try:
+        if not isinstance(args, dict):
+            return f"[tool_error: arguments for '{name}' must be a JSON object, got {type(args).__name__}]"
+        result = await func(**args)
+        return json.dumps(result, default=str)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Tool '%s' raised an exception: %s", name, exc)
+        return f"[tool_error: '{name}' failed: {exc}]"
+
+
 async def _generate(
     query: str,
     context: List[Dict[str, Any]],
@@ -140,18 +189,36 @@ async def _generate(
     *,
     previous_answer: Optional[str] = None,
     critique_feedback: Optional[str] = None,
+    tool_steps: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
-    """Generate an answer using retrieved context."""
+    """Generate an answer using retrieved context, with a ReAct tool-calling loop.
+
+    The loop allows the model to call up to MAX_TOOL_CALLS_PER_GENERATION
+    registered plugin tools before producing its final answer.  Each tool
+    result is injected back into the conversation as an assistant/user
+    message pair so the model can reason over it.
+
+    Args:
+        tool_steps: Optional list to which tool-call audit entries are appended.
+                    Each entry contains ``tool``, ``args_json``, and ``result``.
+    """
+    if tool_steps is None:
+        tool_steps = []
+
     context_text = ""
     if context:
         context_text = "\n\n---\n\n".join(
             f"[Source {i+1}]: {c.get('content', '')}" for i, c in enumerate(context)
         )
 
+    tool_desc = _build_tool_description_string()
+
     system_parts = [
         "You are a knowledgeable assistant. Answer the question using the provided context. "
         "If the context is insufficient, say so and use your general knowledge.",
     ]
+    if tool_desc:
+        system_parts.append(tool_desc)
     if previous_answer and critique_feedback:
         system_parts.append(
             f"\n\nYour previous answer was:\n{previous_answer}\n\n"
@@ -163,13 +230,62 @@ async def _generate(
     if context_text:
         user_content = f"Context:\n{context_text}\n\nQuestion: {query}\n\nAnswer:"
 
-    messages = [
-        {"role": "system", "content": "\n".join(system_parts)},
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": "\n\n".join(system_parts)},
         {"role": "user", "content": user_content},
     ]
 
-    result = await chat_completion(messages, model, stream=False, http_client=http_client, temperature=0.5)
-    return result["content"]
+    # ReAct loop: let the model call tools, then continue generating
+    for call_index in range(MAX_TOOL_CALLS_PER_GENERATION):
+        result = await chat_completion(
+            messages, model, stream=False, http_client=http_client, temperature=0.5
+        )
+        response_text: str = result["content"]
+
+        match = _TOOL_CALL_RE.search(response_text)
+        if not match:
+            # No tool call in this response — we have the final answer
+            return response_text
+
+        tool_name = match.group("name")
+        args_json = match.group("args").strip()
+
+        logger.info(
+            "ReAct tool call %d/%d: tool=%s args=%s",
+            call_index + 1,
+            MAX_TOOL_CALLS_PER_GENERATION,
+            tool_name,
+            args_json[:200],
+        )
+
+        tool_result = await _execute_tool_call(tool_name, args_json)
+
+        # Record the tool call for the caller to log in state steps
+        tool_steps.append({
+            "tool": tool_name,
+            "args_json": args_json,
+            "result": tool_result[:500],
+        })
+
+        # Extend conversation: assistant's tool-call turn + injected tool result
+        messages.append({"role": "assistant", "content": response_text})
+        messages.append({
+            "role": "user",
+            "content": (
+                f"Tool result for <tool_call name=\"{tool_name}\">:\n{tool_result}\n\n"
+                "Continue your answer using the tool result above."
+            ),
+        })
+
+    # Fell through the loop — do one final generation without tool calls
+    logger.warning(
+        "ReAct loop reached max tool calls (%d); generating final answer",
+        MAX_TOOL_CALLS_PER_GENERATION,
+    )
+    final = await chat_completion(
+        messages, model, stream=False, http_client=http_client, temperature=0.5
+    )
+    return final["content"]
 
 
 async def _critique(
@@ -289,6 +405,7 @@ async def run_agent(
         previous_answer = answer if cycle > 0 else None
         critique_feedback = final_critique["feedback"] if final_critique else None
 
+        tool_steps: List[Dict[str, Any]] = []
         answer = await _generate(
             query,
             all_context,
@@ -296,8 +413,23 @@ async def run_agent(
             model,
             previous_answer=previous_answer,
             critique_feedback=critique_feedback,
+            tool_steps=tool_steps,
         )
+
+        # Mark the generate/revise step complete first, then append tool-call steps
         steps[-1].update({"status": "completed", "result": answer[:500]})
+
+        # Log each tool call that occurred during this generation as its own step
+        for ts in tool_steps:
+            steps.append({
+                "step": f"tool_call:{ts['tool']}",
+                "status": "completed",
+                "timestamp": _now(),
+                "tool": ts["tool"],
+                "args_json": ts["args_json"],
+                "result_preview": ts["result"],
+            })
+
         await _save_state(run_id, state)
 
         # Critique
@@ -383,6 +515,7 @@ async def stream_agent_steps(
         step_name = "generate" if cycle == 0 else f"revise_{cycle}"
         yield f"data: {json.dumps({'type': 'step', 'step': step_name, 'status': 'running'})}\n\n"
 
+        tool_steps: List[Dict[str, Any]] = []
         answer = await _generate(
             query,
             all_context,
@@ -390,7 +523,13 @@ async def stream_agent_steps(
             model,
             previous_answer=answer if cycle > 0 else None,
             critique_feedback=final_critique["feedback"] if final_critique else None,
+            tool_steps=tool_steps,
         )
+
+        # Emit an SSE event for each tool call that happened during generation
+        for ts in tool_steps:
+            yield f"data: {json.dumps({'type': 'tool_call', 'tool': ts['tool'], 'args_json': ts['args_json'], 'result_preview': ts['result']})}\n\n"
+
         yield f"data: {json.dumps({'type': 'step', 'step': step_name, 'status': 'completed', 'preview': answer[:300]})}\n\n"
 
         yield f"data: {json.dumps({'type': 'step', 'step': f'critique_{cycle + 1}', 'status': 'running'})}\n\n"

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import CommandPalette from '@/components/CommandPalette'
@@ -49,6 +49,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const pathname = usePathname()
   const settings = useUiStore((s) => s.settings)
+  const focusMode = useUiStore((s) => s.focusMode)
+  const toggleFocusMode = useUiStore((s) => s.toggleFocusMode)
+  const setFocusMode = useUiStore((s) => s.setFocusMode)
 
   useKeyboardShortcuts()
 
@@ -78,38 +81,97 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [settings.fontSize])
 
+  // Alt+F toggles focus mode; Escape exits it
+  const handleGlobalKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.altKey && e.key === 'f') {
+        e.preventDefault()
+        toggleFocusMode()
+      } else if (e.key === 'Escape' && focusMode) {
+        setFocusMode(false)
+      }
+    },
+    [focusMode, toggleFocusMode, setFocusMode]
+  )
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleGlobalKeyDown)
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [handleGlobalKeyDown])
+
   const title = viewTitleMap[pathname] || 'Manic AI'
   const currentConversationId = useConversationStore((s) => s.currentConversationId)
   const isChatRoute = pathname === '/chat' || pathname.startsWith('/chat/')
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onOpenSettings={() => setSettingsOpen(true)}
-        onNavClick={() => setSidebarOpen(false)}
-      />
+    <div className="flex h-screen overflow-hidden relative">
+      {/* Vignette overlay for focus mode */}
+      {focusMode && (
+        <div
+          className="pointer-events-none fixed inset-0 z-[90]"
+          style={{
+            background:
+              'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.65) 100%)',
+          }}
+          aria-hidden="true"
+        />
+      )}
 
-      <main className="flex-1 flex flex-col min-w-0">
-        {/* Mobile top bar — shown on all routes */}
-        <div className="md:hidden flex items-center gap-3 p-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center"
-            style={{ background: 'var(--glass-bg)' }}
-            aria-label="Open navigation menu"
-          >
-            <MenuIcon className="w-6 h-6" />
-          </button>
-          <h1 className="font-semibold truncate flex-1">{title}</h1>
-          {isChatRoute && currentConversationId && (
-            <SystemPromptEditor conversationId={currentConversationId} />
-          )}
-        </div>
+      {/* Exit Focus button */}
+      {focusMode && (
+        <button
+          onClick={() => setFocusMode(false)}
+          className="fixed bottom-6 right-6 z-[95] flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-mono font-bold uppercase tracking-widest transition-all hover:opacity-80"
+          style={{
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-muted)',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+          }}
+          title="Exit focus mode (Escape)"
+          aria-label="Exit focus mode"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2m8-16h2a2 2 0 012 2v2m0 8v2a2 2 0 01-2 2h-2" />
+          </svg>
+          Exit Focus
+        </button>
+      )}
 
-        {/* Desktop chat header strip — only on /chat with an active conversation */}
-        {isChatRoute && currentConversationId && (
+      {/* Sidebar — hidden in focus mode */}
+      {!focusMode && (
+        <Sidebar
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onNavClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <main
+        className="flex-1 flex flex-col min-w-0 transition-all duration-300"
+        style={focusMode ? { maxWidth: '720px', margin: '0 auto', width: '100%' } : undefined}
+      >
+        {/* Mobile top bar — shown on all routes, hidden in focus mode */}
+        {!focusMode && (
+          <div className="md:hidden flex items-center gap-3 p-4" style={{ borderBottom: '1px solid var(--border-color)' }}>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center"
+              style={{ background: 'var(--glass-bg)' }}
+              aria-label="Open navigation menu"
+            >
+              <MenuIcon className="w-6 h-6" />
+            </button>
+            <h1 className="font-semibold truncate flex-1">{title}</h1>
+            {isChatRoute && currentConversationId && (
+              <SystemPromptEditor conversationId={currentConversationId} />
+            )}
+          </div>
+        )}
+
+        {/* Desktop chat header strip — only on /chat with an active conversation, hidden in focus mode */}
+        {!focusMode && isChatRoute && currentConversationId && (
           <div
             className="hidden md:flex items-center justify-end px-4 py-1.5"
             style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}
@@ -124,7 +186,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <CommandPalette />
 
-      {sidebarOpen && (
+      {!focusMode && sidebarOpen && (
         <div className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-20" onClick={() => setSidebarOpen(false)} />
       )}
     </div>
