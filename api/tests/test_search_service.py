@@ -1,6 +1,6 @@
 """Tests for search service -- unified_search deduplication, routing, and reranking."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest

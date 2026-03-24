@@ -7,7 +7,7 @@ so that existing rows remain forward-compatible.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
 import asyncpg

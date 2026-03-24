@@ -1,0 +1,32 @@
+E402 Module level import not at top of file
+  --> api\mcp_main.py:21:1
+   |
+19 | setup_logging(os.getenv("LOG_LEVEL", "INFO"))
+20 |
+21 | import logging
+   | ^^^^^^^^^^^^^^
+22 | logger = logging.getLogger(__name__)
+   |
+
+F841 Local variable `norm_query` is assigned to but never used
+  --> api\services\mmr.py:64:5
+   |
+63 |     # Pre-normalise all vectors once to avoid repeated work inside the loop.
+64 |     norm_query = _normalize(query_embedding)
+   |     ^^^^^^^^^^
+65 |     norm_cands = [_normalize(emb) for emb in candidate_embeddings]
+   |
+help: Remove assignment to unused variable `norm_query`
+
+F841 Local variable `needs_extra_candidates` is assigned to but never used
+   --> api\services\search.py:120:5
+    |
+119 |     # When reranking or MMR is active, fetch more candidates for better selection.
+120 |     needs_extra_candidates = rerank or use_mmr
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+121 |     retrieval_top_k = top_k * 3 if use_mmr else (20 if rerank else top_k)
+    |
+help: Remove assignment to unused variable `needs_extra_candidates`
+
+Found 3 errors.
+No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).

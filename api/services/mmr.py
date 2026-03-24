@@ -61,7 +61,6 @@ def mmr_rerank(
     k = min(k, n)
 
     # Pre-normalise all vectors once to avoid repeated work inside the loop.
-    norm_query = _normalize(query_embedding)
     norm_cands = [_normalize(emb) for emb in candidate_embeddings]
 
     selected: List[int] = []

@@ -1,1024 +1,531 @@
-# Manic-AI Developer Guide
+# Manic AI Developer Guide
 
-A practical reference for contributors joining the project. This guide covers
-everything from cloning the repo to shipping a complete feature — backend route,
-service layer, tests, and frontend page included.
+A practical reference for contributors. Covers local setup, backend and frontend development, testing, code style, and the full workflow for adding a new feature.
 
 ---
 
-## Table of Contents
-
-1. [Quick Start](#1-quick-start)
-2. [Prerequisites](#2-prerequisites)
-3. [Project Structure](#3-project-structure)
-4. [Local Development](#4-local-development)
-5. [Backend Development](#5-backend-development)
-6. [Frontend Development](#6-frontend-development)
-7. [Testing](#7-testing)
-8. [Code Style](#8-code-style)
-9. [Git Workflow](#9-git-workflow)
-10. [Adding a New Feature — End-to-End Walkthrough](#10-adding-a-new-feature--end-to-end-walkthrough)
-11. [Database Migrations](#11-database-migrations)
-12. [Environment Variables](#12-environment-variables)
-13. [CI/CD](#13-cicd)
-14. [Useful Commands](#14-useful-commands)
-
----
-
-## 1. Quick Start
-
-Three commands to go from zero to running dev servers:
+## Quick Start (3 commands)
 
 ```bash
-git clone <repo-url> && cd Manic-AI
-make setup          # install Python + Node deps, copy .env, install pre-commit hooks
-make dev            # start all services with hot-reload
+make setup    # Install Python + Node deps, copy .env.example → .env, install pre-commit hooks
+make up       # Start all Docker services
+make verify   # Verify the setup is correct
 ```
 
-The UI will be available at `http://localhost:3000` and the API at
-`http://localhost:8081`. After the first run, open `.env` and fill in the
-required secrets before the API will fully start (see
-[Environment Variables](#12-environment-variables)).
+After `make setup`, edit `.env` with your secrets before running `make up`.
 
----
-
-## 2. Prerequisites
-
-| Tool | Minimum version | Purpose |
-|------|----------------|---------|
-| Python | 3.11 | FastAPI backend |
-| Node.js | 20 (engines field requires >=18) | Next.js frontend |
-| Docker + Docker Compose | v2 (compose v2 plugin) | All backing services |
-| Ollama | latest | Local LLM inference |
-| Git | any recent | Version control |
-
-Optional but recommended:
-
-- `ruff` installed globally (`pip install ruff`) for editor integration
-- `pre-commit` (installed automatically by `make setup`)
-
-**Verify your setup:**
+Then pull the required ML models:
 
 ```bash
-make verify         # runs scripts/verify_setup.py
+docker exec ollama ollama pull bge-m3
+docker exec ollama ollama pull llama3.2:3b
 ```
 
 ---
 
-## 3. Project Structure
+## Prerequisites
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Python | 3.11+ | API backend |
+| Node.js | 18+ | Frontend |
+| npm | 9+ | Frontend package manager |
+| Docker Engine | 24+ | All services |
+| Docker Compose plugin | 2.20+ | Service orchestration |
+
+---
+
+## Project Structure
 
 ```
 Manic-AI/
 ├── api/                    FastAPI backend (Python)
+│   ├── app.py              App factory — middleware, router registration
+│   ├── main.py             ASGI entry point
+│   ├── config.py           Pydantic Settings (all env vars)
+│   ├── auth.py             API key authentication dependency
+│   ├── database.py         asyncpg connection pool init/close
+│   ├── dependencies.py     FastAPI DI factories (get_db, get_http_client, etc.)
+│   ├── routers/            HTTP route handlers (one file per resource group)
+│   ├── services/           Business logic (RAG, embedding, chunking, agents, etc.)
+│   ├── repositories/       Data access layer (Supabase, Qdrant, Redis)
+│   ├── schemas/            Pydantic request/response models
+│   ├── middleware/         Starlette middlewares (auth, rate limit, guardrails, etc.)
+│   ├── plugins/            Plugin loading and tool registry
 │   ├── alembic/            Database migration scripts
-│   │   └── versions/       Individual migration files (001_, 002_, ...)
-│   ├── middleware/         Request-level concerns (auth, rate-limit, audit, metrics)
-│   ├── repositories/       Data-access layer (Supabase, Qdrant, Redis)
-│   │   └── protocols.py    Protocol (interface) definitions — VectorStore, DocumentStore, CacheStore
-│   ├── routers/            HTTP route handlers, one file per feature area
-│   ├── schemas/            Pydantic request/response models + shared envelope
-│   ├── services/           Business logic (RAG, chunking, embedding, agents, ...)
-│   ├── tests/              pytest test suite
-│   ├── app.py              FastAPI application factory + middleware registration
-│   ├── config.py           Settings (pydantic-settings, reads from env)
-│   ├── database.py         asyncpg connection pool
-│   ├── main.py             Uvicorn entry point
-│   └── requirements*.txt   Runtime and dev dependencies
+│   └── tests/              pytest test suite
 │
-├── frontend/               Next.js UI (TypeScript)
-│   ├── app/                Next.js App Router pages
-│   │   ├── chat/           Chat interface
-│   │   ├── dashboard/      Service dashboard
+├── frontend/               Next.js frontend (TypeScript)
+│   ├── app/                Next.js 15 App Router pages
+│   │   ├── chat/           Chat UI
+│   │   ├── dashboard/      Dashboard with metrics
 │   │   ├── documents/      Document management
-│   │   ├── models/         Model browser
-│   │   ├── rag/            RAG pipeline center
-│   │   ├── settings/       User settings
-│   │   └── ...             (workbench, arena, tools, admin)
-│   ├── components/         Reusable React components
-│   ├── lib/                Utilities and state
-│   │   ├── api.ts          Typed API client functions
-│   │   ├── store.ts        Root Zustand store
-│   │   └── stores/         Domain-scoped Zustand slices
+│   │   ├── rag/            RAG center
+│   │   ├── settings/       Advanced settings
+│   │   ├── models/         Model management
+│   │   ├── arena/          A/B testing arena
+│   │   ├── workbench/      LLM workbench
+│   │   └── tools/          Tools page
+│   ├── components/         Shared React components
+│   ├── lib/                Zustand stores, API client, utilities
+│   │   ├── store.ts        Main Zustand store
+│   │   └── stores/         Specialized stores
+│   ├── hooks/              Custom React hooks
+│   ├── types/              TypeScript type definitions
 │   ├── __tests__/          Jest unit tests
-│   └── e2e/                Playwright E2E specs
+│   └── e2e/                Playwright E2E tests
 │
-├── supabase/               SQL schema and pgvector setup
-├── sql-parts/              SQL schema fragments
-├── scripts/                Setup, migration, SDK generation utilities
-├── docs/                   Project documentation
-├── docker-compose.yml      Full production service stack
-├── docker-compose.dev.yml  Dev overrides (hot-reload, debug ports)
-├── docker-compose.prod.yml Production tuning
+├── caddy/                  Caddyfile (reverse proxy + TLS)
+├── monitoring/             Prometheus, Grafana, Alertmanager, Loki configs
+├── supabase/               PostgreSQL init SQL, Kong config, Studio auth
+├── searxng/                SearXNG configuration
+├── scripts/                Setup and utility scripts
+├── n8n-workflows/          Pre-built n8n automation workflows
+├── obsidian-agent/         Paddy AI agent for Obsidian vaults
+├── docker-compose.yml      All services
+├── docker-compose.dev.yml  Development overrides
+├── docker-compose.prod.yml Production overrides
 ├── Makefile                Developer shortcuts
-└── .github/
-    ├── workflows/ci.yml    GitHub Actions CI pipeline
-    ├── CODEOWNERS          Auto-review assignments
-    └── PULL_REQUEST_TEMPLATE.md
+└── .env.example            Environment variable template
 ```
 
 ---
 
-## 4. Local Development
+## Local Development
 
-### Starting services with hot-reload
-
-The dev compose file mounts local source directories into the containers so
-changes are picked up instantly without rebuilding images:
+### Start services with hot reload
 
 ```bash
 make dev
-# equivalent to:
+# Equivalent to:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
-What the dev override adds on top of the base stack:
+The dev overrides mount source code volumes so changes reflect without rebuilding images.
 
-- **API**: uvicorn `--reload` flag; `LOG_LEVEL=debug`
-- **Frontend**: `NODE_ENV=development` with `WATCHPACK_POLLING=true` for
-  filesystem watches on Windows/WSL
-- **Qdrant**: web UI ports `6333` and `6334` exposed on `$BIND_IP`
-- **n8n**: debug log level
-
-### Stopping and cleaning up
+### View logs
 
 ```bash
-make down           # stop containers (volumes preserved)
-make clean          # stop containers AND remove all volumes
+make logs                          # All services
+docker compose logs api -f         # API only
+docker compose logs frontend -f    # Frontend only
 ```
 
-### Tailing logs
+### Service URLs (local)
 
-```bash
-make logs                              # all services
-docker compose logs -f api frontend    # specific services
-```
-
-### Service status
-
-```bash
-make status         # docker compose ps
-```
-
-### Running services individually (outside Docker)
-
-Useful when iterating quickly on the API or frontend without rebuilding containers:
-
-```bash
-# API — from repo root
-cd api
-pip install -r requirements-dev.txt
-SUPABASE_DB_URL=postgresql://... REDIS_URL=redis://localhost:6379 \
-  uvicorn api.main:app --reload --host 0.0.0.0 --port 8081
-
-# Frontend — from repo root
-cd frontend
-npm ci --legacy-peer-deps
-npm run dev
-```
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:8081 |
+| API docs (Swagger) | http://localhost:8081/docs |
+| API docs (ReDoc) | http://localhost:8081/redoc |
+| Open WebUI | http://localhost:3006 |
+| Langfuse | http://localhost:3007 |
+| n8n | http://localhost:5679 |
+| Flowise | http://localhost:3008 |
+| SearXNG | http://localhost:8889 |
+| Supabase Studio | http://localhost:3005 |
+| Qdrant UI | http://localhost:6333/dashboard |
+| Grafana | http://localhost:3001 |
 
 ---
 
-## 5. Backend Development
+## Backend Development
 
-The API is a **FastAPI** application structured in three clear layers:
+### Installing Python dependencies
 
-```
-Router  ->  Service  ->  Repository
-```
-
-- **Routers** (`api/routers/`) handle HTTP concerns: path parameters, request
-  validation, authentication dependencies, and response serialization. They
-  delegate all logic to services.
-- **Services** (`api/services/`) contain business logic. They call repositories
-  for data access and other services for cross-cutting concerns.
-- **Repositories** (`api/repositories/`) are the only layer that touches
-  databases or external stores. They implement the protocols defined in
-  `repositories/protocols.py`.
-
-### Adding a new route
-
-1. Create a new file in `api/routers/` (or add to an existing one if the
-   domain fits):
-
-```python
-# api/routers/notes.py
-from fastapi import APIRouter, Depends
-from api.auth import require_api_key
-from api.schemas.envelope import ok
-from api.services.notes import NoteService
-
-router = APIRouter(prefix="/notes", tags=["notes"])
-
-
-@router.get("/")
-async def list_notes(service: NoteService = Depends()):
-    notes = await service.list()
-    return ok(notes)
+```bash
+cd api && pip install -r requirements.txt
+# Development extras:
+pip install -r requirements-dev.txt
 ```
 
-2. Register the router in `api/app.py`:
+### Running the API without Docker
 
-```python
-from api.routers import notes as notes_router
+For rapid iteration, run the API directly:
 
-v1.include_router(notes_router.router)
+```bash
+cd api
+SUPABASE_DB_URL=postgresql://postgres:pass@localhost:5433/postgres \
+REDIS_URL=redis://localhost:6380 \
+API_SECRET_KEY=dev-secret \
+ALLOW_UNAUTHENTICATED=true \
+uvicorn api.main:app --reload --port 8081
 ```
 
-### Response envelope
+### Adding a New Endpoint
 
-All endpoints return a consistent JSON envelope via helpers from
-`api/schemas/envelope.py`:
+1. **Create or update a router file** in `api/routers/`. Follow the existing pattern:
+   - Define request/response Pydantic models (or add them to `api/schemas/`)
+   - Use `from api.schemas.envelope import ok` for consistent response wrapping
+   - Add `@limiter.limit(...)` decorator for rate limiting
+   - Use `Depends(require_api_key)` for authentication (already applied at router level in `app.py`)
 
-```python
-from api.schemas.envelope import ok, fail
+2. **Create a service function** in `api/services/` for any business logic that isn't trivial.
 
-# Success
-return ok({"id": "abc", "title": "Hello"})
-# {"success": true, "data": {...}, "error": null, "meta": null}
+3. **Register the router** in `api/app.py`:
+   ```python
+   from api.routers import my_router
+   v1_router.include_router(my_router.router, dependencies=auth_dep, tags=["my-tag"])
+   ```
 
-# Error
-return fail("NOT_FOUND", "Note not found")
-# {"success": false, "data": null, "error": {"code": "NOT_FOUND", "message": "..."}, "meta": null}
+4. **Add to `_TAGS_METADATA`** in `api/app.py` for Swagger docs.
+
+5. **Write tests** (see Testing section).
+
+### Dependency Injection
+
+The `api/dependencies.py` file exposes these FastAPI dependencies:
+
+| Function | Returns | Description |
+|----------|---------|-------------|
+| `get_db` | `asyncpg.Pool` | DB connection pool (raises if unavailable) |
+| `get_db_optional` | `Optional[asyncpg.Pool]` | DB pool or None |
+| `get_http_client` | `httpx.AsyncClient` | Shared async HTTP client |
+| `get_langfuse` | `Langfuse | None` | Langfuse tracing client |
+| `get_redis` | `RedisCacheRepository | None` | Redis repository |
+| `get_document_repo` | `SupabaseDocumentRepository` | Document data access |
+| `get_qdrant_repo` | `QdrantVectorRepository` | Qdrant data access |
+
+### Database Migrations (Alembic)
+
+Create a new migration:
+
+```bash
+cd api
+python -m alembic revision --autogenerate -m "add my_table"
 ```
 
-### Adding a service
+Apply migrations:
 
-Services are plain Python classes. Inject dependencies through `__init__` so
-they are testable with mocks:
-
-```python
-# api/services/notes.py
-from typing import List, Dict, Any
-from api.repositories.protocols import DocumentStore
-
-
-class NoteService:
-    def __init__(self, store: DocumentStore):
-        self._store = store
-
-    async def list(self) -> List[Dict[str, Any]]:
-        return await self._store.list_documents()
+```bash
+python -m alembic upgrade head
 ```
 
-### Repository pattern
+Rollback one step:
 
-Define the interface contract in `api/repositories/protocols.py` as a
-`Protocol`. Concrete implementations (`SupabaseDocuments`, `QdrantVector`,
-`RedisCache`) satisfy the protocol structurally — no inheritance needed.
-Business logic depends only on the protocol, making storage backends
-swappable and services trivially mockable in tests.
+```bash
+python -m alembic downgrade -1
+```
+
+Migration scripts live in `api/alembic/versions/`. The connection URL is read from `SUPABASE_DB_URL` at runtime.
 
 ### Configuration
 
-All settings are in `api/config.py` as a pydantic-settings `Settings` class.
-Add a new setting:
+All settings are defined in `api/config.py` as a `Settings(BaseSettings)` class. Add new config values there:
 
 ```python
-class Settings(BaseSettings):
-    MY_NEW_SETTING: str = "default_value"
+MY_NEW_SETTING: str = "default_value"
 ```
 
-Access it anywhere via the singleton:
+Access it anywhere via:
 
 ```python
 from api.config import settings
-
-value = settings.MY_NEW_SETTING
+settings.MY_NEW_SETTING
 ```
 
-The value is read from the environment variable `MY_NEW_SETTING` at startup.
+Settings are validated on startup. Missing required values raise a `ValueError` immediately.
 
 ---
 
-## 6. Frontend Development
+## Frontend Development
 
-The frontend is a **Next.js 15** application using the App Router. All
-components that need interactivity use the `'use client'` directive. State is
-managed with **Zustand** stores.
+### Tech Stack
 
-### Adding a new page
+| Library | Version | Purpose |
+|---------|---------|---------|
+| Next.js | 15.x | App Router, SSR, API routes |
+| React | 18.x | UI components |
+| TypeScript | 5.7 | Type safety |
+| Tailwind CSS | 3.4 | Utility-first styling |
+| Zustand | 5.0 | Client-side state management |
+| SWR | 2.4 | Server state / data fetching |
+| `@supabase/supabase-js` | 2.47 | Optional Supabase client-side auth |
 
-Pages live under `frontend/app/`. Each route segment is a directory containing
-a `page.tsx` and optionally an `error.tsx`:
-
-```
-frontend/app/
-  notes/
-    page.tsx        # the page component
-    error.tsx       # error boundary (copy from another route)
-```
-
-```typescript
-// frontend/app/notes/page.tsx
-'use client'
-
-import { useEffect } from 'react'
-import { useNotesStore } from '@/lib/stores/notesStore'
-
-export default function NotesPage() {
-  const { notes, fetchNotes } = useNotesStore()
-
-  useEffect(() => { fetchNotes() }, [fetchNotes])
-
-  return (
-    <div className="glass-card p-6">
-      {notes.map(n => <div key={n.id}>{n.title}</div>)}
-    </div>
-  )
-}
-```
-
-Add a navigation link in the sidebar component to make the page discoverable.
-
-### Adding a Zustand store
-
-Domain-scoped stores live in `frontend/lib/stores/`. Each store is its own
-file with its own state and actions:
-
-```typescript
-// frontend/lib/stores/notesStore.ts
-import { create } from 'zustand'
-import { apiGet } from '@/lib/api'
-
-interface Note { id: string; title: string }
-interface NotesState {
-  notes: Note[]
-  fetchNotes: () => Promise<void>
-}
-
-export const useNotesStore = create<NotesState>((set) => ({
-  notes: [],
-  fetchNotes: async () => {
-    const data = await apiGet<Note[]>('/notes')
-    set({ notes: data ?? [] })
-  },
-}))
-```
-
-The root store at `frontend/lib/store.ts` uses `persist` middleware with
-`localStorage` key `manic-ai-storage` for fields that need to survive page
-refreshes. Domain stores do not need to be registered there unless they
-require persistence.
-
-### API client
-
-All backend calls go through the typed helpers in `frontend/lib/api.ts`. Do
-not use `fetch` directly in components. The client handles the base URL,
-authentication headers, and unwrapping the response envelope.
-
-### CSS conventions
-
-- CSS custom properties for theming: `--bg-primary`, `--accent-blue`,
-  `--text-primary`, etc. — defined in `app/globals.css`
-- Utility class `glass-card` for the glassmorphism card style
-- Tailwind CSS for layout and spacing
-
-### Generating the TypeScript SDK
-
-After changing API schemas, regenerate the typed client:
+### Running the frontend without Docker
 
 ```bash
-make sdk
-# runs scripts/generate_sdk.py -> reads OpenAPI spec -> writes frontend types
+cd frontend
+npm ci
+NEXT_PUBLIC_API_URL=http://localhost:8081 npm run dev
 ```
+
+The frontend runs on port 3000. Hot Module Replacement is enabled.
+
+### Environment Variables (Frontend)
+
+Prefix with `NEXT_PUBLIC_` to expose to the browser:
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | Backend API base URL |
+| `NEXT_PUBLIC_OLLAMA_URL` | Ollama URL for direct model access |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase Kong gateway URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key |
+
+### State Management
+
+Main state lives in `frontend/lib/store.ts` (Zustand with `persist` middleware → `localStorage`). Specialized stores are in `frontend/lib/stores/`.
+
+All components use the `'use client'` directive since the frontend is client-rendered.
+
+### Styling Conventions
+
+- CSS variables for theming: `--bg-primary`, `--accent-blue`, `--text-primary`, etc. (defined in `app/globals.css`)
+- Glassmorphism aesthetic: glass-card pattern with gradient accents on a dark background
+- All chart components are pure CSS/SVG — no chart libraries
+
+### Adding a New Page
+
+1. Create a directory in `frontend/app/`:
+   ```
+   frontend/app/my-feature/page.tsx
+   ```
+
+2. Add `'use client'` at the top if the page uses state or browser APIs.
+
+3. Add a navigation link in the `AppShell` component (`components/AppShell.tsx`).
 
 ---
 
-## 7. Testing
+## Testing
 
-### API tests (pytest)
-
-Tests live in `api/tests/`. The suite covers routers, services, repositories,
-middleware, and pure-logic modules. The naming convention is:
-
-| Pattern | What it covers |
-|---------|---------------|
-| `test_router_*.py` | HTTP endpoint tests via `TestClient` |
-| `test_*_service.py` or `test_*.py` | Service and utility unit tests |
-| `test_*_pure.py` | Side-effect-free logic with no mocking |
-| `conftest.py` | Shared fixtures (app instance, mock DB, etc.) |
-
-Run all API tests:
+### API Tests (pytest)
 
 ```bash
 make test-api
-# or with coverage:
+# or
+cd api && python -m pytest --tb=short -q
+
+# With coverage report:
 make test-coverage
+cd api && python -m pytest --cov=. --cov-report=term-missing --tb=short
 ```
 
-Run a specific test file:
+Test files are in `api/tests/`. Naming convention: `test_<module>.py`.
 
-```bash
-cd api && python -m pytest tests/test_router_chat.py -v
-```
+The test suite includes 50+ test files covering routers, services, middleware, auth, embeddings, RAG, chunking, PII detection, and more.
 
-Writing a new test — follow the existing `test_router_*.py` pattern:
+**Key fixtures** (in `api/tests/conftest.py`):
+- `mock_db` — async mock of asyncpg.Pool
+- `mock_http_client` — httpx.AsyncClient mock
+- `test_client` — FastAPI TestClient with `ALLOW_UNAUTHENTICATED=true`
 
-```python
-from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch
-from api.app import app
+Tests that need a real database use the `SUPABASE_DB_URL` env var (set in CI via a Postgres service container).
 
-client = TestClient(app)
-
-def test_list_notes_returns_200():
-    with patch("api.routers.notes.NoteService.list", new_callable=AsyncMock) as mock:
-        mock.return_value = [{"id": "1", "title": "Hello"}]
-        response = client.get("/v1/notes/", headers={"X-API-Key": "test"})
-    assert response.status_code == 200
-    assert response.json()["success"] is True
-```
-
-CI runs tests against real Postgres (port 5432) and Redis (port 6379) service
-containers. Locally, the Docker stack provides the same services.
-
-### Frontend tests (Jest)
-
-Tests live in `frontend/__tests__/` mirroring the source layout:
-
-```
-__tests__/
-  components/     Component rendering tests (React Testing Library)
-  hooks/          Custom hook tests
-  lib/            Utility and API client tests
-  stores/         Zustand store action tests
-  smoke.test.ts   Basic import/smoke checks
-```
-
-Run all frontend tests:
+### Frontend Unit Tests (Jest)
 
 ```bash
 make test-frontend
-# or with coverage:
+# or
+cd frontend && npm test
+
+# With coverage:
 cd frontend && npm run test:coverage
 ```
 
-Run in watch mode during development:
+Test files are in `frontend/__tests__/`. Uses `@testing-library/react` + `jest-environment-jsdom`.
+
+### E2E Tests (Playwright)
 
 ```bash
-cd frontend && npm run test:watch
+make test-e2e
+# or
+cd frontend && npx playwright test
+
+# Interactive UI mode:
+make test-e2e-ui
 ```
 
-### E2E tests (Playwright)
-
-Specs live in `frontend/e2e/` and cover critical user flows:
-
-| Spec | What it tests |
-|------|--------------|
-| `navigation.spec.ts` | Route transitions, sidebar links |
-| `sidebar.spec.ts` | Sidebar expand/collapse, active states |
-| `dashboard.spec.ts` | Dashboard tabs, service status display |
-| `settings.spec.ts` | Settings sections and form interactions |
-
-Run against a running dev stack:
-
-```bash
-make test-e2e           # headless
-make test-e2e-ui        # with Playwright UI for debugging
-```
-
-### Run everything
-
-```bash
-make test               # api + frontend (not E2E)
-```
+E2E tests are in `frontend/e2e/`. Playwright config is at `frontend/playwright.config.ts`. Tests require the full stack to be running.
 
 ---
 
-## 8. Code Style
+## Code Style
 
-### Python (ruff)
+### Python (API)
 
-The project uses **ruff** for both linting and formatting. It is configured
-via `.pre-commit-config.yaml` (ruff v0.8.6).
+- **Linter/formatter:** `ruff` — configuration in `pyproject.toml`
+- Run: `make lint-api` (check) or `make lint-fix` (auto-fix + format)
+- All public functions must have docstrings
+- Use type hints throughout
+- Error handling: always raise `HTTPException` with appropriate status codes and human-readable `detail`
+- Never use bare `except:` — catch specific exception types
+- Logging: use `logger = logging.getLogger(__name__)` at module level
+
+### TypeScript (Frontend)
+
+- **Linter:** ESLint with `eslint-config-next`
+- Run: `make lint-frontend`
+- All React components must have `'use client'` directive if they use state or effects
+- Prefer functional components with hooks over class components
+- Use TypeScript `interface` for prop types, `type` for unions and aliases
+
+### Pre-commit Hooks
+
+Hooks run automatically on `git commit`. Install with:
 
 ```bash
-make lint-api           # check only
-make lint-fix           # auto-fix then format
+make setup-hooks
+# or
+pre-commit install
 ```
 
-Key rules from `.editorconfig`:
-
-- 4-space indentation
-- 120-character line length
-- LF line endings, UTF-8, trailing newline
-
-### TypeScript / JavaScript (ESLint + tsc)
-
-```bash
-make lint-frontend      # eslint
-cd frontend && npx tsc --noEmit   # type-check only
-```
-
-Key rules from `.editorconfig`:
-
-- 2-space indentation for `.ts`, `.tsx`, `.js`, `.jsx`
-- LF line endings
-
-### Editor config
-
-The `.editorconfig` at the repo root enforces consistent whitespace across
-all file types. Install the EditorConfig plugin for VS Code, JetBrains, or
-your editor of choice.
-
-### Pre-commit hooks
-
-`make setup` (or `make setup-hooks`) installs pre-commit hooks that run
-automatically on `git commit`:
-
-| Hook | What it does |
-|------|-------------|
-| `ruff` | Lint + auto-fix Python |
-| `ruff-format` | Format Python |
-| `trailing-whitespace` | Strip trailing spaces |
-| `end-of-file-fixer` | Ensure files end with a newline |
-| `check-yaml` / `check-json` | Syntax validation |
-| `check-added-large-files` | Block files larger than 500 KB |
-| `no-commit-to-branch` | Prevent direct commits to `main` |
-| `detect-private-key` | Block accidental secret commits |
+Hooks include: trailing whitespace, YAML/JSON validation, end-of-file fixes, ruff linting.
 
 ---
 
-## 9. Git Workflow
+## Git Workflow
 
-### Branch naming
+### Branch Strategy
 
-Work on feature branches off `Manic-AI-Prod`:
+- `Manic-AI-Prod` — main production branch (protected, requires PR)
+- Feature branches: `feat/my-feature`
+- Bug fixes: `fix/my-bug`
 
-```
-feat/short-description
-fix/issue-description
-refactor/area-name
-docs/what-was-documented
-```
-
-### Commit messages
-
-Follow **Conventional Commits**:
+### Commit Format
 
 ```
-<type>: <short description>
+<type>: <description>
 
-<optional body — what and why, not how>
+<optional body>
 ```
 
 Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
 
 Examples:
-
 ```
-feat: add notes router with list and create endpoints
-fix: handle empty embedding vector in hybrid search
-docs: add database migration section to developer guide
+feat: add TOTP-based MFA to auth flow
+fix: prevent duplicate document ingestion by content hash
+test: add coverage for cross-encoder reranker
 ```
 
-### Pull requests
+### Pull Request Process
 
-1. Open a PR against `Manic-AI-Prod`.
-2. Fill in the PR template (summary, type of change, testing checklist,
-   security checklist).
-3. The CI pipeline must be green before merging.
-4. `@MrVitality` is auto-requested as reviewer via CODEOWNERS for all paths.
-   Security-sensitive paths (`api/auth.py`, `api/middleware/`,
-   `api/plugins/code_exec/`) require an explicit approval.
+1. Create a feature branch from `Manic-AI-Prod`
+2. Write tests first (TDD)
+3. Implement the feature
+4. Ensure all tests pass: `make test`
+5. Ensure linting passes: `make lint`
+6. Open a PR against `Manic-AI-Prod`
+7. CI runs all checks automatically
+8. PR requires review approval before merge
 
 ---
 
-## 10. Adding a New Feature — End-to-End Walkthrough
+## Adding a Feature End-to-End
 
-This walkthrough adds a minimal "Notes" feature from scratch: a backend route,
-a service, tests, and a frontend page.
+Example: adding a `POST /v1/summarize` endpoint.
 
-### Step 1 — Create the Pydantic schema
+### 1. Write the schema
+
+Create or update `api/schemas/summarize.py`:
 
 ```python
-# api/schemas/notes.py
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-class NoteCreate(BaseModel):
-    title: str
-    body: str
+class SummarizeRequest(BaseModel):
+    text: str = Field(..., max_length=50_000)
+    max_sentences: int = Field(default=3, ge=1, le=20)
 
-class NoteRead(BaseModel):
-    id: str
-    title: str
-    body: str
+class SummarizeResponse(BaseModel):
+    summary: str
+    sentence_count: int
 ```
 
-### Step 2 — Add the service
+### 2. Write the service
+
+Create `api/services/summarize.py`:
 
 ```python
-# api/services/notes.py
-import uuid
-from typing import List
-from api.schemas.notes import NoteCreate, NoteRead
-
-
-class NoteService:
-    """In-memory stand-in — replace with a repository call for persistence."""
-
-    _store: dict[str, NoteRead] = {}
-
-    async def list(self) -> List[NoteRead]:
-        return list(self._store.values())
-
-    async def create(self, payload: NoteCreate) -> NoteRead:
-        note = NoteRead(id=str(uuid.uuid4()), **payload.model_dump())
-        self._store[note.id] = note
-        return note
+async def summarize_text(text: str, max_sentences: int, http_client) -> dict:
+    # Business logic here
+    ...
 ```
 
-### Step 3 — Add the router
+### 3. Write tests first
+
+Create `api/tests/test_router_summarize.py`:
 
 ```python
-# api/routers/notes.py
-from fastapi import APIRouter, Depends
-from api.auth import require_api_key
-from api.schemas.envelope import ok
-from api.schemas.notes import NoteCreate
-from api.services.notes import NoteService
-
-router = APIRouter(prefix="/notes", tags=["notes"])
-
-
-@router.get("/", dependencies=[Depends(require_api_key)])
-async def list_notes(service: NoteService = Depends()):
-    return ok(await service.list())
-
-
-@router.post("/", dependencies=[Depends(require_api_key)], status_code=201)
-async def create_note(payload: NoteCreate, service: NoteService = Depends()):
-    return ok(await service.create(payload))
-```
-
-### Step 4 — Register the router in app.py
-
-Open `api/app.py` and add alongside the existing router imports:
-
-```python
-from api.routers import notes as notes_router
-# ...
-v1.include_router(notes_router.router)
-```
-
-### Step 5 — Write the API test
-
-```python
-# api/tests/test_router_notes.py
-from fastapi.testclient import TestClient
-from api.app import app
-
-client = TestClient(app)
-HEADERS = {"X-API-Key": "test"}
-
-
-def test_create_and_list_note():
-    resp = client.post("/v1/notes/", json={"title": "Hi", "body": "World"}, headers=HEADERS)
-    assert resp.status_code == 201
-    note_id = resp.json()["data"]["id"]
-
-    resp = client.get("/v1/notes/", headers=HEADERS)
+def test_summarize_success(test_client):
+    resp = test_client.post("/v1/summarize", json={"text": "Long text...", "max_sentences": 2})
     assert resp.status_code == 200
-    ids = [n["id"] for n in resp.json()["data"]]
-    assert note_id in ids
+    assert resp.json()["success"] is True
+    assert "summary" in resp.json()["data"]
 ```
 
-Run it:
+### 4. Write the router
+
+Create `api/routers/summarize.py`:
+
+```python
+from fastapi import APIRouter, Depends
+import httpx
+from api.dependencies import get_http_client
+from api.schemas.envelope import ok
+from api.schemas.summarize import SummarizeRequest
+from api.services.summarize import summarize_text
+
+router = APIRouter()
+
+@router.post("/summarize", response_model=None, tags=["summarize"])
+async def summarize(
+    body: SummarizeRequest,
+    client: httpx.AsyncClient = Depends(get_http_client),
+):
+    result = await summarize_text(body.text, body.max_sentences, client)
+    return ok(result)
+```
+
+### 5. Register the router
+
+In `api/app.py`:
+
+```python
+from api.routers import summarize as summarize_router
+v1_router.include_router(summarize_router.router, dependencies=auth_dep, tags=["summarize"])
+```
+
+Add to `_TAGS_METADATA`:
+
+```python
+{"name": "summarize", "description": "Text summarization"},
+```
+
+### 6. Add frontend UI (optional)
+
+Create `frontend/app/tools/summarize/page.tsx` with the `'use client'` directive and call the API via `fetch` or SWR.
+
+### 7. Run tests and lint
 
 ```bash
-cd api && python -m pytest tests/test_router_notes.py -v
-```
-
-### Step 6 — Add the frontend store
-
-```typescript
-// frontend/lib/stores/notesStore.ts
-import { create } from 'zustand'
-import { apiGet, apiPost } from '@/lib/api'
-
-interface Note { id: string; title: string; body: string }
-interface NotesState {
-  notes: Note[]
-  fetchNotes: () => Promise<void>
-  createNote: (title: string, body: string) => Promise<void>
-}
-
-export const useNotesStore = create<NotesState>((set, get) => ({
-  notes: [],
-  fetchNotes: async () => {
-    const data = await apiGet<Note[]>('/notes')
-    set({ notes: data ?? [] })
-  },
-  createNote: async (title, body) => {
-    await apiPost('/notes', { title, body })
-    await get().fetchNotes()
-  },
-}))
-```
-
-### Step 7 — Add the frontend page
-
-```typescript
-// frontend/app/notes/page.tsx
-'use client'
-
-import { useEffect, useState } from 'react'
-import { useNotesStore } from '@/lib/stores/notesStore'
-
-export default function NotesPage() {
-  const { notes, fetchNotes, createNote } = useNotesStore()
-  const [title, setTitle] = useState('')
-
-  useEffect(() => { fetchNotes() }, [fetchNotes])
-
-  return (
-    <div className="glass-card p-6 space-y-4">
-      <h1 className="text-xl font-semibold">Notes</h1>
-      <div className="flex gap-2">
-        <input
-          className="flex-1 bg-transparent border border-white/20 rounded px-3 py-1"
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          placeholder="New note title"
-        />
-        <button
-          onClick={() => { createNote(title, ''); setTitle('') }}
-          className="px-4 py-1 rounded bg-blue-600 hover:bg-blue-500"
-        >
-          Add
-        </button>
-      </div>
-      <ul className="space-y-2">
-        {notes.map(n => <li key={n.id} className="text-sm">{n.title}</li>)}
-      </ul>
-    </div>
-  )
-}
-```
-
-### Step 8 — Add a frontend unit test
-
-```typescript
-// frontend/__tests__/stores/notesStore.test.ts
-import { renderHook, act } from '@testing-library/react'
-import { useNotesStore } from '@/lib/stores/notesStore'
-
-jest.mock('@/lib/api', () => ({
-  apiGet: jest.fn().mockResolvedValue([{ id: '1', title: 'Test', body: '' }]),
-  apiPost: jest.fn().mockResolvedValue({ id: '2', title: 'New', body: '' }),
-}))
-
-it('fetchNotes populates the store', async () => {
-  const { result } = renderHook(() => useNotesStore())
-  await act(async () => { await result.current.fetchNotes() })
-  expect(result.current.notes).toHaveLength(1)
-  expect(result.current.notes[0].title).toBe('Test')
-})
+make test-api lint-api
 ```
 
 ---
 
-## 11. Database Migrations
-
-The API uses **Alembic** for schema migrations. Migration files live in
-`api/alembic/versions/` and are applied in sequence (currently 001 through 006).
-
-### Creating a new migration
+## Makefile Reference
 
 ```bash
-cd api
-alembic revision --autogenerate -m "add_notes_table"
-```
-
-This generates a new file in `api/alembic/versions/`. Always review the
-generated file before running it — autogenerate can miss complex changes
-(custom types, partial indexes) or produce incorrect diffs.
-
-### Applying migrations
-
-```bash
-cd api
-alembic upgrade head          # apply all pending migrations
-alembic upgrade +1            # apply exactly one migration
-```
-
-In CI, `alembic upgrade head` runs automatically before the test suite against
-the Postgres service container.
-
-### Rolling back
-
-```bash
-cd api
-alembic downgrade -1          # roll back the most recent migration
-alembic downgrade base        # roll back everything (destructive)
-```
-
-### Connection configuration
-
-Alembic reads `SUPABASE_DB_URL` from the environment at runtime. The
-`api/alembic.ini` file intentionally leaves `sqlalchemy.url` blank — `env.py`
-injects the value from the environment variable so no credentials are ever
-stored in config files.
-
-### Useful inspection commands
-
-```bash
-alembic current        # show current revision applied to the DB
-alembic history        # list all migrations in order
-alembic show <rev>     # show details of a specific revision
-```
-
----
-
-## 12. Environment Variables
-
-There is no committed `.env` file. `make setup` copies `.env.example` to `.env`
-if it does not already exist. Edit `.env` before starting the stack.
-
-The authoritative reference for every variable is `api/config.py`. Key groups:
-
-| Group | Variables |
-|-------|----------|
-| Database | `SUPABASE_DB_URL` (required) |
-| Cache | `REDIS_URL` |
-| Vector DB | `QDRANT_URL`, `QDRANT_API_KEY` |
-| Search | `SEARXNG_URL`, `SEARXNG_SECRET_KEY` |
-| Inference | `OLLAMA_URL`, `INFERENCE_BACKEND`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` |
-| Models | `CHAT_MODEL`, `EMBEDDING_MODEL`, `VECTOR_DIMENSION` |
-| Auth | `API_SECRET_KEY`, `AUTH_MODE` |
-| Observability | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `SENTRY_DSN`, `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT` |
-| Rate limits | `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_INGEST_PER_MINUTE` |
-| Security | `GUARDRAILS_ENABLED`, `PII_REDACTION_ENABLED` |
-| Infrastructure | `BIND_IP`, `PUBLIC_DOMAIN`, `POSTGRES_PASSWORD` |
-
-`SUPABASE_DB_URL` and `API_SECRET_KEY` are validated at startup by
-pydantic-settings and raise a clear error if missing. The only exception is
-when `ALLOW_UNAUTHENTICATED=true` is set, which is reserved for CI test runs.
-
----
-
-## 13. CI/CD
-
-The pipeline is defined in `.github/workflows/ci.yml` and runs on every pull
-request and push to `Manic-AI-Prod`, plus a nightly security scan at 03:00 UTC.
-Jobs run concurrently where possible; CI is cancelled for a given ref if a
-newer run starts (`concurrency: cancel-in-progress: true`).
-
-### Pipeline overview
-
-| Job | Trigger | What it checks |
-|-----|---------|---------------|
-| `api-lint` | all events | `ruff check api/` |
-| `pre-commit` | all events | All pre-commit hooks |
-| `api-test` | all events | pytest with coverage; Alembic migrations; real Postgres + Redis |
-| `frontend-lint` | all events | `next lint` (ESLint) |
-| `frontend-typecheck` | all events | `tsc --noEmit` |
-| `frontend-test` | all events | Jest with coverage |
-| `build-api` | after lint + test pass | Docker build; Trivy container scan; push to GHCR on merge |
-| `build-frontend` | after lint + test pass | `next build`; Docker build; push to GHCR on merge |
-| `docker-compose-check` | all events | `docker compose config` syntax validation |
-| `security-scan` | all events + nightly | pip-audit, Bandit SAST, npm audit, Trivy FS scan, Gitleaks |
-| `sql-check` | all events | SQL schema syntax validation against Postgres |
-| `deploy` | push to `Manic-AI-Prod` only | SSH deploy to production; health check |
-
-### Fixing a failing build
-
-**`api-lint` fails** — run `make lint-fix` locally, commit the changes.
-
-**`api-test` fails** — run `make test-api` locally to reproduce. The CI
-environment sets `SUPABASE_DB_URL` and `REDIS_URL` — ensure your local test
-run has equivalent environment variables, or start the dev stack first.
-
-**`frontend-typecheck` fails** — run `cd frontend && npx tsc --noEmit`
-locally. Fix all type errors; do not suppress with `// @ts-ignore` unless the
-third-party type definition is genuinely wrong.
-
-**`frontend-test` fails** — run `make test-frontend` locally. Do not disable
-assertions or commit tests marked `.only`.
-
-**`security-scan` flags a vulnerability** — these jobs have
-`continue-on-error: true` so they do not block a merge, but SARIF reports are
-uploaded to GitHub Security. Address CRITICAL and HIGH findings promptly.
-
-**`deploy` fails** — check the Actions log for the SSH step. Common causes:
-production host unreachable, `docker compose pull` timeout, or a migration
-failure. Roll back with `alembic downgrade -1` on the server if needed.
-
-### Container registry
-
-On merge to `Manic-AI-Prod`, images are pushed to GHCR:
-
-```
-ghcr.io/mrvitality/manic-ai-api:latest
-ghcr.io/mrvitality/manic-ai-api:<git-sha>
-ghcr.io/mrvitality/manic-ai-frontend:latest
-ghcr.io/mrvitality/manic-ai-frontend:<git-sha>
-```
-
----
-
-## 14. Useful Commands
-
-### Make targets
-
-```bash
-make help           # list all targets with descriptions
-
-# Service lifecycle
-make up             # start full stack (production mode)
-make dev            # start with hot-reload dev overrides
-make down           # stop all services
-make clean          # stop + delete all volumes (destructive)
-make logs           # tail all logs
-make status         # show container states
-make monitoring     # start Prometheus + Grafana profile
-
-# Testing
-make test           # api + frontend (not E2E)
-make test-api       # pytest only
-make test-frontend  # jest only
-make test-coverage  # pytest with coverage report
-make test-e2e       # playwright headless
-make test-e2e-ui    # playwright with UI
-
-# Linting
-make lint           # api + frontend
-make lint-api       # ruff check
-make lint-frontend  # eslint
-make lint-fix       # ruff --fix + ruff format
-
-# Building
-make build          # build both Docker images locally
-make build-api      # api image only
-make build-frontend # frontend image only
-
-# Setup
-make setup          # full first-time setup
-make setup-deps     # install Python + Node deps only
-make setup-hooks    # install pre-commit hooks only
-make verify         # check environment is correctly configured
-make sdk            # regenerate TypeScript SDK from OpenAPI spec
-make backup         # pg_dump to backups/
-```
-
-### Common Docker Compose commands
-
-```bash
-# Restart a single service
-docker compose restart api
-
-# Rebuild and restart after Dockerfile changes
-docker compose up -d --build api
-
-# Open a shell inside a running container
-docker compose exec api bash
-docker compose exec frontend sh
-
-# View environment variables inside a container
-docker compose exec api env | sort
-
-# Run a one-off command
-docker compose run --rm api python scripts/verify_setup.py
-
-# Scale a stateless service
-docker compose up -d --scale api=2
-```
-
-### Alembic quick reference
-
-```bash
-cd api
-alembic revision --autogenerate -m "describe_change"
-alembic upgrade head
-alembic downgrade -1
-alembic current        # show current revision
-alembic history        # show full migration history
-```
-
-### Python environment
-
-```bash
-# Install all deps (runtime + dev)
-cd api && pip install -r requirements-dev.txt
-
-# Run a single test with verbose output
-cd api && python -m pytest tests/test_router_chat.py -v -s
-
-# Check for import errors in the whole package
-cd api && python -c "from api.app import app; print('OK')"
-```
-
-### Frontend quick reference
-
-```bash
-cd frontend
-
-npm run dev           # dev server on :3000
-npm run build         # production build
-npm run lint          # eslint
-npm test              # jest (single run)
-npm run test:watch    # jest watch mode
-npm run test:coverage # jest with coverage report
-npx tsc --noEmit      # type-check only
-npx playwright test   # E2E tests (requires running dev stack)
+make help         # Show all available commands
+make up           # Start all services
+make down         # Stop all services
+make dev          # Start with dev overrides (hot reload)
+make logs         # Tail all service logs
+make status       # Show service status
+make test         # Run all tests (API + frontend)
+make test-api     # Run Python tests
+make test-frontend  # Run Jest tests
+make test-coverage  # Run API tests with coverage report
+make test-e2e     # Run Playwright E2E tests
+make lint         # Run all linters
+make lint-fix     # Auto-fix Python lint issues
+make build        # Build all Docker images
+make clean        # Stop services and remove all volumes
+make monitoring   # Start monitoring stack
+make backup       # pg_dump → backups/
+make sdk          # Generate TypeScript SDK from OpenAPI spec
+make verify       # Verify dev environment setup
 ```

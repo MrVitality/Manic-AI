@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 import asyncio
 import logging
 import os
@@ -71,8 +72,8 @@ async def lifespan(app: FastAPI):
     _http_client = getattr(app.state, "http_client", None)
     _db_pool = getattr(app.state, "db_pool", None)
 
-    scheduler_task = start_scheduler(_http_client, _db_pool)
-    watcher_task = start_folder_watcher(_http_client, _db_pool)
+    start_scheduler(_http_client, _db_pool)
+    start_folder_watcher(_http_client, _db_pool)
 
     yield  # app runs
 

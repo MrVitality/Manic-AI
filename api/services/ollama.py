@@ -58,4 +58,4 @@ async def stream_pull_model(
                     yield f"data: {line}\n\n"
     except Exception:
         logger.exception("Failed to stream model pull for %s", name)
-        yield f'data: {{"error": "Model pull failed"}}\n\n'
+        yield 'data: {"error": "Model pull failed"}\n\n'

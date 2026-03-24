@@ -19,7 +19,6 @@ from uuid import uuid4
 
 import httpx
 
-from api.config import settings
 
 logger = logging.getLogger(__name__)
 

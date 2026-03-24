@@ -1,6 +1,6 @@
 """Extended tests for /health and /services/status endpoints."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest

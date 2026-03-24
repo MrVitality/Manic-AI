@@ -1,6 +1,6 @@
 """Tests for the /v1/feedback endpoints."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 

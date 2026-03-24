@@ -1,0 +1,308 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\mark_\Desktop\Manic-AI\api
+plugins: anyio-4.12.1, asyncio-1.3.0, cov-7.0.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 189 items / 27 errors
+
+=================================== ERRORS ====================================
+_________________ ERROR collecting tests/test_agent_graph.py __________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_agent_graph.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_agent_graph.py:8: in <module>
+    from api.services.agent_graph import _save_state, _load_state
+E   ModuleNotFoundError: No module named 'api'
+________________ ERROR collecting tests/test_cache_service.py _________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_cache_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_cache_service.py:8: in <module>
+    from api.services.cache import get_cached, set_cached
+E   ModuleNotFoundError: No module named 'api'
+__________________ ERROR collecting tests/test_chat_pure.py ___________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_chat_pure.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_chat_pure.py:3: in <module>
+    from api.services.chat import _build_citations, build_rag_prompt
+E   ModuleNotFoundError: No module named 'api'
+___________________ ERROR collecting tests/test_chunking.py ___________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_chunking.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_chunking.py:4: in <module>
+    from api.services.chunking import (
+E   ModuleNotFoundError: No module named 'api'
+____________________ ERROR collecting tests/test_config.py ____________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_config.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_config.py:6: in <module>
+    from api.config import Settings
+E   ModuleNotFoundError: No module named 'api'
+_______________ ERROR collecting tests/test_context_enricher.py _______________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_context_enricher.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_context_enricher.py:8: in <module>
+    from api.services.context_enricher import enrich_chunk, enrich_chunks_batch
+E   ModuleNotFoundError: No module named 'api'
+________________ ERROR collecting tests/test_cross_encoder.py _________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_cross_encoder.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_cross_encoder.py:3: in <module>
+    from api.services.cross_encoder import _build_passages_text, _parse_scores
+E   ModuleNotFoundError: No module named 'api'
+___________________ ERROR collecting tests/test_envelope.py ___________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_envelope.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_envelope.py:3: in <module>
+    from api.schemas.envelope import ApiError, ApiResponse, ok, fail
+E   ModuleNotFoundError: No module named 'api'
+___________ ERROR collecting tests/test_exception_handlers_pure.py ____________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_exception_handlers_pure.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_exception_handlers_pure.py:5: in <module>
+    from api.exception_handlers import _code_for_status
+E   ModuleNotFoundError: No module named 'api'
+_______________ ERROR collecting tests/test_feedback_service.py _______________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_feedback_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_feedback_service.py:7: in <module>
+    from api.services.feedback import get_feedback_stats, submit_feedback
+E   ModuleNotFoundError: No module named 'api'
+__________________ ERROR collecting tests/test_guardrails.py __________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_guardrails.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_guardrails.py:5: in <module>
+    from api.middleware.guardrails import (
+E   ModuleNotFoundError: No module named 'api'
+___________ ERROR collecting tests/test_guardrails_parametrized.py ____________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_guardrails_parametrized.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_guardrails_parametrized.py:5: in <module>
+    from api.middleware.guardrails import score_injection
+E   ModuleNotFoundError: No module named 'api'
+________________ ERROR collecting tests/test_ollama_service.py ________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_ollama_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_ollama_service.py:5: in <module>
+    from api.services.ollama import validate_model_name
+E   ModuleNotFoundError: No module named 'api'
+_________________ ERROR collecting tests/test_pii_detector.py _________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_pii_detector.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_pii_detector.py:3: in <module>
+    from api.services.pii_detector import detect_pii, redact_pii
+E   ModuleNotFoundError: No module named 'api'
+____________ ERROR collecting tests/test_pii_detector_extended.py _____________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_pii_detector_extended.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_pii_detector_extended.py:3: in <module>
+    from api.services.pii_detector import detect_pii, redact_pii
+E   ModuleNotFoundError: No module named 'api'
+_________________ ERROR collecting tests/test_preprocessor.py _________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_preprocessor.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_preprocessor.py:3: in <module>
+    from api.services.preprocessor import detect_and_extract, extract_text_from_markdown
+E   ModuleNotFoundError: No module named 'api'
+___________________ ERROR collecting tests/test_rag_eval.py ___________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_rag_eval.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_rag_eval.py:4: in <module>
+    from api.services.rag_eval import (
+E   ModuleNotFoundError: No module named 'api'
+_________________ ERROR collecting tests/test_rag_service.py __________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_rag_service.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_rag_service.py:8: in <module>
+    from api.services.rag import check_service
+E   ModuleNotFoundError: No module named 'api'
+_______________ ERROR collecting tests/test_redis_cache_repo.py _______________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_redis_cache_repo.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_redis_cache_repo.py:7: in <module>
+    from api.repositories.redis_cache import RedisCacheRepository
+E   ModuleNotFoundError: No module named 'api'
+___________________ ERROR collecting tests/test_reranker.py ___________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_reranker.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_reranker.py:9: in <module>
+    from api.services.reranker import rerank_chunks, _score_chunk
+E   ModuleNotFoundError: No module named 'api'
+_________________ ERROR collecting tests/test_router_chat.py __________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_router_chat.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_router_chat.py:8: in <module>
+    from api.schemas.chat import ChatMessage, ChatResponse
+E   ModuleNotFoundError: No module named 'api'
+___________________ ERROR collecting tests/test_schemas.py ____________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_schemas.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_schemas.py:6: in <module>
+    from api.schemas.chat import ChatMessage
+E   ModuleNotFoundError: No module named 'api'
+________________ ERROR collecting tests/test_search_logger.py _________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_search_logger.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_search_logger.py:7: in <module>
+    from api.services.search_logger import get_search_history, log_search
+E   ModuleNotFoundError: No module named 'api'
+___________ ERROR collecting tests/test_supabase_documents_pure.py ____________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_supabase_documents_pure.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_supabase_documents_pure.py:3: in <module>
+    from api.repositories.supabase_documents import _parse_metadata
+E   ModuleNotFoundError: No module named 'api'
+________________ ERROR collecting tests/test_token_counter.py _________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_token_counter.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_token_counter.py:4: in <module>
+    from api.services.token_counter import (
+E   ModuleNotFoundError: No module named 'api'
+__________________ ERROR collecting tests/test_user_auth.py ___________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_user_auth.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_user_auth.py:10: in <module>
+    from api.services.user_auth import (
+E   ModuleNotFoundError: No module named 'api'
+__________________ ERROR collecting tests/test_websocket.py ___________________
+ImportError while importing test module 'C:\Users\mark_\Desktop\Manic-AI\api\tests\test_websocket.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_websocket.py:8: in <module>
+    from api.dependencies import get_http_client, get_db_optional
+E   ModuleNotFoundError: No module named 'api'
+=========================== short test summary info ===========================
+ERROR tests/test_agent_graph.py
+ERROR tests/test_cache_service.py
+ERROR tests/test_chat_pure.py
+ERROR tests/test_chunking.py
+ERROR tests/test_config.py
+ERROR tests/test_context_enricher.py
+ERROR tests/test_cross_encoder.py
+ERROR tests/test_envelope.py
+ERROR tests/test_exception_handlers_pure.py
+ERROR tests/test_feedback_service.py
+ERROR tests/test_guardrails.py
+ERROR tests/test_guardrails_parametrized.py
+ERROR tests/test_ollama_service.py
+ERROR tests/test_pii_detector.py
+ERROR tests/test_pii_detector_extended.py
+ERROR tests/test_preprocessor.py
+ERROR tests/test_rag_eval.py
+ERROR tests/test_rag_service.py
+ERROR tests/test_redis_cache_repo.py
+ERROR tests/test_reranker.py
+ERROR tests/test_router_chat.py
+ERROR tests/test_schemas.py
+ERROR tests/test_search_logger.py
+ERROR tests/test_supabase_documents_pure.py
+ERROR tests/test_token_counter.py
+ERROR tests/test_user_auth.py
+ERROR tests/test_websocket.py
+!!!!!!!!!!!!!!!!!! Interrupted: 27 errors during collection !!!!!!!!!!!!!!!!!!!
+============================= 27 errors in 0.75s ==============================

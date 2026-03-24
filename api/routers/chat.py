@@ -11,7 +11,7 @@ import httpx
 from api.config import settings
 from api.dependencies import get_db_optional, get_http_client, get_langfuse
 from api.middleware.rate_limit import limiter
-from api.schemas.chat import ChatRequest, ChatResponse
+from api.schemas.chat import ChatRequest
 from api.schemas.envelope import ok
 from api.services.chat import complete_chat, stream_chat
 

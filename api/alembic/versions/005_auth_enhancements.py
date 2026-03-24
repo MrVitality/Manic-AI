@@ -4,7 +4,6 @@ Revision ID: 005_auth_enhancements
 Revises: 004_user_auth
 """
 from alembic import op
-import sqlalchemy as sa
 
 revision = '005_auth_enhancements'
 down_revision = '004_user_auth'

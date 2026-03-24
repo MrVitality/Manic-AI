@@ -1,0 +1,51 @@
+
+> manic-ai-frontend@2.0.0 lint
+> next lint
+
+
+./app/arena/page.tsx
+186:6  Warning: React Hook useCallback has a missing dependency: 'streamOne'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+228:76  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+257:75  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+384:81  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+499:73  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+./app/not-found.tsx
+14:83  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+./app/tools/page.tsx
+129:74  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+140:73  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+./app/workbench/page.tsx
+233:76  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+379:77  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+381:77  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+433:98  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+493:81  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+589:53  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+./components/ChatArea.tsx
+164:83  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+./components/dashboard/DashboardOverview.tsx
+35:25  Error: React Hook "useMemo" is called conditionally. React Hooks must be called in the exact same order in every component render.  react-hooks/rules-of-hooks
+40:31  Warning: React Hook useMemo has missing dependencies: 'healthyCount' and 'services'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+43:29  Error: React Hook "useMemo" is called conditionally. React Hooks must be called in the exact same order in every component render.  react-hooks/rules-of-hooks
+
+./components/dashboard/DashboardPerformance.tsx
+31:23  Error: React Hook "useMemo" is called conditionally. React Hooks must be called in the exact same order in every component render.  react-hooks/rules-of-hooks
+63:19  Error: React Hook "useMemo" is called conditionally. React Hooks must be called in the exact same order in every component render.  react-hooks/rules-of-hooks
+72:24  Error: React Hook "useMemo" is called conditionally. React Hooks must be called in the exact same order in every component render.  react-hooks/rules-of-hooks
+
+./components/MessageInput.tsx
+562:9  Warning: The attribute aria-expanded is not supported by the role textbox. This role is implicit on the element textarea.  jsx-a11y/role-supports-aria-props
+
+./components/RagDebugPanel.tsx
+189:57  Error: Comments inside children section of tag should be placed inside braces  react/jsx-no-comment-textnodes
+
+./components/Sidebar.tsx
+328:113  Error: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+328:127  Error: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.  react/no-unescaped-entities
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules

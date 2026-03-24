@@ -1,0 +1,19 @@
+{
+  "agents": {
+    "agent-1774270524953-224wgx": {
+      "agentId": "agent-1774270524953-224wgx",
+      "agentType": "reviewer",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "provider": "anthropic",
+        "task": "REVIEW API, FRONTEND, AND BACKEND"
+      },
+      "createdAt": "2026-03-23T12:55:24.963Z",
+      "model": "haiku",
+      "modelRoutedBy": "router"
+    }
+  },
+  "version": "3.0.0"
+}

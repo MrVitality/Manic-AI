@@ -1,6 +1,5 @@
 """Tests for the /ws/status WebSocket endpoint."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx

@@ -1,5 +1,5 @@
 """Domain-specific Prometheus metrics for Manic AI."""
-from prometheus_client import Counter, Histogram, Gauge
+from prometheus_client import Counter, Histogram
 
 # RAG / Search
 rag_queries_total = Counter(

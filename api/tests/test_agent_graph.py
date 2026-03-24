@@ -1,7 +1,7 @@
 """Tests for agent_graph — Redis state persistence and TTL."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 

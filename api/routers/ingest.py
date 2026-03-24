@@ -19,7 +19,6 @@ from api.schemas.ingest import (
     EmbedResponse,
     IngestAccepted,
     IngestRequest,
-    IngestResponse,
     IngestStatusResponse,
 )
 from api.services.embedding import generate_embedding
@@ -29,7 +28,6 @@ from api.services.ingestion import (
     fetch_ingest_job,
     find_duplicate_document,
     get_job_status,
-    ingest_document,
     run_ingest_background,
     _update_job,
 )

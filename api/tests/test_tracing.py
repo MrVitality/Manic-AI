@@ -1,7 +1,6 @@
 """Tests for OpenTelemetry tracing setup."""
 
 import sys
-from contextlib import asynccontextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest

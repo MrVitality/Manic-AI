@@ -1,6 +1,6 @@
 """Tests for api/services/search_logger.py."""
 
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

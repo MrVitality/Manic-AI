@@ -1,6 +1,5 @@
 """Tests for model_router -- cloud (OpenAI) backend routing."""
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx

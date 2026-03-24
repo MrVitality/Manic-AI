@@ -1,6 +1,5 @@
 """Tests for api.services.chunking — pure functions, no I/O needed."""
 
-import pytest
 
 from api.services.chunking import (
     chunk_text,

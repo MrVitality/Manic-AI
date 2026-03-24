@@ -91,6 +91,7 @@ jobs:
         working-directory: api
         env:
           SUPABASE_DB_URL: postgresql://postgres:testpassword@localhost:5432/testdb
+          API_SECRET_KEY: testsecret
         continue-on-error: true
       - name: Run tests with coverage
         run: |
@@ -102,6 +103,7 @@ jobs:
           SUPABASE_DB_URL: postgresql://postgres:testpassword@localhost:5432/testdb
           REDIS_URL: redis://localhost:6379
           ALLOW_UNAUTHENTICATED: "true"
+          API_SECRET_KEY: testsecret
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -201,7 +203,7 @@ jobs:
             ghcr.io/mrvitality/manic-ai-api:latest
       # Trivy scan the built image
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: manic-ai-api:ci-${{ github.sha }}
           format: sarif
@@ -313,7 +315,7 @@ jobs:
 
       # Trivy filesystem scan (IaC, secrets, misconfig)
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           scan-type: fs
           scan-ref: .

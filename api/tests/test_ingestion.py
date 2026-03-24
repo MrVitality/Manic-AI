@@ -5,11 +5,8 @@ pipeline logic using mocked DB and HTTP clients.  No real DB or network
 calls are made.
 """
 import pytest
-import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
 
-import httpx
 
 
 # ---------------------------------------------------------------------------

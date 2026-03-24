@@ -1,5 +1,5 @@
 """RAG evaluation metrics — precision, recall, MRR, NDCG."""
-from typing import Dict, List, Optional
+from typing import Dict, List
 import math
 
 

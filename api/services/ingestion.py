@@ -18,7 +18,7 @@ from api.metrics import ingest_chunks_total, ingest_documents_total
 from api.repositories.qdrant_vector import QdrantVectorRepository
 from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.schemas.ingest import IngestRequest, IngestResponse
-from api.services.chunking import chunk_document, chunk_text
+from api.services.chunking import chunk_document
 from api.services.context_enricher import enrich_chunks_batch
 from api.services.embedding import generate_embedding
 from api.services.pii_detector import redact_pii

@@ -1,13 +1,12 @@
 """Document CRUD routes."""
 
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-import httpx
 
 from api.config import settings
-from api.dependencies import get_document_repo, get_http_client, get_qdrant_repo
+from api.dependencies import get_document_repo, get_qdrant_repo
 from api.middleware.rate_limit import limiter
 from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.repositories.qdrant_vector import QdrantVectorRepository

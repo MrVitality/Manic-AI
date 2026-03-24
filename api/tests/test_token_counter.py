@@ -1,7 +1,5 @@
 """Tests for api.services.token_counter — pure functions, no I/O needed."""
 
-import pytest
-from unittest.mock import patch
 
 from api.services.token_counter import (
     estimate_tokens,

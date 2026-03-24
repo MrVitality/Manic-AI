@@ -2,7 +2,7 @@
 
 import pytest
 import pytest_asyncio
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, AsyncMock
 from httpx import ASGITransport, AsyncClient
 from fastapi import FastAPI
 
@@ -51,7 +51,6 @@ async def test_rate_limit_config_fields_exist():
 @pytest.mark.asyncio
 async def test_app_has_limiter_on_state(rate_limited_client):
     """The FastAPI app must have a limiter registered on app.state."""
-    from api.middleware.rate_limit import limiter as expected_limiter
     # A health check should succeed — confirms the app initialised
     r = await rate_limited_client.get("/health")
     assert r.status_code in (200, 503)  # 503 if services down in test env

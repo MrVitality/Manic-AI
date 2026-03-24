@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """MCP server entry point for Manic-AI.
 
 Runs the MCP server over stdio transport, connecting to the same

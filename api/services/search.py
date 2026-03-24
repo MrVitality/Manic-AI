@@ -15,7 +15,6 @@ from api.metrics import rag_queries_total, search_latency_seconds
 from api.repositories.qdrant_vector import QdrantVectorRepository
 from api.repositories.supabase_documents import SupabaseDocumentRepository
 from api.repositories.supabase_vector import SupabaseVectorRepository
-from api.services.embedding import generate_embedding
 from api.services.mmr import mmr_rerank
 from api.services.reranker import rerank_chunks
 from api.services.search_logger import log_search
@@ -118,7 +117,6 @@ async def unified_search(
             cache_key = None  # do not attempt to write on a broken connection
 
     # When reranking or MMR is active, fetch more candidates for better selection.
-    needs_extra_candidates = rerank or use_mmr
     retrieval_top_k = top_k * 3 if use_mmr else (20 if rerank else top_k)
 
     results: List[Dict[str, Any]] = []

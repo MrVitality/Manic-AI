@@ -81,7 +81,7 @@ async def generate_embedding(
         embedding = response.json()["embedding"]
         embedding_duration_seconds.observe(time.monotonic() - _embed_start)
         ollama_breaker.record_success()
-    except (httpx.ConnectError, httpx.TimeoutException) as exc:
+    except (httpx.ConnectError, httpx.TimeoutException):
         ollama_breaker.record_failure()
         raise
     finally:
