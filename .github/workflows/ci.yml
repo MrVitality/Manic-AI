@@ -210,7 +210,7 @@ jobs:
           output: trivy-api.sarif
           severity: CRITICAL,HIGH
           exit-code: 0   # Don't fail the build, just report
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy-api.sarif
@@ -323,7 +323,7 @@ jobs:
           output: trivy-fs.sarif
           severity: CRITICAL,HIGH
           exit-code: 0
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy-fs.sarif
