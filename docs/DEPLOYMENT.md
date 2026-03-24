@@ -51,6 +51,72 @@ su - deploy
 
 ---
 
+## Tailscale VPN Setup (Recommended)
+
+Tailscale provides secure access to admin/monitoring interfaces without exposing them to the public internet.
+
+### Install Tailscale
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+# Authenticate via the URL shown, then note your Tailscale IP:
+tailscale ip -4
+# Example output: 100.64.0.5
+```
+
+### Configure UFW for Tailscale
+
+```bash
+# Allow all traffic on the Tailscale interface
+sudo ufw allow in on tailscale0
+```
+
+### Set BIND_IP to Tailscale IP
+
+In your `.env` file, set `BIND_IP` to your VPS's Tailscale IP:
+
+```bash
+BIND_IP=100.64.0.5   # Replace with your actual Tailscale IP
+```
+
+This binds all service ports (Grafana, n8n, Qdrant, Prometheus, etc.) to the Tailscale interface only. They become accessible to your team via VPN but invisible to the public internet.
+
+Caddy binds separately to `0.0.0.0:80/443` for public HTTPS traffic — this is unaffected by `BIND_IP`.
+
+### Access Pattern
+
+| Service | URL | Access |
+|---------|-----|--------|
+| **Frontend** | `https://manixsystems.ai` | Public |
+| **API** | `https://manixsystems.ai/v1/*` | Public |
+| **Grafana** | `http://100.64.0.5:3009` | Tailscale only |
+| **Prometheus** | `http://100.64.0.5:9090` | Tailscale only |
+| **Jaeger** | `http://100.64.0.5:16686` | Tailscale only |
+| **Qdrant Dashboard** | `http://100.64.0.5:6333/dashboard` | Tailscale only |
+| **n8n** | `http://100.64.0.5:5679` | Tailscale only |
+| **Open WebUI** | `http://100.64.0.5:3006` | Tailscale only |
+| **Flowise** | `http://100.64.0.5:3008` | Tailscale only |
+| **Langfuse** | `http://100.64.0.5:3007` | Tailscale only |
+| **Alertmanager** | `http://100.64.0.5:9093` | Tailscale only |
+| **Loki** | `http://100.64.0.5:3100` | Tailscale only |
+
+### Verify Tailscale Access
+
+From another machine on your tailnet:
+
+```bash
+# Should work (Tailscale)
+curl http://100.64.0.5:3009    # Grafana
+curl http://100.64.0.5:8081/health   # API direct
+
+# Should NOT work (public IP, blocked by UFW)
+curl http://<public-ip>:3009   # Connection refused
+curl http://<public-ip>:8081   # Connection refused
+```
+
+---
+
 ## Clone and Configure
 
 ```bash
