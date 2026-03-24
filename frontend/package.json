@@ -19,7 +19,7 @@
   "dependencies": {
     "@sentry/nextjs": "^8.0.0",
     "@supabase/ssr": "0.5.2",
-    "@supabase/supabase-js": "2.47.10",
+    "@supabase/supabase-js": "2.100.0",
     "@tailwindcss/typography": "0.5.15",
     "@tanstack/react-virtual": "^3.13.23",
     "dompurify": "^3.3.3",
