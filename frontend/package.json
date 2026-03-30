@@ -20,7 +20,7 @@
     "@sentry/nextjs": "^8.0.0",
     "@supabase/ssr": "0.9.0",
     "@supabase/supabase-js": "2.100.0",
-    "@tailwindcss/typography": "0.5.15",
+    "@tailwindcss/typography": "0.5.19",
     "@tanstack/react-virtual": "^3.13.23",
     "dompurify": "^3.3.3",
     "mermaid": "^11.13.0",
