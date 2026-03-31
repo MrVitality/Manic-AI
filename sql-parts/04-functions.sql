@@ -221,15 +221,17 @@ BEGIN
         LIMIT match_count * 2
     ),
     fused AS (
-        SELECT 
+        SELECT
             v.id,
             v.document_id,
             v.content,
             v.metadata,
             v.v_score,
             COALESCE(k.k_score, 0) AS k_score,
-            (1.0 - keyword_weight) * (1.0 / (rrf_k + v.v_rank)) +
-            keyword_weight * (1.0 / (rrf_k + COALESCE(k.k_rank, match_count * 2 + 1))) AS rrf_score
+            -- Pure RRF: equal weights for vector and keyword ranks.
+            -- keyword_weight parameter is kept for backward compatibility but ignored.
+            (1.0 / (rrf_k + v.v_rank)) +
+            (1.0 / (rrf_k + COALESCE(k.k_rank, match_count * 2 + 1))) AS rrf_score
         FROM vector_results v
         LEFT JOIN keyword_results k ON v.id = k.id
     )

@@ -1,15 +1,16 @@
-"""Cross-encoder reranking using Ollama LLM scoring.
+"""Cross-encoder reranking with FlashRank (fast) or Ollama LLM (fallback).
 
 After hybrid search retrieves candidate chunks, this module reranks them
-by asking the LLM to score each chunk's relevance to the query.
+by relevance to the user query.
 
-Supports two modes:
-- "batch" (default): Scores all candidates in a single LLM call via
-  cross_encoder.cross_encode_rerank(). Much faster for large candidate sets.
+Supports three modes:
+- "flashrank" (default): Uses an 80MB ONNX cross-encoder model (~50ms on CPU).
+  Fastest and most accurate. Falls back to "batch" if FlashRank is unavailable.
+- "batch": Scores all candidates in a single LLM call via
+  cross_encoder.cross_encode_rerank().
 - "individual" (legacy): Scores each candidate with a separate LLM call.
-  Used as a fallback when batch scoring fails.
 
-Configure via the ``reranker_mode`` parameter or settings.
+Configure via the ``reranker_mode`` parameter, settings.RERANKER_MODE, or env var.
 """
 
 import asyncio
@@ -21,12 +22,15 @@ import httpx
 
 from api.config import settings
 from api.services.cross_encoder import cross_encode_rerank
+from api.services.flashrank_reranker import flashrank_rerank, is_available as flashrank_available
 
 logger = logging.getLogger(__name__)
 
 # Default reranking parameters
 DEFAULT_RERANK_TOP_N = 5
-DEFAULT_RERANKER_MODE: Literal["batch", "individual"] = "batch"
+DEFAULT_RERANKER_MODE: Literal["flashrank", "batch", "individual"] = getattr(
+    settings, "RERANKER_MODE", "flashrank"
+)
 RERANK_MODEL = None  # uses settings.CHAT_MODEL if not overridden
 
 _SCORING_PROMPT_TEMPLATE = (
@@ -101,20 +105,34 @@ async def _rerank_individual(
     return scored_chunks[:top_n]
 
 
+def _normalize_rerank_scores(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Normalize rerank_score to 0.0-1.0 range regardless of reranker backend.
+
+    FlashRank already produces 0-1 scores. LLM rerankers produce 0-10 scores.
+    This ensures downstream consumers (CRAG gate, etc.) see a consistent range.
+    """
+    return [
+        {**chunk, "rerank_score": chunk["rerank_score"] / 10.0}
+        if chunk.get("rerank_score", 0.0) > 1.0
+        else chunk
+        for chunk in chunks
+    ]
+
+
 async def rerank_chunks(
     query: str,
     chunks: List[Dict[str, Any]],
     client: httpx.AsyncClient,
     top_n: int = DEFAULT_RERANK_TOP_N,
     model: Optional[str] = None,
-    reranker_mode: Literal["batch", "individual"] = DEFAULT_RERANKER_MODE,
+    reranker_mode: Literal["flashrank", "batch", "individual"] = DEFAULT_RERANKER_MODE,
 ) -> List[Dict[str, Any]]:
-    """Rerank search result chunks by LLM-scored relevance.
+    """Rerank search result chunks by cross-encoder relevance scoring.
 
     Takes candidate chunks (typically top-20 from hybrid search) and
     returns the top_n most relevant ones based on cross-encoder scoring.
 
-    Each returned chunk gets an additional ``rerank_score`` field (0-10).
+    Each returned chunk gets an additional ``rerank_score`` field (0.0-1.0).
     The original ``score`` from the retrieval stage is preserved.
 
     Parameters
@@ -128,29 +146,43 @@ async def rerank_chunks(
     top_n : int
         Number of top results to return.
     model : str, optional
-        Override the scoring model.
-    reranker_mode : "batch" | "individual"
-        "batch" (default): single LLM call for all candidates.
+        Override the scoring model (only used for LLM-based modes).
+    reranker_mode : "flashrank" | "batch" | "individual"
+        "flashrank" (default): fast CPU cross-encoder (~50ms).
+        "batch": single LLM call for all candidates.
         "individual" (legacy): one LLM call per candidate.
     """
     if not chunks:
         return []
 
+    # --- FlashRank (only when explicitly requested) ---
+    if reranker_mode == "flashrank":
+        if flashrank_available():
+            try:
+                result = await flashrank_rerank(query=query, chunks=chunks, top_n=top_n)
+                return _normalize_rerank_scores(result)
+            except RuntimeError:
+                logger.warning("FlashRank reranking failed, falling back to LLM batch")
+        # fall through to batch LLM
+
+    # --- LLM batch reranking ---
     rerank_model = model or RERANK_MODEL or settings.CHAT_MODEL
 
-    if reranker_mode == "batch":
+    if reranker_mode in ("flashrank", "batch"):
         try:
-            return await cross_encode_rerank(
+            result = await cross_encode_rerank(
                 query=query,
                 chunks=chunks,
                 top_n=top_n,
                 http_client=client,
                 model=rerank_model,
             )
+            return _normalize_rerank_scores(result)
         except RuntimeError:
             logger.warning(
                 "Batch reranking failed, falling back to individual scoring"
             )
-            # Fall through to individual mode
 
-    return await _rerank_individual(query, chunks, client, top_n, rerank_model)
+    # --- Individual LLM scoring (last resort) ---
+    result = await _rerank_individual(query, chunks, client, top_n, rerank_model)
+    return _normalize_rerank_scores(result)

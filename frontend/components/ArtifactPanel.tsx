@@ -3,6 +3,7 @@
 import { useState, useCallback, memo, useMemo, useRef, useEffect } from 'react'
 import { useArtifactStore } from '@/lib/stores/artifactStore'
 import type { Artifact, ArtifactType } from '@/lib/stores/artifactStore'
+import DOMPurify from 'dompurify'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -20,7 +21,7 @@ function isSandboxable(language: string | undefined): language is SandboxableLan
 /** Build an srcdoc string for the sandboxed iframe. */
 function buildSrcdoc(code: string, language: SandboxableLanguage): string {
   if (language === 'html') {
-    return code
+    return DOMPurify.sanitize(code, { ALLOW_UNKNOWN_PROTOCOLS: false })
   }
   // javascript: wrap in a minimal HTML shell that intercepts console output
   return `<!DOCTYPE html>

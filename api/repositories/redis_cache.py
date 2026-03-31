@@ -25,6 +25,14 @@ class RedisCacheRepository:
         except Exception as e:
             logger.warning("Redis set failed: %s", e)
 
+    async def delete(self, key: str) -> bool:
+        """Delete a single key. Returns True if the key existed."""
+        try:
+            return bool(await self._redis.delete(key))
+        except Exception as e:
+            logger.warning("Redis delete failed: %s", e)
+            return False
+
     async def delete_pattern(self, pattern: str) -> int:
         try:
             keys = await self._redis.keys(pattern)

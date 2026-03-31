@@ -25,6 +25,12 @@ import type { Conversation, Message, Model, Settings, DocumentInfo, ServiceStatu
 // Backward-compatible composed hook
 // Components that already use `useChatStore` will keep working.
 export function useChatStore() {
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(
+      'useChatStore() is deprecated — use individual stores directly for better performance. ' +
+      'Example: useModelStore(s => s.selectedModel)'
+    )
+  }
   const conversationState = useConversationStore()
   const modelState = useModelStore()
   const documentState = useDocumentStore()

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatStore } from '@/lib/store'
 import { useConversationStore } from '@/lib/stores/conversationStore'
@@ -85,16 +85,7 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
   const [importError, setImportError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Read admin flag from localStorage — set externally by the API key auth flow.
-  // Using useState + useEffect to avoid SSR mismatch.
-  const [isAdmin, setIsAdmin] = useState(false)
-  useEffect(() => {
-    try {
-      setIsAdmin(localStorage.getItem('manic-is-admin') === 'true')
-    } catch {
-      // localStorage unavailable (SSR or sandboxed context)
-    }
-  }, [])
+  // Admin nav item is always visible. Backend enforces access control (403).
 
   const filteredConversations = useMemo(
     () =>
@@ -189,9 +180,7 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
     { path: '/arena', label: 'Arena', icon: <ArenaIcon className="w-5 h-5" /> },
     { path: '/tools', label: 'Tools', icon: <ToolsIcon className="w-5 h-5" /> },
     { path: '/settings', label: 'Config', icon: <SettingsIcon className="w-5 h-5" />, hint: 'Ctrl+,' },
-    ...(isAdmin
-      ? [{ path: '/admin', label: 'Admin', icon: <AdminIcon className="w-5 h-5" /> }]
-      : []),
+    { path: '/admin', label: 'Admin', icon: <AdminIcon className="w-5 h-5" /> },
   ]
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')

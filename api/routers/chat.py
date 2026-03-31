@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 import asyncpg
 import httpx
 
+from api.auth import get_current_user_id
 from api.config import settings
 from api.dependencies import get_db_optional, get_http_client, get_langfuse
 from api.middleware.rate_limit import limiter
@@ -29,6 +30,9 @@ async def chat(
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
     langfuse=Depends(get_langfuse),
 ):
+    effective_user_id = get_current_user_id(request)
+    if effective_user_id:
+        body.user_id = effective_user_id
     try:
         result = await complete_chat(body, client, db, langfuse)
         return ok(result.model_dump())
@@ -47,6 +51,9 @@ async def chat_stream_endpoint(
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
 ):
+    effective_user_id = get_current_user_id(request)
+    if effective_user_id:
+        body.user_id = effective_user_id
     return StreamingResponse(
         stream_chat(body, client, db),
         media_type="text/event-stream",

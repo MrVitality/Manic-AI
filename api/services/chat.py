@@ -13,7 +13,10 @@ from api.config import settings
 from api.repositories.supabase_vector import SupabaseVectorRepository
 from api.schemas.chat import ChatMessage, ChatRequest, ChatResponse, Citation
 from api.services.embedding import generate_embedding
+from api.services.query_classifier import classify_query
 from api.services.reranker import rerank_chunks
+from api.services.relevance_gate import relevance_gate
+from api.services.web_search import web_search
 from api.services.model_router import chat_completion as routed_chat_completion, chat_completion_stream
 from api.services.token_counter import (
     compute_budgets,
@@ -60,24 +63,58 @@ async def retrieve_rag_context(
     db: Optional[asyncpg.Pool],
     client: httpx.AsyncClient,
 ) -> List[Dict]:
-    """Retrieve RAG context chunks when requested, with optional reranking."""
+    """Retrieve RAG context chunks with query routing, reranking, and CRAG gate."""
     if not request.use_rag or not last_message or not db:
         return []
+
+    # --- Phase 3: Query classification ---
+    route = await classify_query(last_message, client)
+    logger.debug("Query route: %s (confidence=%.2f)", route.category, route.confidence)
+
+    if route.category == "direct_answer":
+        return []  # Skip RAG entirely for greetings, math, etc.
+
+    if route.category == "web_search":
+        return await web_search(last_message, client)
+
+    # --- Retrieval ---
     query_embedding = await generate_embedding(last_message, client=client)
     repo = SupabaseVectorRepository(db)
 
     # If reranking, retrieve more candidates (top-20) then rerank to top-5
     retrieval_top_k = 20 if request.rerank else settings.RAG_TOP_K
 
-    results = await repo.hybrid_search(
-        last_message,
-        query_embedding,
-        top_k=retrieval_top_k,
-        keyword_weight=settings.RAG_KEYWORD_WEIGHT,
-        collection_id=request.collection_id,
-        user_id=request.user_id,
-    )
+    if route.category == "keyword":
+        # Keyword-heavy: use hybrid with high keyword weight
+        results = await repo.hybrid_search(
+            last_message,
+            query_embedding,
+            top_k=retrieval_top_k,
+            keyword_weight=0.8,
+            collection_id=request.collection_id,
+            user_id=request.user_id,
+        )
+    elif route.category == "vector":
+        # Pure vector search (skip BM25)
+        results = await repo.vector_search(
+            query_embedding,
+            top_k=retrieval_top_k,
+            threshold=settings.RAG_THRESHOLD,
+            collection_id=request.collection_id,
+            user_id=request.user_id,
+        )
+    else:
+        # Default hybrid search
+        results = await repo.hybrid_search(
+            last_message,
+            query_embedding,
+            top_k=retrieval_top_k,
+            keyword_weight=settings.RAG_KEYWORD_WEIGHT,
+            collection_id=request.collection_id,
+            user_id=request.user_id,
+        )
 
+    # --- Reranking ---
     if request.rerank and results:
         results = await rerank_chunks(
             query=last_message,
@@ -85,6 +122,18 @@ async def retrieve_rag_context(
             client=client,
             top_n=settings.RAG_TOP_K,
         )
+
+    # --- Phase 4: CRAG relevance gate ---
+    # Only apply CRAG gate when reranking produced normalized scores
+    if request.rerank and results:
+        gate_result = await relevance_gate(last_message, results, client)
+        if gate_result.verdict != "correct":
+            logger.info(
+                "CRAG gate verdict=%s: %d web results added",
+                gate_result.verdict,
+                gate_result.web_results_added,
+            )
+        results = list(gate_result.chunks)
 
     return results
 

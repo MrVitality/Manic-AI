@@ -71,22 +71,30 @@ async def search_documents(
     description="Search with detailed scoring breakdown for debugging relevance. "
     "Uses POST to support the same complex query body as /search.",
 )
+@limiter.limit(f"{settings.RATE_LIMIT_PER_MINUTE}/minute")
 async def search_explain(
+    request: Request,
     body: SearchExplainRequest,
     client: httpx.AsyncClient = Depends(get_http_client),
     db: Optional[asyncpg.Pool] = Depends(get_db_optional),
 ):
-    query_embedding = await generate_embedding(body.query, client=client)
-    result = await search_with_explain(
-        query_text=body.query,
-        query_embedding=query_embedding,
-        backend=body.backend or "supabase",
-        top_k=body.top_k or 5,
-        threshold=body.threshold or 0.5,
-        use_hybrid=body.use_hybrid if body.use_hybrid is not None else True,
-        collection_id=body.collection_id,
-        include_vectors=body.include_vectors or False,
-        db=db,
-        client=client,
-    )
-    return ok(result)
+    try:
+        effective_user_id = get_current_user_id(request)
+        query_embedding = await generate_embedding(body.query, client=client)
+        result = await search_with_explain(
+            query_text=body.query,
+            query_embedding=query_embedding,
+            backend=body.backend or "supabase",
+            top_k=body.top_k or 5,
+            threshold=body.threshold or 0.5,
+            use_hybrid=body.use_hybrid if body.use_hybrid is not None else True,
+            collection_id=body.collection_id,
+            include_vectors=body.include_vectors or False,
+            user_id=effective_user_id,
+            db=db,
+            client=client,
+        )
+        return ok(result)
+    except Exception:
+        logger.exception("Search explain failed for query: %s", body.query[:100])
+        raise HTTPException(status_code=500, detail="Internal server error")

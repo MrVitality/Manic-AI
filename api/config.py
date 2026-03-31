@@ -42,8 +42,21 @@ class Settings(BaseSettings):
     # --- RAG tuning ---
     RAG_TOP_K: int = 5
     RAG_THRESHOLD: float = 0.7
-    RAG_KEYWORD_WEIGHT: float = 0.3
+    RAG_KEYWORD_WEIGHT: float = 0.3  # Deprecated: hybrid_search now uses pure RRF (equal weights)
     RAG_CONTEXT_WINDOW: int = 4096
+
+    # --- Reranker ---
+    RERANKER_MODE: str = "flashrank"  # "flashrank" (fast CPU), "batch" (LLM), "individual" (LLM legacy)
+    FLASHRANK_MODEL: str = "ms-marco-MultiBERT-L-12"
+
+    # --- Query classification ---
+    QUERY_CLASSIFICATION_ENABLED: bool = True
+    QUERY_CLASSIFICATION_CACHE_TTL: int = 3600  # seconds; 1 hour for cached classifications
+
+    # --- CRAG (Corrective RAG) relevance gate ---
+    CRAG_ENABLED: bool = True
+    CRAG_HIGH_THRESHOLD: float = 0.7  # Above this: use retrieved context as-is
+    CRAG_LOW_THRESHOLD: float = 0.3   # Below this: discard context, use web search
 
     # --- Langfuse observability ---
     LANGFUSE_PUBLIC_KEY: str = ""

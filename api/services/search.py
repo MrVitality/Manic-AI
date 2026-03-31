@@ -276,8 +276,9 @@ async def search_with_explain(
     use_hybrid: bool,
     collection_id: Optional[str],
     include_vectors: bool,
-    db: Optional[asyncpg.Pool],
-    client: httpx.AsyncClient,
+    user_id: Optional[str] = None,
+    db: Optional[asyncpg.Pool] = None,
+    client: Optional[httpx.AsyncClient] = None,
 ) -> Dict[str, Any]:
     """Search with debug/explain metadata."""
     start = time.time()
@@ -291,6 +292,7 @@ async def search_with_explain(
                 top_k=top_k,
                 keyword_weight=settings.RAG_KEYWORD_WEIGHT,
                 collection_id=collection_id,
+                user_id=user_id,
             )
         else:
             raw = await sb_vector.vector_search(
@@ -298,6 +300,7 @@ async def search_with_explain(
                 top_k=top_k,
                 threshold=threshold,
                 collection_id=collection_id,
+                user_id=user_id,
             )
 
         doc_ids = list({r["document_id"] for r in raw})
@@ -325,6 +328,8 @@ async def search_with_explain(
         filters: Dict[str, str] = {}
         if collection_id:
             filters["collection_id"] = collection_id
+        if user_id:
+            filters["user_id"] = user_id
         qdrant_results = await qdrant.search(
             query_embedding,
             collection_name="documents",

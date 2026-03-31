@@ -29,9 +29,11 @@ async def init_redis(*, app=None):
         client = aioredis.from_url(settings.REDIS_URL)
         await client.ping()
         _set_redis(client)
-        # Wire the same client into the search cache.
+        # Wire the same client into the search cache and query classifier.
         from api.services.search import _set_redis as _search_set_redis
         _search_set_redis(client)
+        from api.services.query_classifier import _set_redis as _qclass_set_redis
+        _qclass_set_redis(client)
         logger.info("Redis embedding cache enabled")
         if app is not None:
             from api.repositories.redis_cache import RedisCacheRepository
@@ -41,6 +43,8 @@ async def init_redis(*, app=None):
         _set_redis(None)
         from api.services.search import _set_redis as _search_set_redis
         _search_set_redis(None)
+        from api.services.query_classifier import _set_redis as _qclass_set_redis
+        _qclass_set_redis(None)
 
 
 async def generate_embedding(

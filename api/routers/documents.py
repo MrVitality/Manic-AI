@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from api.auth import get_current_user_id
 from api.config import settings
 from api.dependencies import get_document_repo, get_qdrant_repo
 from api.middleware.rate_limit import limiter
@@ -41,7 +42,7 @@ async def delete_document(
 ):
     # Fetch the document's owner before deleting so we can enforce IDOR
     # protection.  We return 404 in all non-owned cases to avoid enumeration.
-    caller_id: Optional[str] = request.headers.get("X-User-Id") or None
+    caller_id = get_current_user_id(request)
     owner_id = await repo.get_document_user_id(document_id)
 
     if owner_id is None and caller_id is not None:

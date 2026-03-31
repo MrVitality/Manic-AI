@@ -493,6 +493,7 @@ const MemoizedMessageItem = memo<MessageItemProps>(function MessageItem({
     prev.message.isStreaming === next.message.isStreaming &&
     prev.message.error === next.message.error &&
     toolCallsEqual &&
+    (prev.message.sources?.length ?? 0) === (next.message.sources?.length ?? 0) &&
     prev.isLast === next.isLast &&
     prev.onRegenerate === next.onRegenerate
   )

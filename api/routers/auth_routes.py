@@ -7,7 +7,7 @@ here; rate limiting and guardrails middleware still run for every request.
 
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 import asyncpg
@@ -243,7 +243,7 @@ async def mfa_validate(
         raise HTTPException(status_code=401, detail="Invalid TOTP code")
 
     # Consume the token so it cannot be reused.
-    await redis.delete_pattern(f"mfa_token:{body.mfa_token}")
+    await redis.delete(f"mfa_token:{body.mfa_token}")
 
     logger.info("MFA validated — issuing API key for user %s", row["id"])
     return ok(
@@ -339,7 +339,7 @@ async def rotate_key(
         raise HTTPException(status_code=401, detail="Authentication required")
 
     new_key = f"manic_{secrets.token_urlsafe(32)}"
-    new_expires = datetime.utcnow() + timedelta(days=90)
+    new_expires = datetime.now(timezone.utc) + timedelta(days=90)
     async with db.acquire() as conn:
         await conn.execute(
             "UPDATE public.users SET api_key = $1, key_expires_at = $2 WHERE id = $3",
