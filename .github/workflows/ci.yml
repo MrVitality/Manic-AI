@@ -388,10 +388,10 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
-            cd ~/Desktop/Manic-AI
+            cd ~/Manic-AI
             git pull origin Manic-AI-Prod
             docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
             docker compose ps
       - name: Verify deployment health
         uses: appleboy/ssh-action@v1

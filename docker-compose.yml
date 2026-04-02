@@ -53,10 +53,7 @@ services:
           memory: 8G
           cpus: "4"
         reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+          memory: 4G
     networks:
       - app-network
     healthcheck:
