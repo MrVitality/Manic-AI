@@ -384,7 +384,7 @@ services:
     container_name: ai-studio-auth
     restart: unless-stopped
     ports:
-      - "${BIND_IP}:3005:80"
+      - "${BIND_IP}:3010:80"
     volumes:
       - ./supabase/studio-nginx.conf:/etc/nginx/nginx.conf:ro
       - ./supabase/.htpasswd:/etc/nginx/.htpasswd:ro
@@ -394,7 +394,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
+      test: ["CMD-SHELL", "curl -sf -o /dev/null -w '%{http_code}' http://localhost:80/ | grep -q 401 || curl -sf http://localhost:80/"]
       interval: 30s
       timeout: 10s
       retries: 3
