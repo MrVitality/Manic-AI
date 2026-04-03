@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { type JSX, useState, useEffect } from 'react'
 import GeneralSettings from '@/components/settings/GeneralSettings'
 import InferenceSettings from '@/components/settings/InferenceSettings'
 import RagSettingsPanel from '@/components/settings/RagSettingsPanel'

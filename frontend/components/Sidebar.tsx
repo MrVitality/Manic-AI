@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { type JSX, useState, useMemo, useRef, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatStore } from '@/lib/store'
 import { useConversationStore } from '@/lib/stores/conversationStore'
