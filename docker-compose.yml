@@ -622,6 +622,8 @@ services:
     stop_grace_period: 35s
     ports:
       - "${BIND_IP}:8081:8081"
+    env_file:
+      - .env
     environment:
       OLLAMA_URL: http://ollama:11434
       CHAT_MODEL: ${CHAT_MODEL:-llama3.2:3b}
@@ -679,6 +681,8 @@ services:
     container_name: manic-ai-mcp
     restart: unless-stopped
     command: ["python", "-m", "api.mcp_main"]
+    env_file:
+      - .env
     environment:
       OLLAMA_URL: http://ollama:11434
       CHAT_MODEL: ${CHAT_MODEL:-llama3.2:3b}
