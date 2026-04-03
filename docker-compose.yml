@@ -486,7 +486,7 @@ services:
         max-file: "3"
 
   searxng:
-    image: searxng/searxng:2024.11.17-b20ed819e
+    image: searxng/searxng:latest
     container_name: ai-searxng
     restart: unless-stopped
     ports:
