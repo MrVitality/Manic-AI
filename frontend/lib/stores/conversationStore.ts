@@ -3,7 +3,10 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Conversation, Message } from '@/types'
 import { getApiUrl, getApiKey } from '@/lib/api'
 
-const generateId = () => crypto.randomUUID()
+const generateId = (): string =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 
 interface ConversationState {
   conversations: Conversation[]
