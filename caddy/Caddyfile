@@ -37,9 +37,14 @@
         reverse_proxy frontend:3000
     }
 
-    # API (FastAPI)
+    # API (FastAPI) — long timeouts for model pulls and streaming
     handle /v1/* {
-        reverse_proxy api:8081
+        reverse_proxy api:8081 {
+            transport http {
+                response_header_timeout 1800s
+                dial_timeout 10s
+            }
+        }
     }
     handle /health* {
         reverse_proxy api:8081
