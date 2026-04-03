@@ -182,11 +182,15 @@ async def complete_chat(
 
     trace = None
     if langfuse:
-        trace = langfuse.trace(
-            name="chat",
-            input={"messages": messages, "model": model, "use_rag": request.use_rag},
-            metadata={"temperature": request.temperature, "user_id": request.user_id},
-        )
+        try:
+            trace = langfuse.trace(
+                name="chat",
+                input={"messages": messages, "model": model, "use_rag": request.use_rag},
+                metadata={"temperature": request.temperature, "user_id": request.user_id},
+            )
+        except (AttributeError, TypeError):
+            logger.warning("Langfuse tracing unavailable — skipping")
+            trace = None
 
     # Compute token budgets
     budgets = compute_budgets(context_window)
