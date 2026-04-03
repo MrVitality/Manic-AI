@@ -361,13 +361,16 @@ export default function AdminDashboard() {
     setLoading(true)
     setError(null)
     try {
-      const [usersData, statsData] = await Promise.all([
-        apiFetch<PaginatedUsers>(`/v1/admin/users?limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`),
-        apiFetch<SystemStats>('/v1/admin/stats'),
-      ])
+      const usersData = await apiFetch<PaginatedUsers>(`/v1/admin/users?limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`)
       setUsers(usersData.users)
       setTotal(usersData.total)
-      setStats(statsData)
+      // Stats are optional — don't block the page if they fail
+      try {
+        const statsData = await apiFetch<SystemStats>('/v1/admin/stats')
+        setStats(statsData)
+      } catch {
+        // Stats endpoint may not be fully set up yet — ignore
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load admin data')
     } finally {
