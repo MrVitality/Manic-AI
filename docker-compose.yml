@@ -409,7 +409,7 @@ services:
   # Workflow & Automation
   # ===========================================================================
   n8n:
-    image: n8nio/n8n:1.81.4
+    image: n8nio/n8n:1.123.28
     container_name: ai-n8n
     restart: unless-stopped
     ports:
@@ -457,7 +457,7 @@ services:
   # Chat & Search UIs
   # ===========================================================================
   open-webui:
-    image: ghcr.io/open-webui/open-webui:v0.8.3
+    image: ghcr.io/open-webui/open-webui:v0.8.6
     container_name: ai-open-webui
     restart: unless-stopped
     ports:
@@ -993,7 +993,7 @@ services:
         max-file: "3"
 
   grafana:
-    image: grafana/grafana:10.4.0
+    image: grafana/grafana:latest
     container_name: ai-grafana
     restart: unless-stopped
     ports:
