@@ -265,9 +265,19 @@ export async function* streamChat(
     : messages
 
   const streamPath = endpoint === 'agent' ? '/agent/stream' : '/chat/stream'
-  const combinedSignal = signal
-    ? (AbortSignal as unknown as { any: (signals: AbortSignal[]) => AbortSignal }).any([signal, AbortSignal.timeout(STREAM_TIMEOUT_MS)])
-    : AbortSignal.timeout(STREAM_TIMEOUT_MS)
+  // AbortSignal.any() requires Chrome 116+ / Firefox 124+ / Safari 17.4+.
+  // Fall back to the caller's signal (or a plain timeout) when unavailable.
+  let combinedSignal: AbortSignal
+  try {
+    const anyFn = (AbortSignal as unknown as { any?: (signals: AbortSignal[]) => AbortSignal }).any
+    if (anyFn && signal) {
+      combinedSignal = anyFn([signal, AbortSignal.timeout(STREAM_TIMEOUT_MS)])
+    } else {
+      combinedSignal = signal ?? AbortSignal.timeout(STREAM_TIMEOUT_MS)
+    }
+  } catch {
+    combinedSignal = signal ?? AbortSignal.timeout(STREAM_TIMEOUT_MS)
+  }
   const response = await fetch(`${getApiV1()}${streamPath}`, {
     method: 'POST',
     headers: buildHeaders(),
