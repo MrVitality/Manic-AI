@@ -457,7 +457,7 @@ services:
   # Chat & Search UIs
   # ===========================================================================
   open-webui:
-    image: ghcr.io/open-webui/open-webui:v0.8.6
+    image: ghcr.io/open-webui/open-webui:v0.8.12
     container_name: ai-open-webui
     restart: unless-stopped
     ports:
