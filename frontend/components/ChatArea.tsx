@@ -117,7 +117,10 @@ export default function ChatArea() {
                     .map((a) => `\n\n[Attached file: ${a.name}]\n\`\`\`\n${a.text}\n\`\`\``)
                   if (parts.length > 0) fullMessage += parts.join('')
                 }
-                sendMessage(fullMessage)
+                sendMessage(fullMessage).catch((err) => {
+                  console.error('[ChatArea] sendMessage failed:', err)
+                  alert(`Chat error: ${err instanceof Error ? err.message : String(err)}`)
+                })
                 setInputText('')
               }}
               onStop={stopGeneration}
