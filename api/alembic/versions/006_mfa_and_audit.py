@@ -24,7 +24,7 @@ def upgrade() -> None:
     # Audit log table
     op.execute("""
         CREATE TABLE IF NOT EXISTS public.api_key_usage_log (
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id UUID REFERENCES public.users(id),
             api_key_prefix VARCHAR(16),
             endpoint TEXT,
@@ -32,15 +32,15 @@ def upgrade() -> None:
             ip_address INET,
             user_agent TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        CREATE INDEX IF NOT EXISTS idx_usage_log_user_id ON public.api_key_usage_log(user_id);
-        CREATE INDEX IF NOT EXISTS idx_usage_log_created_at ON public.api_key_usage_log(created_at);
+        )
     """)
+    op.execute("CREATE INDEX IF NOT EXISTS idx_usage_log_user_id ON public.api_key_usage_log(user_id)")
+    op.execute("CREATE INDEX IF NOT EXISTS idx_usage_log_created_at ON public.api_key_usage_log(created_at)")
 
     # Active sessions table
     op.execute("""
         CREATE TABLE IF NOT EXISTS public.user_sessions (
-            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id UUID REFERENCES public.users(id),
             api_key_prefix VARCHAR(16),
             ip_address INET,
@@ -48,9 +48,9 @@ def upgrade() -> None:
             last_active_at TIMESTAMPTZ DEFAULT NOW(),
             created_at TIMESTAMPTZ DEFAULT NOW(),
             is_active BOOLEAN DEFAULT TRUE
-        );
-        CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON public.user_sessions(user_id);
+        )
     """)
+    op.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON public.user_sessions(user_id)")
 
 
 def downgrade() -> None:
