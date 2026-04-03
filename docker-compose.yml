@@ -325,7 +325,10 @@ services:
       - /bin/sh
       - -c
       - |
-        envsubst < /var/lib/kong/kong.yml.template > /tmp/kong.yml
+        sed -e "s|\$${ANON_KEY}|$$ANON_KEY|g" \
+            -e "s|\$${SERVICE_ROLE_KEY}|$$SERVICE_ROLE_KEY|g" \
+            -e "s|\$${KONG_CORS_ORIGINS}|$$KONG_CORS_ORIGINS|g" \
+            /var/lib/kong/kong.yml.template > /tmp/kong.yml
         export KONG_DECLARATIVE_CONFIG=/tmp/kong.yml
         /docker-entrypoint.sh kong docker-start
     volumes:
