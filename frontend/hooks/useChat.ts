@@ -88,63 +88,82 @@ export function useChat() {
       let fullContent = ''
       let sources: RagSource[] = []
       let toolCalls: ToolCallInfo[] = []
+      let streamWorked = false
 
-      for await (const event of streamChat({
-        model: selectedModel,
-        messages,
-        temperature: settings.temperature,
-        systemPrompt: effectiveSystemPrompt,
-        useRag,
-      }, controller.signal, useAgentMode ? 'agent' : 'chat')) {
-        if (event.type === 'content' && event.content) {
-          fullContent += event.content
-          updateMessage(conversationId, assistantMessageId, {
-            content: fullContent,
-          })
+      // Try streaming first, fall back to non-streaming if it fails
+      try {
+        for await (const event of streamChat({
+          model: selectedModel,
+          messages,
+          temperature: settings.temperature,
+          systemPrompt: effectiveSystemPrompt,
+          useRag,
+        }, controller.signal, useAgentMode ? 'agent' : 'chat')) {
+          streamWorked = true
+          if (event.type === 'content' && event.content) {
+            fullContent += event.content
+            updateMessage(conversationId, assistantMessageId, {
+              content: fullContent,
+            })
 
-          // Detect artifact patterns in streamed content
-          detectAndAddArtifacts(fullContent, detectedBlockHashesRef.current)
-        } else if (event.type === 'sources' && event.sources) {
-          sources = event.sources
-          updateMessage(conversationId, assistantMessageId, {
-            sources,
-          })
-        } else if (event.type === 'tool_start') {
-          const toolCall: ToolCallInfo = {
-            id: event.tool_call_id || `tc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-            toolName: event.tool_name || 'tool',
-            status: 'pending',
-            description: event.tool_description || 'Searching knowledge base...',
-            startedAt: Date.now(),
+            // Detect artifact patterns in streamed content
+            detectAndAddArtifacts(fullContent, detectedBlockHashesRef.current)
+          } else if (event.type === 'sources' && event.sources) {
+            sources = event.sources
+            updateMessage(conversationId, assistantMessageId, {
+              sources,
+            })
+          } else if (event.type === 'tool_start') {
+            const toolCall: ToolCallInfo = {
+              id: event.tool_call_id || `tc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              toolName: event.tool_name || 'tool',
+              status: 'pending',
+              description: event.tool_description || 'Searching knowledge base...',
+              startedAt: Date.now(),
+            }
+            toolCalls = [...toolCalls, toolCall]
+            updateMessage(conversationId, assistantMessageId, {
+              toolCalls: [...toolCalls],
+            })
+          } else if (event.type === 'tool_end') {
+            const callId = event.tool_call_id
+            toolCalls = toolCalls.map((tc) =>
+              tc.id === callId || (!callId && tc.status === 'pending')
+                ? {
+                    ...tc,
+                    status: 'complete' as const,
+                    description: event.tool_description || 'Search complete',
+                    sources: event.sources,
+                    completedAt: Date.now(),
+                  }
+                : tc
+            )
+            updateMessage(conversationId, assistantMessageId, {
+              toolCalls: [...toolCalls],
+            })
+          } else if (event.type === 'error') {
+            toolCalls = toolCalls.map((tc) =>
+              tc.status === 'pending'
+                ? { ...tc, status: 'error' as const, error: event.error || 'Stream error', completedAt: Date.now() }
+                : tc
+            )
+            throw new Error(event.error || 'Stream error')
           }
-          toolCalls = [...toolCalls, toolCall]
-          updateMessage(conversationId, assistantMessageId, {
-            toolCalls: [...toolCalls],
+        }
+      } catch (streamError) {
+        // If streaming never produced content, fall back to non-streaming
+        if (!streamWorked || !fullContent) {
+          console.warn('[useChat] Streaming failed, falling back to non-streaming:', streamError)
+          const result = await chat({
+            model: selectedModel,
+            messages,
+            temperature: settings.temperature,
+            systemPrompt: effectiveSystemPrompt,
+            useRag,
           })
-        } else if (event.type === 'tool_end') {
-          const callId = event.tool_call_id
-          toolCalls = toolCalls.map((tc) =>
-            tc.id === callId || (!callId && tc.status === 'pending')
-              ? {
-                  ...tc,
-                  status: 'complete' as const,
-                  description: event.tool_description || 'Search complete',
-                  sources: event.sources,
-                  completedAt: Date.now(),
-                }
-              : tc
-          )
-          updateMessage(conversationId, assistantMessageId, {
-            toolCalls: [...toolCalls],
-          })
-        } else if (event.type === 'error') {
-          // Mark any pending tool calls as errored
-          toolCalls = toolCalls.map((tc) =>
-            tc.status === 'pending'
-              ? { ...tc, status: 'error' as const, error: event.error || 'Stream error', completedAt: Date.now() }
-              : tc
-          )
-          throw new Error(event.error || 'Stream error')
+          fullContent = result.content
+        } else {
+          throw streamError
         }
       }
 
