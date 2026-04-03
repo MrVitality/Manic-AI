@@ -584,7 +584,6 @@ services:
   flowise:
     image: flowiseai/flowise:2.2.7
     container_name: ai-flowise
-    user: "1001:1001"
     restart: unless-stopped
     ports:
       - "${BIND_IP}:3008:3000"
