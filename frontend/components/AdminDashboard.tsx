@@ -48,9 +48,18 @@ interface CreateUserForm {
 // ---------------------------------------------------------------------------
 
 function getApiKey(): string {
-  // sessionStorage: not accessible after tab close, reduces XSS exfiltration window
   if (typeof window === 'undefined') return ''
-  return sessionStorage.getItem('manic-admin-api-key') ?? ''
+  // Try sessionStorage first (admin-specific key), then fall back to main app key
+  const adminKey = sessionStorage.getItem('manic-admin-api-key')
+  if (adminKey) return adminKey
+  try {
+    const stored = localStorage.getItem('manic-ai-ui')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      return parsed?.state?.settings?.apiKey ?? ''
+    }
+  } catch { /* ignore */ }
+  return ''
 }
 
 async function apiFetch<T>(
