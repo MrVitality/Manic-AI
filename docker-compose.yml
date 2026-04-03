@@ -9,9 +9,9 @@ services:
     container_name: ai-caddy
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"  # HTTP/3
+      - "${BIND_IP}:80:80"
+      - "${BIND_IP}:443:443"
+      - "${BIND_IP}:443:443/udp"  # HTTP/3
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
