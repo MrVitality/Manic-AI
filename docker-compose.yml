@@ -17,7 +17,7 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     environment:
-      - DOMAIN=${PUBLIC_DOMAIN:-manixsystems.ai}
+      - DOMAIN=${PUBLIC_DOMAIN:-manixsystems.cloud}
     depends_on:
       - api
       - frontend

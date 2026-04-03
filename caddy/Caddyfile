@@ -1,4 +1,4 @@
-manixsystems.ai {
+manixsystems.cloud {
     # Frontend (Next.js)
     handle /chat* {
         reverse_proxy frontend:3000
@@ -73,6 +73,6 @@ manixsystems.ai {
 }
 
 # Redirect www to bare domain
-www.manixsystems.ai {
-    redir https://manixsystems.ai{uri} permanent
+www.manixsystems.cloud {
+    redir https://manixsystems.cloud{uri} permanent
 }
