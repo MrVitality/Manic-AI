@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-WORKDIR /app
+WORKDIR /srv
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
@@ -8,15 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 RUN addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 appuser
 
-COPY --chown=appuser:appgroup requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=appuser:appgroup requirements.txt /srv/api/
+RUN pip install --no-cache-dir -r /srv/api/requirements.txt
 
-COPY --chown=appuser:appgroup . .
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+COPY --chown=appuser:appgroup . /srv/api/
+RUN chmod +x /srv/api/entrypoint.sh
 
 USER appuser
 
 EXPOSE 8081
 
-CMD ["/app/entrypoint.sh"]
+CMD ["/srv/api/entrypoint.sh"]

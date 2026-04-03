@@ -1,8 +1,11 @@
 #!/bin/sh
 set -e
 
+cd /srv
+
 echo "[entrypoint] Running database migrations..."
-python -m alembic upgrade head || echo "[entrypoint] Migration failed or not needed, continuing..."
+cd /srv/api && python -m alembic upgrade head || echo "[entrypoint] Migration failed or not needed, continuing..."
 
 echo "[entrypoint] Starting API server..."
-exec uvicorn main:app --host 0.0.0.0 --port 8081 --timeout-graceful-shutdown 30
+cd /srv
+exec uvicorn api.main:app --host 0.0.0.0 --port 8081 --timeout-graceful-shutdown 30
