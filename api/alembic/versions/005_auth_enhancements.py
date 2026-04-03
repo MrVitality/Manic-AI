@@ -1,12 +1,12 @@
 """Add key_expires_at to users and user_id FK to conversations.
 
 Revision ID: 005_auth_enhancements
-Revises: 004_user_auth
+Revises: 004
 """
 from alembic import op
 
 revision = '005_auth_enhancements'
-down_revision = '004_user_auth'
+down_revision = '004'
 branch_labels = None
 depends_on = None
 
