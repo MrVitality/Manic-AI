@@ -120,6 +120,9 @@ const DEFAULT_TIMEOUT_MS = 30_000
 /** Timeout (ms) for streaming fetch calls. */
 const STREAM_TIMEOUT_MS = 120_000
 
+/** Timeout (ms) for model pull operations (large downloads). */
+const MODEL_PULL_TIMEOUT_MS = 30 * 60_000 // 30 minutes
+
 /** Return the versioned API base, e.g. ``http://localhost:8081/v1``. */
 const getApiV1 = (): string => `${getApiUrl()}/v1`
 
@@ -187,7 +190,7 @@ export async function pullModel(
     method: 'POST',
     headers: buildHeaders(),
     body: JSON.stringify({ name: modelName }),
-    signal: AbortSignal.timeout(STREAM_TIMEOUT_MS),
+    signal: AbortSignal.timeout(MODEL_PULL_TIMEOUT_MS),
   })
 
   if (!response.body) throw new Error('No response body')
