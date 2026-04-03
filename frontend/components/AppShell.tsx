@@ -157,7 +157,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}
           onOpenSettings={() => setSettingsOpen(true)}
-          onNavClick={() => setSidebarOpen(false)}
+          onNavClick={() => { if (window.innerWidth < 768) setSidebarOpen(false) }}
         />
       )}
 
