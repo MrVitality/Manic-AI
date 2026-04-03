@@ -29,7 +29,7 @@ export default function RagSearchLab({
   onConfigChange,
 }: RagSearchLabProps) {
   const [query, setQuery] = useState(searchQuery)
-  const debounceRef = useRef<NodeJS.Timeout>()
+  const debounceRef = useRef<NodeJS.Timeout>(undefined)
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value)
