@@ -765,6 +765,7 @@ services:
   # Obsidian AI Agent (Paddy) - Sidecar
   # ===========================================================================
   paddy-agent:
+    profiles: ["obsidian"]
     build:
       context: ./obsidian-agent
       dockerfile: Dockerfile
@@ -803,6 +804,7 @@ services:
         max-file: "3"
 
   paddy-rag-pipeline:
+    profiles: ["obsidian"]
     build: ./obsidian-agent/backend_rag_pipeline
     container_name: paddy-rag-pipeline
     restart: unless-stopped
