@@ -1,8 +1,12 @@
 # Manic-AI
 
+> **READ FIRST**: [`docs/manic-ai-prd.md`](docs/manic-ai-prd.md) — Product Requirements Document. Covers vision, users, goals, non-goals, requirements by phase, current state, success metrics, and open questions. **Future Claude Code sessions should load this before planning any new work on the real estate hub pivot.**
+
 ## Project Overview
 
-Full-stack AI platform with RAG (Retrieval-Augmented Generation) capabilities.
+Manic-AI is being pivoted from a general AI platform into the **central operations hub for Mark Vitale's real estate business** (Vera Cohen Realty, Capital Region NY). Phases 1-2 shipped (lead intake + scoring + drip, content generation + Fair Housing gate). Phases 3-5 planned in the PRD.
+
+Core stack under the pivot:
 
 **Stack:**
 - **Frontend**: Next.js (TypeScript) — `frontend/`
