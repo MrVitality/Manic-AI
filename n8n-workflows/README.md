@@ -10,6 +10,44 @@ Workflow templates that sync external knowledge sources into Manic AI's RAG pipe
 | Google Drive | `google-drive-connector.json` | Google Docs, TXT, MD, HTML, PDF |
 | Confluence | `confluence-connector.json` | Confluence wiki pages |
 
+## Real Estate — Phase 1 Workflows
+
+Two workflows ported from `~/Downloads/Lead and Content Machine/` and patched
+to target the `re.*` schema (migration `005_re_schema_phase1.sql`).
+
+| File | Purpose | Trigger |
+|---|---|---|
+| `02_hot_lead_response.json` | Instant email to hot leads + interaction log | Supabase Realtime webhook on `re.leads` INSERT where `tier='hot'` (or cron fallback via `re.v_hot_leads`) |
+| `03_drip_nurture.json` | Daily drip send to warm/cold leads via `re.v_drip_due_today` | Cron Mon–Sat 8am |
+
+### Import checklist
+
+1. Open n8n at `http://100.98.154.61:5679`.
+2. **Settings → Credentials → New** and create:
+   - **Postgres** → host `ai-supabase-db`, port `5432`, db `postgres`, user/password from `.env` (`POSTGRES_USER` / `POSTGRES_PASSWORD`), SSL off (internal network).
+   - **Gmail OAuth2** → use Mark's `mvitale@veracohenrealty.com` Google account, scopes `gmail.send` / `gmail.compose` / `gmail.modify`.
+   - *(optional)* **Telegram Bot** for hot-lead phone alerts.
+3. **Workflows → Import from File** for each of `02_*.json` and `03_*.json`.
+4. For every imported node, re-bind the credential (n8n imports drop credential references by design).
+5. In WF02, pick a trigger strategy:
+   - **Recommended**: Supabase Realtime webhook on `re.leads` INSERT with filter `tier=hot` → points at the n8n webhook URL. Near-instant.
+   - **Fallback**: Cron every 5 min, query `SELECT * FROM re.v_hot_leads`.
+6. Activate both workflows.
+
+### Verification
+
+Fire a test intake with `POST /v1/re/leads/intake` (see plan section 11) and confirm:
+- A row lands in `re.leads` with a score and tier.
+- If tier=`hot`, WF02 fires and an email shows up. Start with your own address, not a real lead.
+- WF03 runs tomorrow at 8am — or trigger it manually via the n8n UI to smoke test against seeded warm leads.
+
+### Fair Housing reminder
+
+These workflows send email. Protected-class references in `re.drip_sequences`
+body templates are your responsibility until the Phase 2 compliance critic
+lands. Review all templates before activation and never auto-drip untested
+copy.
+
 All connectors run on a 6-hour schedule and perform incremental sync (only pages modified since the last run).
 
 ## Setup Instructions

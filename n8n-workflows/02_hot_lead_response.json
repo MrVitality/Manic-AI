@@ -1,0 +1,383 @@
+{
+  "name": "02 | Hot Lead Instant Response",
+  "nodes": [
+    {
+      "parameters": {
+        "events": [
+          "insert"
+        ],
+        "schema": "public",
+        "table": "re.leads",
+        "additionalFields": {}
+      },
+      "id": "supabase-trigger",
+      "name": "Trigger - New Hot Lead in DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "OPTION A: Use Supabase Realtime webhook.\nCreate a Supabase Database Webhook on table 'leads' for INSERT events.\nFilter: tier = 'hot'\nSend to: https://YOUR_N8N_URL/webhook/hot-lead-alert\n\nThen use a Webhook trigger node here instead and this fires automatically."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hot-lead-alert",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-hot",
+      "name": "Webhook - Hot Lead Alert",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "USE THIS NODE instead of the Supabase trigger above.\nConfigure Supabase Database Webhook to POST here when tier='hot'"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract lead data from Supabase webhook payload\n// Supabase sends: { type: 'INSERT', table: 'leads', record: {...}, schema: 'public' }\nconst payload = $input.first().json;\nconst record = payload.record || payload;\n\nreturn [{ json: record }];"
+      },
+      "id": "extract-lead",
+      "name": "Extract Lead Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tier }}",
+              "rightValue": "hot",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "confirm-hot",
+      "name": "Confirm Tier = Hot",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "llama3.1:8b"
+            },
+            {
+              "name": "stream",
+              "value": false
+            },
+            {
+              "name": "prompt",
+              "value": "=You are writing a first-touch email on behalf of Mark Vitale, a licensed real estate agent in the Capital Region of New York (Albany, Schenectady, Troy, Saratoga Springs area). Mark works with Vera Cohen Realty.\n\nThis lead just came in and scored HOT ({{ $json.score }}/100). Write a personal, warm, non-salesy first-touch email that:\n1. References their specific interest ({{ $json.property_interest }}) naturally\n2. Acknowledges their timeline ({{ $json.timeline }}) without pressure\n3. Positions Mark as the local expert who can help immediately\n4. Has ONE clear, low-friction call to action (schedule a quick call or reply with questions)\n5. Is conversational, not corporate — Mark is the \"neighbor next door\" agent\n6. Is 150-200 words max\n7. Does NOT use generic filler phrases like \"I hope this email finds you well\"\n\nLead details:\n- Name: {{ $json.name }}\n- Source: {{ $json.source }}\n- Message they sent: {{ $json.message }}\n- Property interest: {{ $json.property_interest }}\n- Timeline: {{ $json.timeline }}\n- Buyer or seller: {{ $json.buyer_seller }}\n- Suggested tone: {{ $json.suggested_tone }}\n- AI next action: {{ $json.next_action }}\n\nReturn ONLY the email body (no subject line, no JSON, just the email text starting with Hi [Name],)."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ollama-email",
+      "name": "Ollama - Draft First Touch Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "llama3.1:8b"
+            },
+            {
+              "name": "stream",
+              "value": false
+            },
+            {
+              "name": "prompt",
+              "value": "=Write a compelling email subject line for this real estate lead follow-up.\n\nLead name: {{ $('Extract Lead Record').item.json.name }}\nProperty interest: {{ $('Extract Lead Record').item.json.property_interest }}\nSource: {{ $('Extract Lead Record').item.json.source }}\nTone: {{ $('Extract Lead Record').item.json.suggested_tone }}\n\nRules:\n- Max 50 characters\n- Do not use emojis\n- Do not use all caps\n- Should feel personal, not mass-email\n- Good examples: 'About your home search in Albany', 'Quick question about Saratoga listings'\n\nReturn ONLY the subject line text, nothing else."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ollama-subject",
+      "name": "Ollama - Generate Subject Line",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const emailBody = $('Ollama - Draft First Touch Email').item.json.response;\nconst subjectLine = $('Ollama - Generate Subject Line').item.json.response;\nconst lead = $('Extract Lead Record').item.json;\n\n// Clean up any trailing whitespace or newlines\nconst cleanBody = emailBody.trim();\nconst cleanSubject = subjectLine.replace(/\\n/g, '').trim();\n\n// Add Mark's signature\nconst signature = `\n\nBest,\nMark Vitale\nLicensed Real Estate Agent | Vera Cohen Realty\n(518) 533-8775\nrealtormarkvitale.com\nAlbany | Schenectady | Troy | Saratoga Springs`;\n\nreturn [{\n  json: {\n    lead_id: lead.id,\n    lead_name: lead.name,\n    lead_email: lead.email,\n    subject: cleanSubject,\n    body: cleanBody + signature,\n    score: lead.score,\n    tier: lead.tier\n  }\n}];"
+      },
+      "id": "assemble-email",
+      "name": "Assemble Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "mvitale@veracohenrealty.com",
+        "toEmail": "={{ $json.lead_email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "replyTo": "mvitale@veracohenrealty.com"
+        }
+      },
+      "id": "send-email",
+      "name": "Send Email via Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1340,
+        400
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CRED_ID",
+          "name": "Gmail OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "re.leads",
+        "updateKey": "id",
+        "columns": "last_contacted,drip_stage",
+        "additionalFields": {}
+      },
+      "id": "update-lead",
+      "name": "Update Lead - Last Contacted",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Set:\nid: {{ $('Extract Lead Record').item.json.id }}\nlast_contacted: {{ $now }}\ndrip_stage: 1"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "re.interactions",
+        "columns": "lead_id,type,subject,body,direction,automated,workflow_id",
+        "additionalFields": {}
+      },
+      "id": "log-email",
+      "name": "Log Email Interaction",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Set:\nlead_id: {{ $('Extract Lead Record').item.json.id }}\ntype: email_sent\nsubject: {{ $('Assemble Email').item.json.subject }}\nbody: {{ $('Assemble Email').item.json.body }}\ndirection: outbound\nautomated: true\nworkflow_id: 02_hot_lead_response"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🔥 HOT LEAD ALERT 🔥\n\nName: {{ $('Extract Lead Record').item.json.name }}\nScore: {{ $('Extract Lead Record').item.json.score }}/100\nSource: {{ $('Extract Lead Record').item.json.source }}\nInterest: {{ $('Extract Lead Record').item.json.property_interest }}\nTimeline: {{ $('Extract Lead Record').item.json.timeline }}\n\nEmail sent to: {{ $('Extract Lead Record').item.json.email }}\nSubject: {{ $('Assemble Email').item.json.subject }}\n\nNext action: {{ $('Extract Lead Record').item.json.next_action }}\n\nReply ASAP — they're hot! 🏡",
+        "additionalFields": {}
+      },
+      "id": "telegram-alert",
+      "name": "Telegram - Alert Mark",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1780,
+        220
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "YOUR_TELEGRAM_CRED_ID",
+          "name": "Telegram Bot"
+        }
+      },
+      "notes": "Optional: Set up a Telegram bot via @BotFather.\nAlternative: Use Gmail to send yourself an alert email instead."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"email_sent\", \"lead\": \"{{ $('Extract Lead Record').item.json.name }}\" }"
+      },
+      "id": "respond",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - Hot Lead Alert": {
+      "main": [
+        [
+          {
+            "node": "Extract Lead Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Lead Record": {
+      "main": [
+        [
+          {
+            "node": "Confirm Tier = Hot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Tier = Hot": {
+      "main": [
+        [
+          {
+            "node": "Ollama - Draft First Touch Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ollama - Generate Subject Line",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram - Alert Mark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama - Draft First Touch Email": {
+      "main": [
+        [
+          {
+            "node": "Assemble Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama - Generate Subject Line": {
+      "main": [
+        [
+          {
+            "node": "Assemble Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email via Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email via Gmail": {
+      "main": [
+        [
+          {
+            "node": "Update Lead - Last Contacted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead - Last Contacted": {
+      "main": [
+        [
+          {
+            "node": "Log Email Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Email Interaction": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "real-estate",
+    "leads",
+    "system-1"
+  ]
+}

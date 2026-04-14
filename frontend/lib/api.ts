@@ -7,6 +7,7 @@ import type {
   UsageAnalyticsData, ModelAnalyticsData, RagAnalyticsData, ServiceHealthSnapshot,
   ChunkInfo, SearchExplainResult, SearchExplainResponse, RagStatsData, SystemInfo,
   CollectionInfo, RagSource,
+  LeadSummary, LeadDetail, LeadFilter, LeadIntakePayload, LeadTier,
 } from '@/types'
 
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
@@ -705,6 +706,56 @@ export async function clearCache(): Promise<{ cleared: boolean; keys_removed: nu
 
 export function streamServiceStatus(): EventSource {
   return new EventSource(`${getApiUrl()}/services/status/stream`)
+}
+
+// =============================================================================
+// Real Estate — Leads
+// =============================================================================
+
+export async function fetchLeads(
+  filter: Partial<LeadFilter> = {},
+): Promise<{ leads: LeadSummary[]; total: number }> {
+  const params = new URLSearchParams()
+  if (filter.tier) params.set('tier', filter.tier)
+  if (filter.source) params.set('source', filter.source)
+  params.set('limit', String(filter.limit ?? 50))
+  params.set('offset', String(filter.offset ?? 0))
+
+  const response = await fetch(`${getApiV1()}/re/leads?${params.toString()}`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+
+  // Pre-parse to capture the meta envelope (total, limit, offset)
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}: ${response.statusText}`)
+  }
+  const envelope = await response.json()
+  if (envelope?.success === false) {
+    throw new Error(envelope.error?.message || 'Failed to fetch leads')
+  }
+  return {
+    leads: (envelope.data || []) as LeadSummary[],
+    total: envelope.meta?.total ?? (envelope.data?.length ?? 0),
+  }
+}
+
+export async function fetchLeadDetail(id: string): Promise<LeadDetail> {
+  const response = await fetch(`${getApiV1()}/re/leads/${encodeURIComponent(id)}`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  return unwrap<LeadDetail>(response)
+}
+
+export async function createLead(payload: LeadIntakePayload): Promise<LeadDetail> {
+  const response = await fetch(`${getApiV1()}/re/leads/intake`, {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  return unwrap<LeadDetail>(response)
 }
 
 export function connectStatusWebSocket(

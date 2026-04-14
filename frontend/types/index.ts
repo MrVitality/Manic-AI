@@ -144,7 +144,72 @@ export interface ServicesStatusResponse {
 }
 
 // Active view
-export type ActiveView = 'chat' | 'documents' | 'models' | 'dashboard' | 'rag' | 'settings'
+export type ActiveView = 'chat' | 'documents' | 'models' | 'dashboard' | 'rag' | 'settings' | 'leads'
+
+// =============================================================================
+// Real Estate — Lead domain
+// =============================================================================
+export type LeadTier = 'hot' | 'warm' | 'cold' | 'converted' | 'disqualified'
+
+export interface LeadSummary {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  source: string | null
+  tier: LeadTier | null
+  score: number | null
+  property_interest: string | null
+  timeline: string | null
+  last_contacted: string | null
+  next_follow_up: string | null
+  created_at: string
+}
+
+export interface LeadInteraction {
+  id: string
+  type: string
+  subject: string | null
+  body: string | null
+  direction: 'outbound' | 'inbound' | null
+  automated: boolean
+  workflow_id: string | null
+  created_at: string
+}
+
+export interface LeadDetail extends LeadSummary {
+  message: string | null
+  buyer_seller: string | null
+  score_reasoning: string | null
+  suggested_tone: string | null
+  drip_stage: number | null
+  tags: string[]
+  notes: string | null
+  source_funnel: string | null
+  contact_id: string | null
+  updated_at: string
+  interactions: LeadInteraction[]
+}
+
+export interface LeadFilter {
+  tier: LeadTier | null
+  source: string | null
+  limit: number
+  offset: number
+}
+
+export interface LeadIntakePayload {
+  name: string
+  email?: string
+  phone?: string
+  source?: string
+  source_funnel?: string
+  message?: string
+  property_interest?: string
+  timeline?: string
+  buyer_seller?: string
+  raw_payload?: Record<string, unknown>
+}
 
 // Dashboard types
 export type DashboardTab = 'overview' | 'services' | 'performance'

@@ -14,6 +14,7 @@ import {
   DocumentIcon,
   CpuIcon,
   DashboardIcon,
+  BoltIcon,
   TrashIcon,
   SettingsIcon,
   SunIcon,
@@ -172,6 +173,7 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
 
   const navItems: NavItem[] = [
     { path: '/chat', label: 'Chat', icon: <ChatBubbleIcon className="w-5 h-5" /> },
+    { path: '/leads', label: 'Leads', icon: <BoltIcon className="w-5 h-5" />, hint: 'Ctrl+L' },
     { path: '/documents', label: 'Docs', icon: <DocumentIcon className="w-5 h-5" />, hint: 'Ctrl+D' },
     { path: '/models', label: 'Models', icon: <CpuIcon className="w-5 h-5" />, hint: 'Ctrl+M' },
     { path: '/dashboard', label: 'Health', icon: <DashboardIcon className="w-5 h-5" />, hint: 'Ctrl+H' },

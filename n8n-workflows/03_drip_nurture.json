@@ -1,0 +1,325 @@
+{
+  "name": "03 | Drip Nurture Sequence",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-6"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule - 8AM Mon-Sat",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Runs every weekday + Saturday at 8am.\nChecks for leads due for drip follow-up."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM re.v_drip_due_today LIMIT 50",
+        "options": {}
+      },
+      "id": "fetch-drip-leads",
+      "name": "Fetch Leads Due for Drip",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Uses the v_drip_due_today view defined in the schema.\nReturns leads that are past their delay threshold."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "any-leads",
+      "name": "Any Leads to Contact?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-leads",
+      "name": "Split Into Individual Leads",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        900,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT area, median_price, avg_dom, months_of_supply FROM market_snapshots WHERE snapshot_date = (SELECT MAX(snapshot_date) FROM market_snapshots) AND area = 'Albany County' LIMIT 1",
+        "options": {}
+      },
+      "id": "fetch-market-data",
+      "name": "Fetch Latest Market Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        900,
+        420
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "llama3.1:8b"
+            },
+            {
+              "name": "stream",
+              "value": false
+            },
+            {
+              "name": "prompt",
+              "value": "=You are writing a follow-up email for Mark Vitale, a real estate agent in the Capital Region of New York (Albany, Schenectady, Troy, Saratoga Springs). Mark works with Vera Cohen Realty.\n\nThis is drip stage {{ $('Split Into Individual Leads').item.json.drip_stage }} for a {{ $('Split Into Individual Leads').item.json.tier }} lead.\n\nLead info:\n- Name: {{ $('Split Into Individual Leads').item.json.name }}\n- Property interest: {{ $('Split Into Individual Leads').item.json.property_interest }}\n- Original message: {{ $('Split Into Individual Leads').item.json.message }}\n- Timeline: {{ $('Split Into Individual Leads').item.json.timeline }}\n- Buyer or seller: {{ $('Split Into Individual Leads').item.json.buyer_seller }}\n\nCurrent Capital Region market snapshot:\n- Median price: ${{ $('Fetch Latest Market Data').item.json.median_price || '285,000' }}\n- Average days on market: {{ $('Fetch Latest Market Data').item.json.avg_dom || '38' }} days\n- Months of supply: {{ $('Fetch Latest Market Data').item.json.months_of_supply || '1.8' }}\n\nDrip sequence template to use as inspiration (adapt it, don't copy verbatim):\nSubject hint: {{ $('Split Into Individual Leads').item.json.subject_template }}\nBody hint: {{ $('Split Into Individual Leads').item.json.body_template }}\n\nWrite a personalized follow-up email that:\n1. References their specific situation naturally\n2. Includes ONE relevant market data point for the Capital Region\n3. Feels like it came from a real person, not a system\n4. Has a single soft call-to-action\n5. Is 120-180 words\n6. Does NOT mention being an automated follow-up\n\nReturn ONLY valid JSON in this exact format with no markdown or explanation:\n{\n  \"subject\": \"<email subject line, max 50 chars>\",\n  \"body\": \"<full email body starting with Hi [Name],>\"\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ollama-drip-email",
+      "name": "Ollama - Generate Drip Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ollamaResponse = $('Ollama - Generate Drip Email').item.json.response;\nconst lead = $('Split Into Individual Leads').item.json;\n\nlet emailData;\ntry {\n  const cleaned = ollamaResponse.replace(/```json/g,'').replace(/```/g,'').trim();\n  emailData = JSON.parse(cleaned);\n} catch(e) {\n  // Fallback: use template directly\n  emailData = {\n    subject: lead.subject_template.replace('{{name}}', lead.name),\n    body: lead.body_template\n      .replace('{{name}}', lead.name)\n      .replace('{{property_interest}}', lead.property_interest || 'the Capital Region')\n      .replace('{{avg_dom}}', '38')\n  };\n}\n\nconst signature = `\n\nBest,\nMark Vitale\nLicensed Real Estate Agent | Vera Cohen Realty\n(518) 533-8775 | realtormarkvitale.com`;\n\nreturn [{\n  json: {\n    lead_id: lead.id,\n    lead_email: lead.email,\n    lead_name: lead.name,\n    subject: emailData.subject,\n    body: emailData.body + signature,\n    new_drip_stage: (parseInt(lead.drip_stage) || 0) + 1\n  }\n}];"
+      },
+      "id": "parse-drip-email",
+      "name": "Parse Drip Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "mvitale@veracohenrealty.com",
+        "toEmail": "={{ $json.lead_email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.body }}",
+        "options": {
+          "replyTo": "mvitale@veracohenrealty.com"
+        }
+      },
+      "id": "send-drip-email",
+      "name": "Send Drip Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1560,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CRED_ID",
+          "name": "Gmail OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE re.leads SET last_contacted = NOW(), drip_stage = {{ $('Parse Drip Email').item.json.new_drip_stage }} WHERE id = '{{ $('Parse Drip Email').item.json.lead_id }}'",
+        "options": {}
+      },
+      "id": "update-drip-stage",
+      "name": "Update Drip Stage",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "re.interactions",
+        "columns": "lead_id,type,subject,body,direction,automated,workflow_id",
+        "additionalFields": {}
+      },
+      "id": "log-drip",
+      "name": "Log Drip Interaction",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Set:\nlead_id: {{ $('Parse Drip Email').item.json.lead_id }}\ntype: email_sent\nsubject: {{ $('Parse Drip Email').item.json.subject }}\nbody: {{ $('Parse Drip Email').item.json.body }}\ndirection: outbound\nautomated: true\nworkflow_id: 03_drip_nurture"
+    }
+  ],
+  "connections": {
+    "Schedule - 8AM Mon-Sat": {
+      "main": [
+        [
+          {
+            "node": "Fetch Leads Due for Drip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Leads Due for Drip": {
+      "main": [
+        [
+          {
+            "node": "Any Leads to Contact?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Leads to Contact?": {
+      "main": [
+        [
+          {
+            "node": "Split Into Individual Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Individual Leads": {
+      "main": [
+        [
+          {
+            "node": "Fetch Latest Market Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Ollama - Generate Drip Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama - Generate Drip Email": {
+      "main": [
+        [
+          {
+            "node": "Parse Drip Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Drip Email": {
+      "main": [
+        [
+          {
+            "node": "Send Drip Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Drip Email": {
+      "main": [
+        [
+          {
+            "node": "Update Drip Stage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Drip Stage": {
+      "main": [
+        [
+          {
+            "node": "Log Drip Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "real-estate",
+    "leads",
+    "system-1"
+  ]
+}
