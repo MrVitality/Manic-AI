@@ -8,6 +8,9 @@ import type {
   ChunkInfo, SearchExplainResult, SearchExplainResponse, RagStatsData, SystemInfo,
   CollectionInfo, RagSource,
   LeadSummary, LeadDetail, LeadFilter, LeadIntakePayload, LeadTier,
+  ListingSummary, ListingDetail, ListingFilter, ListingCreatePayload,
+  GenerateContentResult,
+  ContentEntry, ContentFilter, ContentUpdatePayload,
 } from '@/types'
 
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
@@ -756,6 +759,191 @@ export async function createLead(payload: LeadIntakePayload): Promise<LeadDetail
     signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   })
   return unwrap<LeadDetail>(response)
+}
+
+// =============================================================================
+// Real Estate — Listings
+// =============================================================================
+
+export async function fetchListings(
+  filter: Partial<ListingFilter> = {},
+): Promise<{ listings: ListingSummary[]; total: number }> {
+  const params = new URLSearchParams()
+  if (filter.status) params.set('status', filter.status)
+  if (filter.city) params.set('city', filter.city)
+  if (filter.source) params.set('source', filter.source)
+  params.set('limit', String(filter.limit ?? 50))
+  params.set('offset', String(filter.offset ?? 0))
+
+  const response = await fetch(`${getApiV1()}/re/listings?${params.toString()}`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}: ${response.statusText}`)
+  }
+  const envelope = await response.json()
+  if (envelope?.success === false) {
+    throw new Error(envelope.error?.message || 'Failed to fetch listings')
+  }
+  return {
+    listings: (envelope.data || []) as ListingSummary[],
+    total: envelope.meta?.total ?? (envelope.data?.length ?? 0),
+  }
+}
+
+export async function fetchListingDetail(id: string): Promise<ListingDetail> {
+  const response = await fetch(`${getApiV1()}/re/listings/${encodeURIComponent(id)}`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  return unwrap<ListingDetail>(response)
+}
+
+export async function createListing(payload: ListingCreatePayload): Promise<ListingDetail> {
+  const response = await fetch(`${getApiV1()}/re/listings`, {
+    method: 'POST',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  return unwrap<ListingDetail>(response)
+}
+
+export async function updateListing(
+  id: string,
+  payload: Partial<ListingCreatePayload>,
+): Promise<ListingDetail> {
+  const response = await fetch(`${getApiV1()}/re/listings/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  return unwrap<ListingDetail>(response)
+}
+
+export async function deleteListing(id: string): Promise<void> {
+  const response = await fetch(`${getApiV1()}/re/listings/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  await unwrap<unknown>(response)
+}
+
+/** Generate content for a listing. This call may take 60s+ — use a long timeout. */
+export async function generateContentForListing(
+  id: string,
+): Promise<GenerateContentResult> {
+  const response = await fetch(
+    `${getApiV1()}/re/listings/${encodeURIComponent(id)}/generate-content`,
+    {
+      method: 'POST',
+      headers: buildHeaders(),
+      signal: AbortSignal.timeout(5 * 60_000), // 5 min — generation can take 60s+
+    },
+  )
+  return unwrap<GenerateContentResult>(response)
+}
+
+// =============================================================================
+// Real Estate — Content Calendar
+// =============================================================================
+
+export async function fetchContentCalendar(
+  filter: Partial<ContentFilter> = {},
+): Promise<{ entries: ContentEntry[]; total: number }> {
+  const params = new URLSearchParams()
+  if (filter.status) params.set('status', filter.status)
+  if (filter.platform) params.set('platform', filter.platform)
+  if (filter.listing_id) params.set('listing_id', filter.listing_id)
+  if (filter.start_date) params.set('start_date', filter.start_date)
+  if (filter.end_date) params.set('end_date', filter.end_date)
+  params.set('limit', String(filter.limit ?? 100))
+  params.set('offset', String(filter.offset ?? 0))
+
+  const response = await fetch(`${getApiV1()}/re/content?${params.toString()}`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}: ${response.statusText}`)
+  }
+  const envelope = await response.json()
+  if (envelope?.success === false) {
+    throw new Error(envelope.error?.message || 'Failed to fetch content')
+  }
+  return {
+    entries: (envelope.data || []) as ContentEntry[],
+    total: envelope.meta?.total ?? (envelope.data?.length ?? 0),
+  }
+}
+
+export async function fetchContent(id: string): Promise<ContentEntry> {
+  const response = await fetch(`${getApiV1()}/re/content/${encodeURIComponent(id)}`, {
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  return unwrap<ContentEntry>(response)
+}
+
+export async function updateContent(
+  id: string,
+  payload: ContentUpdatePayload,
+): Promise<ContentEntry> {
+  const response = await fetch(`${getApiV1()}/re/content/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: buildHeaders(),
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  return unwrap<ContentEntry>(response)
+}
+
+export async function approveContent(id: string): Promise<ContentEntry> {
+  const response = await fetch(
+    `${getApiV1()}/re/content/${encodeURIComponent(id)}/approve`,
+    {
+      method: 'POST',
+      headers: buildHeaders(),
+      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+    },
+  )
+  return unwrap<ContentEntry>(response)
+}
+
+export async function rejectContent(id: string): Promise<ContentEntry> {
+  const response = await fetch(
+    `${getApiV1()}/re/content/${encodeURIComponent(id)}/reject`,
+    {
+      method: 'POST',
+      headers: buildHeaders(),
+      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+    },
+  )
+  return unwrap<ContentEntry>(response)
+}
+
+export async function recheckContent(id: string): Promise<ContentEntry> {
+  const response = await fetch(
+    `${getApiV1()}/re/content/${encodeURIComponent(id)}/recheck`,
+    {
+      method: 'POST',
+      headers: buildHeaders(),
+      signal: AbortSignal.timeout(2 * 60_000), // compliance check may take a moment
+    },
+  )
+  return unwrap<ContentEntry>(response)
+}
+
+export async function deleteContent(id: string): Promise<void> {
+  const response = await fetch(`${getApiV1()}/re/content/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: buildHeaders(),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  })
+  await unwrap<unknown>(response)
 }
 
 export function connectStatusWebSocket(

@@ -39,6 +39,8 @@ from api.routers import auth_routes, openai_compat
 from api.routers import scheduler as scheduler_router
 from api.routers import consensus as consensus_router
 from api.routers import re_leads as re_leads_router
+from api.routers import re_listings as re_listings_router
+from api.routers import re_content as re_content_router
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +223,8 @@ def create_app() -> FastAPI:
     v1_router.include_router(scheduler_router.router, dependencies=auth_dep, tags=["agent"])
     v1_router.include_router(consensus_router.router, dependencies=auth_dep, tags=["chat"])
     v1_router.include_router(re_leads_router.router, dependencies=auth_dep, tags=["re-leads"])
+    v1_router.include_router(re_listings_router.router, dependencies=auth_dep, tags=["re-listings"])
+    v1_router.include_router(re_content_router.router, dependencies=auth_dep, tags=["re-content"])
 
     _app.include_router(v1_router)
 

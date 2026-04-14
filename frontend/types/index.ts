@@ -211,6 +211,130 @@ export interface LeadIntakePayload {
   raw_payload?: Record<string, unknown>
 }
 
+// =============================================================================
+// Real Estate — Listings domain
+// =============================================================================
+export type ListingStatus = 'active' | 'pending' | 'sold' | 'expired' | 'withdrawn' | 'draft'
+export type ListingSource = 'manual' | 'scraper' | 'idx' | 'import'
+
+export interface ListingSummary {
+  id: string
+  address: string
+  city: string | null
+  state: string | null
+  zip: string | null
+  beds: number | null
+  baths: number | null
+  sqft: number | null
+  list_price: number | null
+  list_date: string | null
+  status: ListingStatus
+  days_on_market: number | null
+  key_features: string[]
+  description: string | null
+  mls_number: string | null
+  agent_notes: string | null
+  source: ListingSource
+  content_generated: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ListingDetail extends ListingSummary {
+  content_count?: number
+}
+
+export interface ListingFilter {
+  status: ListingStatus | null
+  city: string | null
+  source: ListingSource | null
+  limit: number
+  offset: number
+}
+
+export interface ListingCreatePayload {
+  address: string
+  city?: string
+  state?: string
+  zip?: string
+  beds?: number
+  baths?: number
+  sqft?: number
+  list_price?: number
+  list_date?: string
+  status?: ListingStatus
+  key_features?: string[]
+  description?: string
+  mls_number?: string
+  agent_notes?: string
+  source?: ListingSource
+}
+
+export interface GenerateContentResult {
+  total: number
+  draft: number
+  flagged: number
+  blocked: number
+  calendar_ids: string[]
+}
+
+// =============================================================================
+// Real Estate — Content Calendar domain
+// =============================================================================
+export type ContentPlatform =
+  | 'instagram' | 'facebook' | 'linkedin' | 'email' | 'tiktok'
+  | 'youtube' | 'mls' | 'reels' | 'all'
+export type ContentType =
+  | 'listing' | 'market_update' | 'evergreen' | 'educational'
+  | 'personal' | 'testimonial'
+export type ContentStatus =
+  | 'draft' | 'flagged' | 'blocked' | 'approved'
+  | 'scheduled' | 'posted' | 'archived'
+export type FairHousingVerdict = 'pass' | 'warn' | 'block' | null
+
+export interface ContentEntry {
+  id: string
+  listing_id: string | null
+  scheduled_date: string | null
+  platform: ContentPlatform
+  content_type: ContentType
+  status: ContentStatus
+  title: string | null
+  content: string
+  hashtags: string[]
+  image_notes: string | null
+  source_listing: string | null
+  generated_by: string | null
+  posted_at: string | null
+  engagement_notes: string | null
+  compliance_checked_at: string | null
+  fair_housing_notes: string | null
+  fair_housing_verdict: FairHousingVerdict
+  approved_by: string | null
+  approved_at: string | null
+  created_at: string
+}
+
+export interface ContentFilter {
+  status: ContentStatus | null
+  platform: ContentPlatform | null
+  listing_id: string | null
+  start_date: string | null
+  end_date: string | null
+  limit: number
+  offset: number
+}
+
+export interface ContentUpdatePayload {
+  title?: string | null
+  content?: string
+  hashtags?: string[]
+  image_notes?: string | null
+  scheduled_date?: string | null
+  platform?: ContentPlatform
+  status?: ContentStatus
+}
+
 // Dashboard types
 export type DashboardTab = 'overview' | 'services' | 'performance'
 export type RagCenterTab = 'pipeline' | 'collections' | 'search-lab' | 'analytics' | 'eval' | 'graph' | 'embeddings'

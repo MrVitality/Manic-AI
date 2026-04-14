@@ -1,0 +1,284 @@
+{
+  "name": "09 | Evergreen Content Drip",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * 2,4"
+            }
+          ]
+        }
+      },
+      "id": "schedule-tue-thu",
+      "name": "Schedule - Tue & Thu 10AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Posts approved content every Tuesday and Thursday at 10am.\nThis is the best time window for organic real estate content engagement."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM re.v_content_queue WHERE platform IN ('facebook', 'instagram') ORDER BY created_at ASC LIMIT 1",
+        "options": {}
+      },
+      "id": "fetch-next-post",
+      "name": "Fetch Next Approved Post",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        }
+      },
+      "id": "has-content",
+      "name": "Has Content to Post?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.platform }}",
+              "rightValue": "facebook",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "which-platform",
+      "name": "Which Platform?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        900,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $env.FACEBOOK_PAGE_ID }}/feed",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{ $json.content }}"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $env.FACEBOOK_PAGE_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "post-facebook",
+      "name": "Post to Facebook Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        120
+      ],
+      "notes": "Requires:\n1. Facebook Page ID (set as FACEBOOK_PAGE_ID env var in n8n)\n2. Page Access Token (set as FACEBOOK_PAGE_ACCESS_TOKEN env var)\n\nGet these from: developers.facebook.com\nCreate a Facebook App → Add 'Pages' product → Generate Page Access Token\nFor images: Use /photos endpoint instead of /feed and include a URL"
+    },
+    {
+      "parameters": {
+        "fromEmail": "mvitale@veracohenrealty.com",
+        "toEmail": "mvitale@veracohenrealty.com",
+        "subject": "=📱 Instagram Post Ready to Publish – {{ $now.format('MMM D') }}",
+        "emailType": "text",
+        "message": "=Your scheduled Instagram post is ready.\n\nPlatform: Instagram\nContent Type: {{ $json.content_type }}\n\n--- CAPTION ---\n{{ $json.content }}\n\n--- IMAGE NOTES ---\n{{ $json.image_notes || 'Use a branded listing or neighborhood photo' }}\n\nNote: Instagram cannot be auto-posted without the Instagram Content Publishing API (requires Facebook Business verification). Copy the caption above and post manually, or use Later/Buffer free tier for scheduling.\n\nMark this as posted when done.",
+        "options": {}
+      },
+      "id": "email-instagram",
+      "name": "Email Instagram Post to Mark",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1120,
+        360
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CRED_ID",
+          "name": "Gmail OAuth2"
+        }
+      },
+      "notes": "Instagram Graph API auto-posting requires:\n- Facebook Business verification\n- Instagram Business account linked to Facebook Page\n- Content Publishing API access\n\nFor now, we email the content to Mark with image notes.\nAlternative: Use Buffer free tier (10 posts/month) or Meta Business Suite (free)."
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE re.content_calendar SET status = 'posted', posted_at = NOW() WHERE id = '{{ $('Fetch Next Approved Post').item.json.id }}'",
+        "options": {}
+      },
+      "id": "mark-posted",
+      "name": "Mark as Posted in DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "mvitale@veracohenrealty.com",
+        "toEmail": "mvitale@veracohenrealty.com",
+        "subject": "📭 Content Queue Empty – Time to Create More",
+        "emailType": "text",
+        "message": "Your approved content queue is empty.\n\nAction needed:\n1. Review and approve drafts in your content calendar\n2. Trigger Workflow 08 to repurpose existing content\n3. New listing? Trigger Workflow 06 to generate fresh content\n\nApproved content queue always needs 2+ weeks of buffer.",
+        "options": {}
+      },
+      "id": "notify-empty-queue",
+      "name": "Notify - Queue Empty",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        900,
+        460
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CRED_ID",
+          "name": "Gmail OAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule - Tue & Thu 10AM": {
+      "main": [
+        [
+          {
+            "node": "Fetch Next Approved Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Next Approved Post": {
+      "main": [
+        [
+          {
+            "node": "Has Content to Post?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Content to Post?": {
+      "main": [
+        [
+          {
+            "node": "Which Platform?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify - Queue Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Which Platform?": {
+      "main": [
+        [
+          {
+            "node": "Post to Facebook Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Instagram Post to Mark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Facebook Page": {
+      "main": [
+        [
+          {
+            "node": "Mark as Posted in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Instagram Post to Mark": {
+      "main": [
+        [
+          {
+            "node": "Mark as Posted in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "real-estate",
+    "content",
+    "system-2"
+  ]
+}

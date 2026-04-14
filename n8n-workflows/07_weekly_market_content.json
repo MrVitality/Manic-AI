@@ -1,0 +1,381 @@
+{
+  "name": "07 | Weekly Market Update Content",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "schedule-monday",
+      "name": "Schedule - Monday 6AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v1/scrape",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.FIRECRAWL_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "https://www.redfin.com/city/245/NY/Albany/housing-market"
+            },
+            {
+              "name": "formats",
+              "value": [
+                "markdown"
+              ]
+            },
+            {
+              "name": "onlyMainContent",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "scrape-albany",
+      "name": "Firecrawl - Albany Market Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        180
+      ],
+      "notes": "Uses your existing Firecrawl setup.\nSet FIRECRAWL_API_KEY in n8n environment variables."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v1/scrape",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.FIRECRAWL_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "https://www.redfin.com/city/36252/NY/Saratoga-Springs/housing-market"
+            },
+            {
+              "name": "formats",
+              "value": [
+                "markdown"
+              ]
+            },
+            {
+              "name": "onlyMainContent",
+              "value": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "scrape-saratoga",
+      "name": "Firecrawl - Saratoga Market Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT area, median_price, avg_dom, months_of_supply, active_listings, list_to_sale_ratio FROM re.market_snapshots WHERE snapshot_date >= NOW() - INTERVAL '30 days' ORDER BY snapshot_date DESC, area LIMIT 10",
+        "options": {}
+      },
+      "id": "fetch-historical",
+      "name": "Fetch Historical Snapshots",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        460,
+        520
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract key data points from Firecrawl scrapes and historical DB data\nconst albanyRaw = $('Firecrawl - Albany Market Data').item.json.data?.markdown || '';\nconst saratogaRaw = $('Firecrawl - Saratoga Market Data').item.json.data?.markdown || '';\nconst historical = $('Fetch Historical Snapshots').all().map(i => i.json);\n\n// Truncate to avoid token overflow in Ollama\nconst albanySnippet = albanyRaw.substring(0, 2000);\nconst saratogaSnippet = saratogaRaw.substring(0, 1500);\n\n// Build historical context string\nlet histContext = '';\nif (historical.length > 0) {\n  histContext = 'Recent DB snapshots:\\n';\n  historical.forEach(s => {\n    histContext += `${s.area}: median $${s.median_price}, ${s.avg_dom} avg DOM, ${s.months_of_supply} mo supply\\n`;\n  });\n}\n\nconst weekOf = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });\n\nreturn [{\n  json: {\n    albanyData: albanySnippet,\n    saratogaData: saratogaSnippet,\n    historicalContext: histContext,\n    weekOf\n  }\n}];"
+      },
+      "id": "build-market-context",
+      "name": "Build Market Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:11434/api/generate",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "llama3.1:70b"
+            },
+            {
+              "name": "stream",
+              "value": false
+            },
+            {
+              "name": "prompt",
+              "value": "=You are writing a weekly Capital Region real estate market update for Mark Vitale, a licensed real estate agent with Vera Cohen Realty serving Albany, Schenectady, Troy, and Saratoga Springs NY.\n\nMark's brand voice: knowledgeable local expert, 'neighbor-next-door' tone — conversational, data-backed, never corporate or salesy. He's the agent people trust because he knows every street.\n\nMarket data scraped this week:\n\nALBANY AREA:\n{{ $json.albanyData }}\n\nSARATOGA SPRINGS:\n{{ $json.saratogaData }}\n\nHISTORICAL CONTEXT:\n{{ $json.historicalContext }}\n\nWeek of: {{ $json.weekOf }}\n\nGenerate ALL of the following content pieces. Return ONLY valid JSON with no markdown:\n{\n  \"instagram\": {\n    \"caption\": \"<120-150 word caption with hook + 1 key insight + CTA + 20 hashtags>\"\n  },\n  \"facebook\": {\n    \"post\": \"<200-250 word post, storytelling style, 1-2 key data points, end with question to drive comments>\"\n  },\n  \"email_newsletter\": {\n    \"subject\": \"<compelling subject line max 50 chars>\",\n    \"intro\": \"<150 word newsletter intro paragraph with market summary>\"\n  },\n  \"reel_script\": {\n    \"script\": \"<45-second video script (110-120 words) for Mark to deliver to camera, with [B-ROLL] notes>\"\n  },\n  \"did_you_know\": {\n    \"stat_post\": \"<60-80 word punchy stat post for any platform>\"\n  },\n  \"market_snapshot\": {\n    \"albany_median\": <integer or null>,\n    \"albany_dom\": <integer or null>,\n    \"saratoga_median\": <integer or null>,\n    \"saratoga_dom\": <integer or null>,\n    \"trend_summary\": \"<1 sentence market trend>\"\n  }\n}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ollama-market-update",
+      "name": "Ollama - Generate All Market Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $('Ollama - Generate All Market Content').item.json.response;\nconst weekOf = $('Build Market Context').item.json.weekOf;\n\nlet content;\ntry {\n  content = JSON.parse(response.replace(/```json/g,'').replace(/```/g,'').trim());\n} catch(e) {\n  // Structured fallback\n  content = {\n    instagram: { caption: response.substring(0, 500) },\n    facebook: { post: response.substring(0, 800) },\n    email_newsletter: { subject: 'Capital Region Market Update', intro: response.substring(0, 400) },\n    reel_script: { script: 'See full content in email.' },\n    did_you_know: { stat_post: 'Check this week\\'s market data below.' },\n    market_snapshot: {}\n  };\n}\n\nconst today = new Date().toISOString().split('T')[0];\n\n// Save market snapshot data to DB\nconst snapshot = content.market_snapshot || {};\n\n// Return all content pieces as separate items for batch DB insert\nreturn [\n  {\n    json: {\n      platform: 'instagram',\n      content_type: 'market_update',\n      title: `Market Update: Week of ${weekOf}`,\n      content: content.instagram?.caption || '',\n      scheduled_date: today,\n      status: 'draft',\n      generated_by: 'llama3.1:70b',\n      image_notes: 'Use branded market stats graphic. Key number as overlay text.',\n      _snapshot: snapshot\n    }\n  },\n  {\n    json: {\n      platform: 'facebook',\n      content_type: 'market_update',\n      title: `Market Update: Week of ${weekOf}`,\n      content: content.facebook?.post || '',\n      scheduled_date: today,\n      status: 'draft',\n      generated_by: 'llama3.1:70b',\n      image_notes: 'Use market stats infographic or neighborhood photo',\n      _snapshot: snapshot\n    }\n  },\n  {\n    json: {\n      platform: 'email',\n      content_type: 'market_update',\n      title: content.email_newsletter?.subject || `Market Update ${weekOf}`,\n      content: content.email_newsletter?.intro || '',\n      scheduled_date: today,\n      status: 'draft',\n      generated_by: 'llama3.1:70b',\n      image_notes: 'Add data table below intro. Use consistent branded header.',\n      _snapshot: snapshot\n    }\n  },\n  {\n    json: {\n      platform: 'tiktok',\n      content_type: 'market_update',\n      title: `Market Update Reel: ${weekOf}`,\n      content: content.reel_script?.script || '',\n      scheduled_date: today,\n      status: 'draft',\n      generated_by: 'llama3.1:70b',\n      image_notes: 'Film at desk or driving around neighborhood. Show data on screen.',\n      _snapshot: snapshot\n    }\n  },\n  {\n    json: {\n      platform: 'all',\n      content_type: 'market_update',\n      title: `Did You Know: ${weekOf}`,\n      content: content.did_you_know?.stat_post || '',\n      scheduled_date: today,\n      status: 'draft',\n      generated_by: 'llama3.1:70b',\n      image_notes: 'Bold stat graphic with brand colors. Square format.',\n      _snapshot: snapshot\n    }\n  }\n];"
+      },
+      "id": "parse-market-content",
+      "name": "Parse & Structure Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "re.content_calendar",
+        "columns": "platform,content_type,title,content,scheduled_date,status,generated_by,image_notes",
+        "additionalFields": {}
+      },
+      "id": "save-market-content",
+      "name": "Save to Content Calendar",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "re.market_snapshots",
+        "columns": "snapshot_date,area,median_price,avg_dom,raw_data",
+        "additionalFields": {}
+      },
+      "id": "save-snapshot",
+      "name": "Save Market Snapshot",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        460
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "YOUR_SUPABASE_CRED_ID",
+          "name": "Supabase Postgres"
+        }
+      },
+      "notes": "Run this ONCE (use first item only) to save the weekly snapshot.\nSet:\nsnapshot_date: {{ $now.format('YYYY-MM-DD') }}\narea: Albany County\nmedian_price: {{ $json._snapshot.albany_median }}\navg_dom: {{ $json._snapshot.albany_dom }}\nraw_data: {{ JSON.stringify($json._snapshot) }}"
+    },
+    {
+      "parameters": {
+        "fromEmail": "mvitale@veracohenrealty.com",
+        "toEmail": "mvitale@veracohenrealty.com",
+        "subject": "=📊 Weekly Market Content Ready – {{ $now.format('MMM D') }}",
+        "emailType": "text",
+        "message": "=Your weekly market update content has been generated and saved to the content calendar.\n\nContent created:\n📱 Instagram Caption (with hashtags)\n👥 Facebook Post\n📧 Email Newsletter Intro\n🎬 Reels Script (45 sec)\n💡 Did You Know Stat Post\n\nAll set to DRAFT — review and approve in your content calendar.\n\nThis content is ready for the week. Suggested posting schedule:\n• Monday: Instagram + Facebook post\n• Wednesday: Did You Know stat graphic\n• Thursday: Reels video\n• Friday: Email newsletter send",
+        "options": {}
+      },
+      "id": "notify-mark",
+      "name": "Notify Mark",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1560,
+        360
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CRED_ID",
+          "name": "Gmail OAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule - Monday 6AM": {
+      "main": [
+        [
+          {
+            "node": "Firecrawl - Albany Market Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Firecrawl - Saratoga Market Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Historical Snapshots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Firecrawl - Albany Market Data": {
+      "main": [
+        [
+          {
+            "node": "Build Market Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Firecrawl - Saratoga Market Data": {
+      "main": [
+        [
+          {
+            "node": "Build Market Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Historical Snapshots": {
+      "main": [
+        [
+          {
+            "node": "Build Market Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Market Context": {
+      "main": [
+        [
+          {
+            "node": "Ollama - Generate All Market Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama - Generate All Market Content": {
+      "main": [
+        [
+          {
+            "node": "Parse & Structure Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Structure Content": {
+      "main": [
+        [
+          {
+            "node": "Save to Content Calendar",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save Market Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Content Calendar": {
+      "main": [
+        [
+          {
+            "node": "Notify Mark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "real-estate",
+    "content",
+    "system-2"
+  ]
+}

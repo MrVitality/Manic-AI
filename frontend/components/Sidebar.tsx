@@ -24,6 +24,8 @@ import {
   UploadIcon,
   AdminIcon,
   MarkdownIcon,
+  HomeIcon,
+  CalendarIcon,
 } from '@/components/ui/Icons'
 
 interface SidebarProps {
@@ -174,6 +176,8 @@ export default function Sidebar({ isOpen, onToggle, onOpenSettings, onNavClick }
   const navItems: NavItem[] = [
     { path: '/chat', label: 'Chat', icon: <ChatBubbleIcon className="w-5 h-5" /> },
     { path: '/leads', label: 'Leads', icon: <BoltIcon className="w-5 h-5" />, hint: 'Ctrl+L' },
+    { path: '/listings', label: 'Listings', icon: <HomeIcon className="w-5 h-5" /> },
+    { path: '/content', label: 'Content', icon: <CalendarIcon className="w-5 h-5" /> },
     { path: '/documents', label: 'Docs', icon: <DocumentIcon className="w-5 h-5" />, hint: 'Ctrl+D' },
     { path: '/models', label: 'Models', icon: <CpuIcon className="w-5 h-5" />, hint: 'Ctrl+M' },
     { path: '/dashboard', label: 'Health', icon: <DashboardIcon className="w-5 h-5" />, hint: 'Ctrl+H' },
