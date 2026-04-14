@@ -363,7 +363,7 @@ async def generate_listing_content(
     # Lazy import -- the content_generator service is owned by another
     # agent and may not exist at import time during parallel development.
     try:
-        from api.services.agent_graph.content_generator import (  # type: ignore
+        from api.services.content_generator import (  # type: ignore
             ListingInput,
             generate_content,
         )
