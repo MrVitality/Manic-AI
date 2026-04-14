@@ -10,8 +10,7 @@ services:
     restart: unless-stopped
     ports:
       - "${BIND_IP}:80:80"
-      - "${BIND_IP}:443:443"
-      - "${BIND_IP}:443:443/udp"  # HTTP/3
+      # 443 ports removed — Tailscale-only deployment, no TLS termination at Caddy
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -87,11 +86,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      disable: true
     logging:
       driver: json-file
       options:
@@ -644,7 +639,7 @@ services:
       LANGFUSE_HOST: http://langfuse:3000
       INFERENCE_BACKEND: ${INFERENCE_BACKEND:-ollama}
       VLLM_URL: ${VLLM_URL:-}
-      OTEL_ENABLED: "true"
+      OTEL_ENABLED: "false"
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://ai-jaeger:4317"
     depends_on:
       supabase-db:
@@ -677,54 +672,11 @@ services:
   # ===========================================================================
   # Manic AI - MCP Server
   # ===========================================================================
-  mcp-server:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
-    container_name: manic-ai-mcp
-    restart: unless-stopped
-    command: ["python", "-m", "api.mcp_main"]
-    env_file:
-      - .env
-    environment:
-      OLLAMA_URL: http://ollama:11434
-      CHAT_MODEL: ${CHAT_MODEL:-llama3.2:3b}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-bge-m3}
-      VECTOR_DIMENSION: ${VECTOR_DIMENSION:-1024}
-      SUPABASE_DB_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB}
-      REDIS_URL: redis://:${REDIS_PASSWORD}@ai-redis:6379
-      QDRANT_URL: http://qdrant:6333
-      SEARXNG_URL: http://ai-searxng:8080
-      RAG_TOP_K: ${RAG_TOP_K:-5}
-      RAG_THRESHOLD: ${RAG_THRESHOLD:-0.7}
-      RAG_KEYWORD_WEIGHT: ${RAG_KEYWORD_WEIGHT:-0.3}
-    depends_on:
-      supabase-db:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'api.mcp_main' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: "1"
-    networks:
-      - db-network
-      - app-network
-      - tools-network
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+  # NOTE: MCP servers communicate over stdio and are meant to be spawned
+  # on-demand by clients (Claude Desktop, agents). Running as a long-lived
+  # container causes immediate EOF → restart loop. Invoke manually with:
+  #   docker compose run --rm -it api python -m api.mcp_main
+  # ===========================================================================
 
   # ===========================================================================
   # Manic AI - Frontend
@@ -757,7 +709,11 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      # Alpine image has no curl; use busybox wget. Must use 127.0.0.1 (not
+      # localhost) because musl resolves localhost→::1 first but Next.js binds
+      # 0.0.0.0 (IPv4 only), which would produce false "Connection refused".
+      # --spider returns non-zero for 3xx responses, so fetch to /dev/null.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
