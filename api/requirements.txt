@@ -19,7 +19,7 @@ pyotp==2.9.0
 qrcode[pil]==7.4.2
 prometheus-client==0.24.1
 python-json-logger==2.0.7
-limits==3.7.0
+limits==5.8.0
 alembic==1.18.4
 opentelemetry-api==1.40.0
 opentelemetry-sdk==1.40.0
